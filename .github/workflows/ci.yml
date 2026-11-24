@@ -1,10 +1,10 @@
 name: CI
 # Public genealogia CI: GitHub-hosted runners only (free on public repos). Never a self-hosted runner here.
-# Runs on pull requests (affected e2e only) and on sync/** branches pushed by the private mirror (full e2e).
+# Runs on pull requests (affected e2e only), on pushes to main and sync/** (full e2e).
 on:
   pull_request:
   push:
-    branches: ['sync/**']
+    branches: ['main', 'sync/**']
   schedule:
     - cron: '47 20 * * *'   # nightly: full e2e suite
   workflow_dispatch:

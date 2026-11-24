@@ -268,14 +268,6 @@
       ],
       "e2e": []
     },
-    "qa-session": {
-      "paths": [
-        "server/scripts/qa-session.js",
-        "server/test/qa-session*.test.js",
-        "scripts/live-check.mjs"
-      ],
-      "e2e": []
-    },
     "docs": {
       "paths": [
         "**/*.md",
