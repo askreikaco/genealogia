@@ -1,0 +1,8 @@
+node_modules
+# relation backfill backups (server/scripts/rel-backfill.js writes here; personal data, never in git)
+server/rel-backups/
+# facts -> events backfill backups (server/scripts/facts-to-events.js; personal data, never in git)
+server/facts-backups/
+# real family data is never in git: the fictional demo seed is server/seed/demo-persons.json (guard: server/test/no-real-seed.test.js)
+server/seed/persons*.json
+custom/**/persons*.json

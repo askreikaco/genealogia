@@ -1,0 +1,71 @@
+/* List toolbar (ListToolbar: search, Filters button, active tags) and the filter sheet. Shared by app.css pages and book.html. */
+.lbar{display:flex;gap:var(--sp-3);align-items:stretch;min-width:0}.lbar .srch{flex:1;min-width:0;margin:0}
+.srch input,.fp-body select,.tbar2 select,.lq select{box-sizing:border-box;width:100%;height:48px;border-radius:0;-webkit-appearance:none;appearance:none;background-color:var(--c-layer);border:0;border-bottom:1px solid var(--c-border-strong);padding:0 var(--sp-5);font-size:var(--fs-2);color:var(--c-text)}
+.fp-body select,.tbar2 select,.lq select{padding-right:40px;background-image:linear-gradient(45deg,transparent 50%,var(--c-text) 50%),linear-gradient(135deg,var(--c-text) 50%,transparent 50%);background-position:calc(100% - 20px) 21px,calc(100% - 15px) 21px;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.fp-body select{background-color:var(--c-bg)}
+.srch input:focus,.fp-body select:focus,.fld select:focus{outline:2px solid var(--c-accent);outline-offset:-2px}
+.fbtn{position:relative;width:48px;height:48px;flex:none;display:grid;place-items:center;background:var(--c-layer);border:0;border-bottom:1px solid var(--c-border-strong);color:var(--c-text);cursor:pointer}
+.fbtn:hover{background:var(--c-layer-2)}.fbtn:focus-visible{outline:2px solid var(--c-accent);outline-offset:-2px}
+.fbadge{position:absolute;top:6px;right:6px;min-width:16px;height:16px;padding:0 var(--sp-2);border-radius:8px;background:var(--c-accent);color:var(--c-on-color);font-size:11px;line-height:var(--lh-1);text-align:center}
+.ltags{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center}
+.tagx{height:24px;padding:0 var(--sp-3);border:0;border-radius:12px;background:var(--blue-b);color:var(--blue-f);font:inherit;font-size:var(--fs-1);cursor:pointer}
+
+.lcount{margin:0;font-size:var(--fs-1);color:var(--c-text-2);display:block}
+dialog.fpanel{position:fixed;inset:auto 0 0 0;margin:0;padding:0;border:0;width:100%;max-width:100%;max-height:85vh;overflow:hidden;background:var(--c-layer);color:var(--c-text)}
+/* flex only when open: a closed dialog stays display:none */
+dialog.fpanel[open]{display:flex;flex-direction:column}
+dialog.fpanel::backdrop{background:var(--c-scrim)}
+@media (min-width:672px){dialog.fpanel{inset:0;margin:18vh auto auto;width:472px;max-width:calc(100vw - 32px);height:auto;max-height:70vh}}
+/* the footer is pinned: only the body scrolls */
+.fp-foot{flex:none;display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:var(--sp-3);padding:var(--sp-3) var(--sp-5) max(var(--sp-4),env(safe-area-inset-bottom));border-top:1px solid var(--c-border);background:var(--c-layer)}
+.fp-foot .btn{min-height:48px}
+.fp-foot .fp-reset{margin-right:auto}
+.fp-hd{display:flex;justify-content:space-between;align-items:flex-start;padding-left:var(--sp-5)}.fp-hd h2{margin:0;padding-top:var(--sp-5);font-size:var(--fs-4);font-weight:400;line-height:var(--lh-4)}
+.fp-body{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:var(--sp-5);padding:var(--sp-3) var(--sp-5) var(--sp-6)}.fp-body label:not(.radio){display:flex;flex-direction:column;gap:var(--sp-2);font-size:var(--fs-1);color:var(--c-text-2)}
+.fset{border:0;padding:0;margin:0}.fset legend{font-size:var(--fs-1);color:var(--c-text-2);margin-bottom:var(--sp-2)}
+.tbar2 .lbar{flex:1}
+.tbar2{padding:0!important;margin:0!important;align-items:stretch}
+/* desktop inline quick filters: same controls as the sheet,phone keeps everything in the sheet */
+.lq{display:flex;gap:var(--sp-3);align-items:stretch}.lq select{width:auto;min-width:180px;max-width:260px}
+
+/* Filters sheet: toggle row (also used by the person form in app.css) */
+.fp-switch{display:flex;align-items:center;gap:var(--sp-4);min-height:40px;font-size:var(--fs-2);color:var(--c-text);cursor:pointer}
+.fp-switch input{width:40px;height:20px;appearance:none;-webkit-appearance:none;background:var(--c-border-strong);border-radius:10px;position:relative;cursor:pointer;margin:0;transition:background var(--dur-fast)}
+.fp-switch input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:var(--r-round);background:#fff;transition:transform var(--dur-fast)}
+.fp-switch input:checked{background:var(--c-accent)}
+.fp-switch input:checked::after{transform:translateX(20px)}
+.fp-body input[type=text]{box-sizing:border-box;width:100%;height:48px;border-radius:0;-webkit-appearance:none;appearance:none;background-color:var(--c-bg);border:0;border-bottom:1px solid var(--c-border-strong);padding:0 var(--sp-5);font-size:var(--fs-2);color:var(--c-text)}
+.fp-body input[type=text]:focus{outline:2px solid var(--c-accent);outline-offset:-2px}
+.fp-body .radio{display:flex;align-items:center;gap:var(--sp-3);min-height:44px;font-size:var(--fs-2);color:var(--c-text);cursor:pointer}
+/* Buttons used by the sheets (btn, ghost, ter, icon button, sheet close): shared by app and book */
+.btn{min-height:40px;padding:0 var(--sp-5);display:inline-flex;align-items:center;justify-content:center;background:var(--c-accent);color:var(--c-on-color);border:0;cursor:pointer;white-space:nowrap}
+.btn.sm{min-height:32px;padding:0 var(--sp-4)}.btn.ter{background:transparent;color:var(--c-accent);box-shadow:inset 0 0 0 1px var(--c-accent)}.btn.gh{background:transparent;color:var(--c-accent)}.btn.dng{background:#da1e28}
+.ib{min-width:32px;height:32px;background:none;border:0;color:var(--c-text-2);cursor:pointer;font-size:var(--fs-2);padding:0 6px}.ib:hover{background:var(--c-layer-2)}
+.csw-x{width:48px;height:48px;flex:none;display:grid;place-items:center;border:0;background:none;color:var(--c-text);cursor:pointer}
+.csw-x:hover{background:var(--c-layer-2)}.csw-x:focus-visible{outline:2px solid var(--c-accent);outline-offset:-2px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* Family emblem (crest): fills its tile or the book seal; the Hán name is the fallback (js/emblem.js) */
+.crest{display:block;width:100%;height:100%;object-fit:contain}
+/* The owner crest (js/ui.js crestTile, familyCrest): one square, sm 20 / md 40 / lg 64 px. Colour comes from the surname. */
+.crest-sq{flex:none;display:grid;place-items:center;container-type:inline-size;width:var(--sz-crest-md);height:var(--sz-crest-md);color:var(--c-on-color)}
+.crest-sq.crest-sm{width:var(--sz-crest-sm);height:var(--sz-crest-sm)}
+.crest-sq.crest-lg{width:var(--sz-crest-lg);height:var(--sz-crest-lg)}
+.crest-ch{font-family:'Noto Serif TC','Songti TC','PMingLiU',serif;font-size:60cqi;line-height:1}
+/* Grey icon square (menu rows, switcher): not a crest */
+.ibox{display:grid;place-items:center;flex:none;width:var(--sz-crest-md);height:var(--sz-crest-md);border-radius:var(--r-icon);background:var(--c-layer-2);color:var(--c-text)}
+.ibox .ic{width:var(--sz-crest-sm);height:var(--sz-crest-sm)}
+
+/* toggle row (Kèm vợ/chồng, Ẩn người còn sống): label left, switch right, one row; beats the generic sheet label rule */
+.fp-body label.fp-switch{display:flex;flex-direction:row-reverse;align-items:center;justify-content:space-between;gap:var(--sp-4);min-height:48px;padding:0;text-align:left;font-size:var(--fs-2);color:var(--c-text)}
+
+/* sticky toolbar (owner 2026-11-24): every search / filter / + group (.lbar, or a wrapper marked .stk) sticks under the
+   top bar while its container is on screen. Opaque background from the container (--stk-bg), one z layer, a divider
+   only while stuck ([data-stuck], set by ui.js), no layout shift. Inside a card it releases when the card scrolls away
+   (sticky is bounded by its parent). On the profile the tab bar sticks too and toolbars stick just below it. */
+.lbar,.stk{position:sticky;top:var(--sticky-top);z-index:var(--z-sticky);background:var(--stk-bg,var(--c-bg))}
+.stk .lbar,.tbar2 .lbar,.tbar .lbar{position:static;background:none}
+.cd,.relsec,.grpsec,.mg-g{--stk-bg:var(--c-layer)}
+.lbar[data-stuck],.stk[data-stuck],.tbar2[data-stuck],.ptabs[data-stuck]{box-shadow:0 1px 0 var(--c-border)}
+.ptabs{position:sticky;top:var(--topbar-h);z-index:var(--z-sticky);background:var(--c-bg)}
+.ptabs~*{--sticky-top:calc(var(--topbar-h) + var(--tabs-h))}

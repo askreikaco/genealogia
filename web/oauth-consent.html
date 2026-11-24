@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cho phép ứng dụng AI</title>
+<link rel="stylesheet" href="/tokens.css">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+  html,body{height:100%}
+  body{margin:0;background:var(--c-bg);color:var(--c-text);font-family:var(--sans)}
+  .cs{min-height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto}
+  .cs-head{height:48px;background:#161616;color:#ffffff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600}
+  .cs-body{flex:1;padding:24px 16px;display:flex;flex-direction:column;gap:24px}
+  h1{margin:0;font-size:24px;font-weight:400;line-height:1.3}
+  fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+  legend{font-size:12px;color:var(--c-text-2);margin-bottom:8px;padding:0}
+  .row{display:flex;align-items:center;gap:12px;min-height:48px;background:var(--c-layer);padding:0 16px;cursor:pointer}
+  .row input{width:20px;height:20px;margin:0;flex:none}
+  .row:has(input:disabled){opacity:.5;cursor:default}
+  .cs-bar{display:flex;gap:1px;background:var(--c-border)}
+  .cs-bar button{flex:1;height:64px;border:0;font:inherit;font-size:16px;text-align:left;padding:0 16px;cursor:pointer}
+  .cs-no{background:#393939;color:#ffffff}
+  .cs-ok{background:#0f62fe;color:#ffffff}
+  .cs-ok:disabled{opacity:.5;cursor:default}
+  .cs-err{color:var(--c-danger);margin:0;min-height:1.2em;padding:0 16px;font-size:14px}
+  .cs-msg{padding:24px 16px;color:var(--c-text-2)}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<div class="cs">
+  <div class="cs-head">Gia phả</div>
+  <div id="sign" class="cs-body hide">
+    <h1>Đăng nhập để tiếp tục</h1>
+    <a class="btn primary" href="/api/auth/google?next=oauth/consent" style="min-height:48px;display:flex;align-items:center;justify-content:center">Đăng nhập bằng Google</a>
+  </div>
+  <form id="ask" class="cs-body hide">
+    <h1><span id="cname"></span> muốn truy cập</h1>
+    <fieldset id="fams"><legend>Dòng họ</legend></fieldset>
+    <fieldset id="levels"><legend>Được phép</legend></fieldset>
+    <p id="err" class="cs-err" role="alert"></p>
+  </form>
+  <p id="msg" class="cs-msg hide" role="alert"></p>
+  <div id="bar" class="cs-bar hide">
+    <button type="button" class="cs-no" id="no">Từ chối</button>
+    <button type="submit" form="ask" class="cs-ok" id="ok">Cho phép</button>
+  </div>
+</div>
+<script type="module" src="/js/oauth-consent.js"></script>
+</body>
+</html>

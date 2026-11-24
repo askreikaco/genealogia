@@ -1,0 +1,5 @@
+{ "units": [
+  { "code": "T99", "name": "Tỉnh Sông Thử Nhập", "kind": "province", "valid_from": "1976", "other_names": [{ "name": "Tỉnh Cũ Thử Nhập", "lang": "vi", "valid_from": "1900", "valid_to": "1975" }] },
+  { "code": "T99-1", "name": "Huyện Đồi Thử Nhập", "kind": "district", "parent_code": "T99", "valid_from": "1976" },
+  { "code": "T99-2", "name": "Huyện Bãi Thử Nhập", "kind": "district", "parent_code": "T99", "wikidata_id": "Q9990301" }
+] }

@@ -1,0 +1,4 @@
+{ "totalResultsCount": 1, "geonames": [
+  { "geonameId": 9990101, "name": "Ben Lua", "lat": "10.751", "lng": "106.502", "countryCode": "VN", "fcode": "ADM3",
+    "adminName1": "Tinh Song Lon", "adminName2": "", "alternateNames": [{ "name": "Bến Lúa", "lang": "vi" }, { "name": "Ben Lua Commune", "lang": "en" }] }
+] }

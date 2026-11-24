@@ -1,0 +1,45 @@
+{
+ "web/app.css": {
+  "media": 28,
+  "size": 187,
+  "other": 32,
+  "space": 80,
+  "type": 48,
+  "radius": 11,
+  "colour": 28,
+  "shadow": 8,
+  "motion": 1,
+  "z": 1
+ },
+ "web/book.css": {
+  "space": 73,
+  "z": 2,
+  "size": 18,
+  "type": 70,
+  "other": 10,
+  "colour": 6,
+  "shadow": 2,
+  "radius": 1
+ },
+ "web/fields.css": {
+  "size": 1,
+  "space": 2,
+  "type": 1,
+  "other": 6
+ },
+ "web/js/app.js": {
+  "js-colour": 26
+ },
+ "web/js/book.js": {
+  "js-style": 1
+ },
+ "web/listui.css": {
+  "media": 1,
+  "size": 25,
+  "space": 4,
+  "other": 9,
+  "radius": 3,
+  "type": 1,
+  "colour": 2
+ }
+}

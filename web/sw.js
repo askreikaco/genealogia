@@ -1,0 +1,90 @@
+// Offline shell: the app files the install step caches. Same-origin files go network first (a deploy shows on the
+// next open) and fall back to this cache when offline. API responses are never cached here (IndexedDB holds the data).
+// SHELL must list every file the app loads: a missing path makes install fail (addAll), so tests/sw.test.js checks it.
+const V = 'gp-dev'; // = BUILD in js/update.js (server/test/update.test.js)
+const SHELL = [
+  '/',
+  '/index.html',
+  '/book.html',
+  '/tokens.css',
+  '/app.css',
+  '/listui.css',
+  '/book.css',
+  '/fields.css',
+  '/manifest.webmanifest',
+  '/icon.svg',
+  '/js/app.js',
+  '/js/book.js',
+  '/js/booktext.js',
+  '/js/bookchart.js',
+  '/js/bookplan.js',
+  '/js/elder.js',
+  '/vendor/simplewebauthn-browser.umd.min.js',
+  '/js/events.js',
+  '/js/events-ui.js',
+  '/js/events-life.js',
+  '/js/estimate-graph.js',
+  '/js/events-history.js',
+  '/js/formrules.js',
+  '/js/fuzzy.js',
+  '/js/oauth-consent.js',
+  '/oauth-consent.html',
+  '/js/emblem.js',
+  '/js/geo.js',
+  '/js/kin/engine.js',
+  '/js/kin/index.js',
+  '/js/kin/packs/direct.js',
+  '/js/kin/packs/en.js',
+  '/js/kin/packs/ja.js',
+  '/js/kin/packs/ko.js',
+  '/js/kin/packs/vi.js',
+  '/js/kin/packs/zh-Hans.js',
+  '/js/kin/packs/zh-Hant.js',
+  '/js/lunar.js',
+  '/js/model.js',
+  '/js/relgraph.js',
+  '/js/relui.js',
+  '/js/store.js',
+  '/js/succession.js',
+  '/js/treechart.js',
+  '/js/ui.js',
+  '/js/links.js',
+  '/js/places.js',
+  '/js/shortid.js',
+  '/js/account.js',
+  '/js/match.js',
+  '/js/variants.js',
+  '/js/clan.js',
+  '/js/clan-core.js',
+  '/js/branches.js',
+  '/js/codes.js',
+  '/js/famlabel.js',
+  '/js/prefill.js',
+  '/js/surnames-vi.js',
+  '/js/update.js',
+];
+// A new version waits while an older one controls open pages: the app shows "Có bản mới · Tải lại" and posts
+// 'skip-waiting' when the owner taps it (or the app is idle). A first install has no older worker and activates at once.
+self.addEventListener('install', (e) => e.waitUntil(caches.open(V).then((c) => c.addAll(SHELL)).then(() => { if (!self.registration || !self.registration.active) return self.skipWaiting(); })));
+self.addEventListener('message', (e) => { if (e.data && e.data.type === 'skip-waiting') self.skipWaiting(); });
+self.addEventListener('activate', (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== V).map((k) => caches.delete(k)))).then(() => self.clients.claim())));
+self.addEventListener('fetch', (e) => {
+  const u = new URL(e.request.url);
+  if (e.request.method !== 'GET' || u.pathname.startsWith('/api/')) return;
+  if (u.origin === location.origin && e.request.mode === 'navigate') {
+    const key = u.pathname.startsWith('/book') ? '/book' : '/index.html';
+    e.respondWith(fetch(e.request).then((r) => { caches.open(V).then((c) => c.put(key, r.clone())); return r; }).catch(() => caches.match(key)));
+    return;
+  }
+  // same-origin app files: network first (a deploy shows on the next open), cache when offline
+  if (u.origin === location.origin) {
+    e.respondWith(fetch(e.request).then((r) => { if (r.ok) caches.open(V).then((c) => c.put(e.request, r.clone())); return r; }).catch(() => caches.match(e.request)));
+    return;
+  }
+  // fonts/CDN: stale-while-revalidate
+  e.respondWith(caches.open(V).then(async (c) => {
+    const hit = await c.match(e.request);
+    const net = fetch(e.request).then((r) => { if (r.ok || r.type === 'opaque') c.put(e.request, r.clone()); return r; }).catch(() => hit);
+    return hit || net;
+  }));
+});

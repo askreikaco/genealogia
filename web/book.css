@@ -1,0 +1,171 @@
+:root{--paper:#fff;--ink:#1b1b1b;--ink2:#555;--red:#a2191f;--rule:#c9c2b8;--blue:#0043ce;--warnb:#fcf4d6;--warnf:#684e00;--m:#1192e8;--f:#ee538b;
+--serif:'Noto Serif',Georgia,'Times New Roman',serif;--sans:'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;--mono:'IBM Plex Mono',Menlo,monospace;
+--stage:#e0e0e0;--ui:#fff;--uit:#161616;--uib:#e0e0e0;--ia:#0f62fe;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--stage:#0b0b0b;--ui:#262626;--uit:#f4f4f4;--uib:#393939;--ia:#4589ff;color-scheme:dark}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--stage);font-family:var(--sans);color:var(--uit)}
+html.inapp body{background:var(--c-bg);color:var(--c-text)}
+html.inapp .pages{background:var(--c-bg)}
+/* in the app the book is an iframe below the app top bar: the toolbar sticks at the iframe's own top (no gap) */
+.pages{display:flex;flex-direction:column;align-items:center;gap:24px;padding:24px 16px 64px}
+.loading{padding:48px;text-align:center;color:var(--uit)}
+/* toolbar: list toolbar (listui.css) + book results; Carbon tokens (tokens.css), sticky over the pages */
+/* the list toolbar column: same max width, gutter and gap as the list pages (main); the controls are the shared listui.css ones */
+.tbar{position:sticky;top:0;z-index:10;background:var(--c-bg);color:var(--c-text);padding:var(--sp-5) var(--sp-5) var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-5);max-width:1024px;margin:0 auto}
+.bhits{display:flex;flex-direction:column;background:var(--c-layer);max-height:50vh;overflow:auto}
+.bhits[hidden]{display:none}
+.bhit{display:block;width:100%;min-height:44px;padding:var(--sp-3) var(--sp-5);border:0;background:transparent;color:var(--c-text);font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.bhit:hover,.bhit:focus-visible{background:var(--c-layer-2)}
+.bhit .sub{margin-left:var(--sp-2)}
+/* count line and search results: sentence case, grey, normal tracking (the .sub above is the print subtitle) */
+.bhits .sub{margin:0;font-family:var(--sans);font-size:12px;letter-spacing:normal;text-transform:none;color:var(--c-text-2)}
+.bact{display:block;width:100%;min-height:48px;margin-top:var(--sp-3);padding:0 var(--sp-5);border:0;background:var(--c-layer-2);color:var(--c-text);font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.bact:focus-visible{outline:2px solid var(--c-accent);outline-offset:-2px}
+#embedcode{display:block;margin-top:var(--sp-3);padding:var(--sp-3);background:var(--c-layer-2);font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
+#embedcode[hidden]{display:none}
+.ln.hit{outline:2px solid var(--c-accent);outline-offset:2px}
+.entry.hit{outline:2px solid var(--c-accent);outline-offset:4px}
+
+/* A4 reference page: every box is laid out in px at 842x595 whatever the viewport. book.js sets --s (container width / 842,
+   at most 1). .pgw is the on-screen box of the scaled page; .pg is scaled inside it with transform (not zoom: WebKit lays
+   zoomed boxes out differently, which cut the cover and grew the tiles on iPhone). Print uses neither (see @media print). */
+.pgw{flex:none;position:relative;overflow:hidden;width:calc(var(--pw,842px) * var(--s,1));height:calc(var(--ph,595px) * var(--s,1));box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.pg{width:var(--pw,842px);height:var(--ph,595px);flex:none;transform:scale(var(--s,1));transform-origin:0 0;font-size:calc(10.525px * var(--bk-fs,1));background:var(--paper);color:var(--ink);font-family:var(--serif);line-height:1.5;padding:48px 46px 40px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:12px}
+.foot{position:static;margin-top:auto;flex:none;display:flex;justify-content:space-between;font-family:var(--sans);font-size:0.81em;color:var(--ink2);border-top:.5px solid var(--rule);padding-top:0.476em}
+/* cover + opener */
+.cv{padding:0}.cover,.opener{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:0.6em;padding:3em 5.714em}
+.cover{border:0.952em double var(--red);margin:1.5em}
+.seal{width:6.095em;height:6.095em;border:0.19em solid var(--red);color:var(--red);font-size:3.429em;display:flex;align-items:center;justify-content:center;font-family:serif;container-type:inline-size}
+.kick{font-family:var(--sans);font-size:1.048em;letter-spacing:.3em;text-transform:uppercase;color:var(--ink2)}
+.cover h1{font-size:5.143em;font-weight:700;letter-spacing:.06em;color:var(--red);line-height:1}
+.opener h2{font-size:3.048em;font-weight:700;color:var(--red);letter-spacing:.04em;line-height:1.1}
+.rule{width:7.619em;height:0.19em;background:var(--red)}
+.cs{font-size:1.19em;max-width:36ch;color:var(--ink)}
+.stats{display:flex;gap:2.667em;margin-top:0.952em}.stats div{display:flex;flex-direction:column}.stats b{font-size:2.286em;font-weight:400;font-variant-numeric:tabular-nums}.stats span{font-family:var(--sans);font-size:0.857em;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
+.ed{font-family:var(--sans);font-size:0.857em;color:var(--ink2);margin-top:2.857em}
+/* text pages */
+.ch{font-size:1.905em;font-weight:700;color:var(--red);border-bottom:1px solid var(--red);padding-bottom:0.571em}
+.pg .sub{font-family:var(--sans);font-size:0.952em;letter-spacing:.2em;text-transform:uppercase;color:var(--ink2);margin-top:0.571em}
+.lead{font-size:1.143em}
+.pg p{text-align:justify;hyphens:auto}
+.note{font-style:italic;color:var(--ink2)}
+.flagi{background:var(--warnb);color:var(--warnf);padding:0 0.286em;font-family:var(--sans);font-size:0.857em}
+.toc{display:flex;flex-direction:column;gap:0.476em;font-size:1.095em}
+.toc div,.ie{display:flex;align-items:baseline;gap:0.571em}.toc i,.ie i{flex:1;border-bottom:1px dotted var(--rule)}.toc b,.ie b{font-weight:400;font-variant-numeric:tabular-nums}
+.genh{font-family:var(--sans);font-weight:600;font-size:1.048em;letter-spacing:.14em;color:var(--red);border-top:0.19em solid var(--red);border-bottom:.5px solid var(--red);padding:0.381em 0}
+.genh span{font-weight:400;letter-spacing:0;color:var(--ink2);font-family:var(--serif);font-style:italic;font-size:1em}
+/* flows: explicit equal columns (the plan decides what goes in each; no multicol breaking) */
+.cols{flex:1;min-height:0;display:grid;column-gap:2.095em;overflow:hidden}
+.col{position:relative;min-width:0;display:flex;flex-direction:column}
+.col+.col::before{content:"";position:absolute;left:-1.048em;top:0;bottom:0;border-left:.5px solid var(--rule)}
+.entry{break-inside:avoid;padding-bottom:0.857em;margin-bottom:0.857em;border-bottom:.5px solid var(--rule);display:flex;flex-direction:column;gap:0.19em;overflow-wrap:anywhere}
+.eh{display:flex;align-items:baseline;gap:0.381em;flex-wrap:wrap}
+.rank{font-weight:700}.nm{font-weight:700;color:var(--red);letter-spacing:.02em}
+
+.par{font-style:italic;color:var(--blue);font-size:0.952em}
+.none{color:var(--ink2);font-style:italic}
+.gio{font-size:0.905em;color:var(--ink)}.gio.c{font-size:1.048em;margin-top:0.762em}
+.flag{font-family:var(--sans);font-size:0.81em;background:var(--warnb);color:var(--warnf);padding:0.19em 0.476em;align-self:flex-start}
+/* tree */
+.tree{width:100%;height:auto;font-family:var(--sans)}
+.tree path{fill:none;stroke:var(--ink2);stroke-width:.8}
+.tn rect{fill:var(--paper);stroke:var(--ink2);stroke-width:.8}
+.tn.m rect{stroke-left:var(--m)}.tn.hl rect{stroke:var(--red);stroke-width:1.6}
+/* tables */
+.tb{width:100%;border-collapse:collapse;font-size:0.952em}
+.tb th{text-align:left;font-family:var(--sans);font-size:0.81em;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);border-bottom:1px solid var(--ink);padding:0.381em 0.571em}
+.tb td{border-bottom:.5px solid var(--rule);padding:0.381em 0.571em}
+.num{font-variant-numeric:tabular-nums;color:var(--red);font-weight:600}.mut{color:var(--ink2);font-style:italic}
+.il{font-family:var(--sans);font-weight:600;color:var(--red);font-size:1.048em;margin:0.381em 0 0.19em;break-after:avoid}
+.ie b{font-family:var(--mono);font-size:0.714em;color:var(--ink2)}
+/* structured entry (Register / Gramps style) */
+.eh{display:flex;gap:0.762em;align-items:flex-start;flex-wrap:nowrap}
+.reg{font-family:var(--sans);font-weight:600;font-size:1.238em;color:var(--paper);background:var(--red);min-width:2.476em;height:2.095em;padding:0 0.381em;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;flex:none}
+.par{font-style:normal;color:var(--ink2);font-family:var(--sans);font-size:0.81em}
+.dab{font-family:var(--mono);font-size:0.714em;color:var(--ink2)}
+.facts{display:grid;grid-template-columns:4.952em 1fr;gap:1px 0.571em;margin-top:0.381em;font-size:0.905em}
+.facts dt{font-family:var(--sans);font-size:0.762em;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);padding-top:1px}
+.facts dd{margin:0}
+.miss{color:var(--ink2);font-style:italic}
+.fam{margin-top:0.286em;font-size:0.905em}
+.lbl{font-family:var(--sans);font-size:0.762em;letter-spacing:.06em;text-transform:uppercase;color:var(--red);margin-right:0.381em}
+.kids{list-style:none;margin:0.19em 0 0 0;padding-left:0.762em;border-left:0.143em solid var(--rule)}
+.kids li{line-height:1.45}
+.src{font-family:var(--sans);font-size:0.714em;color:var(--ink2);margin-top:0.286em}
+.ph{width:5.143em;height:6.476em;flex:none;margin-left:auto}.ph rect{fill:#ece8e2}.ph circle,.ph path{fill:#bdb5aa}
+.entry.full{border:1px solid var(--rule);padding:0.952em 1.143em;max-width:32.381em}
+.ct{font-family:var(--sans);font-size:0.857em}
+.rules{font-size:0.952em}.rules b{font-weight:700}.rules ul{margin:0.381em 0 0 1.524em;display:flex;flex-direction:column;gap:0.286em}
+/* simplified entry v3 */
+.entry{gap:0.286em;padding-bottom:0.762em;margin-bottom:0.762em}
+.eh{gap:0.667em;align-items:flex-start}
+.reg{font-size:0.952em;min-width:2.095em;height:1.714em;margin-top:1px}
+.nm{color:var(--red);font-weight:700;letter-spacing:0}
+.par{font-family:var(--serif);font-style:italic;font-size:0.905em;color:var(--ink2)}
+.ln{font-size:0.933em;line-height:1.5}
+.ln i,.f i{font-style:normal;color:var(--ink2);font-family:var(--sans);font-size:0.81em;margin-right:0.19em}
+.f{margin-right:0.952em;white-space:nowrap}
+.mut{color:var(--ink2);font-style:italic}
+.kids{list-style:none;margin:1px 0 0;padding:0;border:0;font-size:0.933em;columns:1}
+.kids li{padding-left:0.952em;text-indent:-10px}
+.kids li::before{content:"– ";color:var(--ink2)}
+/* ID boxes that point to another person (child, parent, a name in a story): grey filled, the entry's own number stays red */
+.xr{font-family:var(--sans);font-size:0.714em;color:var(--paper);background:var(--ink2);padding:0 0.286em;border-radius:0.19em;text-decoration:none}
+/* story paragraphs: plain text, the body size of the facts lines, no label, no box */
+.stp{font-size:0.933em;line-height:1.5;margin:0.2em 0 0}
+/* an entry that continues in the next column or page: no rule and no space between its parts */
+.entry.more{border-bottom:0;padding-bottom:0;margin-bottom:0}
+
+.flag{font-size:0.762em;padding:1px 0.476em}
+.entry.full{max-width:34.286em}
+.ct{font-family:var(--sans);font-size:0.857em;color:var(--ink2)}
+.cols .genh{break-inside:avoid;break-after:avoid;margin-bottom:0.571em}
+.f{white-space:normal;display:inline}
+.on{flex:1;min-width:0}.on b{font-weight:700}.on.m b{color:var(--ink)}.on.f b{color:var(--ink)}
+
+.toc a{color:inherit;text-decoration:none;display:flex;gap:0.571em;align-items:baseline;flex:1}
+@page{size:A4 landscape;margin:0}
+@media print{body{background:#fff}.tbar,.prog{display:none!important}.pages{padding:0;gap:0}.pgw{width:auto;height:auto;overflow:visible;box-shadow:none;break-after:page}.pg{transform:none;box-shadow:none;break-after:page;zoom:1.33}}
+
+/* landscape book: 3 text columns,tree charts */
+.chartpg{gap:0.762em}
+.chartbox{flex:1;min-height:0;display:flex;align-items:flex-start;justify-content:center}
+.chart{max-width:100%;height:auto;font-family:var(--sans)}
+.chart path{fill:none;stroke:var(--ink2);stroke-width:1}
+.chart .bx rect{fill:var(--paper);stroke:var(--ink2);stroke-width:.8}
+.chart .bx.m rect{stroke-left:var(--m)}
+.chart .bx.root rect{stroke:var(--red);stroke-width:2}
+.chart .r{font-size:0.81em;fill:var(--ink2)}
+.chart .n{font-size:1em;font-weight:700;fill:var(--ink);font-family:var(--serif)}
+.chart .bx.f .n{fill:#7a1238}
+.chart .bx.root .n{fill:var(--red)}
+.chart .y{font-size:0.762em;fill:var(--ink2)}
+
+.chartbox{flex-direction:column;align-items:center;gap:0.571em;overflow:hidden}
+.cfig{display:flex;flex-direction:column;align-items:center;gap:0.19em}
+.cfig figcaption{font-family:var(--sans);font-size:0.857em;font-weight:600;color:var(--red);align-self:flex-start}
+.shelf{display:flex;flex-wrap:wrap;gap:0.762em 1.143em;align-items:flex-start;justify-content:center;width:100%}
+.rowbr{flex-basis:100%;height:0;border:0;margin:0}
+
+
+
+
+
+/* toolbar select: the shared field style (fields.css) */
+.cols.idx3{font-size:0.905em;column-gap:1.524em}
+.cols.idx3 .col+.col::before{left:-0.762em}
+.prog{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:20;background:var(--ui);color:var(--uit);box-shadow:0 2px 8px rgba(0,0,0,.3);padding:10px 16px;display:flex;flex-direction:column;gap:6px;min-width:260px;font-size:14px}
+.prog[hidden]{display:none}
+.prog progress{width:100%;height:8px}
+
+/* Settings presets (Cài đặt): colours from the shared tokens only; font and size steps */
+html[data-bk-theme=calm]{--paper:var(--c-layer);--ink:var(--c-text);--ink2:var(--c-text-2);--rule:var(--c-border)}
+html[data-bk-theme=modern]{--paper:var(--c-bg);--ink:var(--c-text);--ink2:var(--c-text-2);--rule:var(--c-border-strong)}
+html[data-bk-font=sans]{--serif:var(--sans)}
+html[data-bk-size=s]{--bk-fs:.95}html[data-bk-size=l]{--bk-fs:1.05}
+/* Khổ dọc: portrait A4 page box (the planner lays out 595 x 842 for it) */
+html[data-bk-orient=port]{--pw:595px;--ph:842px}
+.seal .crest-sq{width:86%;height:86%}
+
+/* person code after the name (web/js/codes.js) */
+.pcode{font-weight:400;font-size:.85em;color:var(--ink2);white-space:nowrap}

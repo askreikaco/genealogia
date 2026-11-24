@@ -1,0 +1,29 @@
+{
+  "name": "giapha-server",
+  "version": "1.80.0",
+  "private": true,
+  "description": "genealogia: family tree API (public read, login to edit, offline sync) + static web app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js",
+    "test": "node --test --test-concurrency=1 --test-timeout=120000 --test-force-exit test/*.test.js",
+    "test:e2e": "node --test --test-concurrency=1 --test-timeout=120000 --test-force-exit ../test/e2e/*.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@simplewebauthn/server": "13.3.0",
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "qrcode": "1.5.4",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "pdf-lib": "^1.17.1"
+  }
+}

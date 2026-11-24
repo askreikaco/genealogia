@@ -1,0 +1,10 @@
+{ "results": { "bindings": [
+  { "item": { "value": "http://www.wikidata.org/entity/Q9990001" }, "itemLabel": { "value": "Bến Lúa" }, "typeLabel": { "value": "commune of Vietnam" },
+    "coord": { "value": "Point(106.5 10.75)" }, "parentLabel": { "value": "Tỉnh Sông Lớn" }, "country": { "value": "http://www.wikidata.org/entity/Q881" },
+    "name": { "value": "Xã Bến Lúa", "xml:lang": "vi" }, "from": { "value": "1956-01-01T00:00:00Z" } },
+  { "item": { "value": "http://www.wikidata.org/entity/Q9990001" }, "itemLabel": { "value": "Bến Lúa" }, "typeLabel": { "value": "commune of Vietnam" },
+    "coord": { "value": "Point(106.5 10.75)" }, "parentLabel": { "value": "Tỉnh Sông Lớn" }, "country": { "value": "http://www.wikidata.org/entity/Q881" },
+    "name": { "value": "Làng Bến Thóc", "xml:lang": "vi" }, "from": { "value": "1700-01-01T00:00:00Z" }, "to": { "value": "1956-03-15T00:00:00Z" } },
+  { "item": { "value": "http://www.wikidata.org/entity/Q9990002" }, "itemLabel": { "value": "Bến Lúa" }, "typeLabel": { "value": "river" },
+    "coord": { "value": "Point(105.1 9.9)" } }
+] } }

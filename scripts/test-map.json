@@ -1,0 +1,347 @@
+{
+  "modules": {
+    "match": {
+      "paths": [
+        "server/match-*.js",
+        "server/scripts/match-run.js",
+        "server/test/match*.test.js",
+        "web/js/match.js",
+        "server/migrations/024_match_suggestions.sql"
+      ],
+      "e2e": [
+        "test/e2e/match*.test.js"
+      ]
+    },
+    "variants": {
+      "paths": [
+        "server/variants-*.js",
+        "server/test/variants*.test.js",
+        "server/migrations/023_field_variants.sql",
+        "web/js/variants.js"
+      ],
+      "e2e": [
+        "test/e2e/variants*.test.js"
+      ]
+    },
+    "places": {
+      "paths": [
+        "server/places-*.js",
+        "server/test/places*.test.js",
+        "server/test/fixtures/places/**",
+        "server/migrations/020_places.sql",
+        "server/migrations/021_places_enrich.sql",
+        "server/scripts/places-*.js",
+        "web/js/places.js"
+      ],
+      "e2e": [
+        "test/e2e/places*.test.js"
+      ]
+    },
+    "links": {
+      "paths": [
+        "server/links-*.js",
+        "server/test/links*.test.js",
+        "web/js/links.js",
+        "server/migrations/019_person_links.sql"
+      ],
+      "e2e": [
+        "test/e2e/links*.test.js"
+      ]
+    },
+    "accounts": {
+      "paths": [
+        "server/test/accounts*.test.js",
+        "server/accounts.js",
+        "server/account-routes.js",
+        "server/scripts/accounts-backfill.js",
+        "web/js/account.js",
+        "server/migrations/025_accounts.sql"
+      ],
+      "e2e": [
+        "test/e2e/accounts.test.js",
+        "test/e2e/e2e-signin*.test.js",
+        "test/e2e/accounts-page.test.js"
+      ]
+    },
+    "ai": {
+      "paths": [
+        "server/ai-*.js",
+        "server/test/ai-*.test.js",
+        "web/js/oauth-consent.js",
+        "web/oauth-consent.html"
+      ],
+      "e2e": [
+        "test/e2e/ai-*.test.js"
+      ]
+    },
+    "book": {
+      "paths": [
+        "web/js/book*.js",
+        "web/book.html",
+        "web/book.css",
+        "server/test/book*.test.js"
+      ],
+      "e2e": [
+        "test/e2e/book-*.test.js"
+      ]
+    },
+    "tree": {
+      "paths": [
+        "web/js/treechart.js",
+        "web/js/relgraph.js",
+        "web/js/model.js",
+        "web/js/kin/**",
+        "server/test/relgraph*.test.js",
+        "server/test/kin*.test.js",
+        "server/test/roots-order.test.js"
+      ],
+      "e2e": [
+        "test/e2e/descendants*.test.js",
+        "test/e2e/tree-roots-order.test.js"
+      ]
+    },
+    "relations": {
+      "paths": [
+        "server/relations.js",
+        "server/scripts/rel-*.js",
+        "server/test/rel-*.test.js",
+        "server/test/relations*.test.js",
+        "web/js/relui.js"
+      ],
+      "e2e": [
+        "test/e2e/relations*.test.js"
+      ]
+    },
+    "elder": {
+      "paths": [
+        "server/elder-*.js",
+        "server/passkey-*.js",
+        "web/js/elder*.js",
+        "server/test/elder*.test.js",
+        "server/test/passkey*.test.js"
+      ],
+      "e2e": [
+        "test/e2e/elder*.test.js"
+      ]
+    },
+    "events": {
+      "paths": [
+        "server/events.js",
+        "web/js/events*.js",
+        "server/test/events*.test.js",
+        "server/facts-events.js",
+        "server/scripts/facts-to-events.js",
+        "server/test/facts-events.test.js",
+        "server/migrations/022_facts_events.sql"
+      ],
+      "e2e": [
+        "test/e2e/events*.test.js"
+      ]
+    },
+    "estimate": {
+      "paths": [
+        "web/js/estimate-graph.js",
+        "web/js/events-life.js",
+        "web/js/events-ui.js",
+        "server/test/estimate-graph.test.js",
+        "server/test/events-life.test.js"
+      ],
+      "e2e": [
+        "test/e2e/estimate-graph.test.js"
+      ]
+    },
+    "form": {
+      "paths": [
+        "web/js/form*.js",
+        "web/js/datefield*.js",
+        "server/test/form*.test.js"
+      ],
+      "e2e": [
+        "test/e2e/form-*.test.js"
+      ]
+    },
+    "gedcom": {
+      "paths": [
+        "server/gedcom*.js",
+        "server/test/gedcom*.test.js"
+      ],
+      "e2e": [
+        "test/e2e/gedcom*.test.js"
+      ]
+    },
+    "lists": {
+      "paths": [
+        "server/test/everyone*.test.js",
+        "server/test/family-all*.test.js",
+        "server/test/tatca*.test.js",
+        "web/js/geo.js"
+      ],
+      "e2e": [
+        "test/e2e/everyone*.test.js",
+        "test/e2e/family-all*.test.js",
+        "test/e2e/cay-page*.test.js",
+        "test/e2e/tatca-combined*.test.js",
+        "test/e2e/gopy.test.js"
+      ]
+    },
+    "profile": {
+      "paths": [
+        "web/js/profile*.js",
+        "server/test/profile*.test.js"
+      ],
+      "e2e": [
+        "test/e2e/profile-*.test.js"
+      ]
+    },
+    "search": {
+      "paths": [
+        "web/js/fuzzy.js",
+        "server/test/fuzzy*.test.js",
+        "server/test/suggest*.test.js"
+      ],
+      "e2e": [
+        "test/e2e/tim-search*.test.js"
+      ]
+    },
+    "succession": {
+      "paths": [
+        "server/succession*.js",
+        "web/js/succession*.js",
+        "server/test/succession*.test.js"
+      ],
+      "e2e": [
+        "test/e2e/succession*.test.js"
+      ]
+    },
+    "shell": {
+      "paths": [
+        "web/app.css",
+        "web/tokens.css",
+        "web/index.html",
+        "server/test/hidden-controls*.test.js",
+        "server/test/keep-mounted*.test.js",
+        "server/test/minimal-ui*.test.js"
+      ],
+      "e2e": [
+        "test/e2e/hidden-controls*.test.js",
+        "test/e2e/keep-mounted*.test.js",
+        "test/e2e/minimal-ui*.test.js",
+        "test/e2e/sticky-toolbar*.test.js"
+      ]
+    },
+    "update": {
+      "paths": [
+        "web/js/update.js",
+        "server/test/update*.test.js",
+        "server/test/sw*.test.js"
+      ],
+      "e2e": [
+        "test/e2e/update*.test.js"
+      ]
+    },
+    "toolbar": {
+      "paths": [
+        "web/js/prefill.js",
+        "server/test/prefill.test.js"
+      ],
+      "e2e": [
+        "test/e2e/toolbar-add*.test.js"
+      ]
+    },
+    "tokens": {
+      "paths": [
+        "scripts/raw-values.mjs",
+        "scripts/raw-values-baseline.json",
+        "server/test/raw-values.test.js",
+        "web/listui.css",
+        "web/fields.css"
+      ],
+      "e2e": [
+        "test/e2e/minimal-ui*.test.js"
+      ]
+    },
+    "refseed": {
+      "paths": [
+        "server/scripts/seed-reference.js",
+        "server/scripts/build-reference-specs.js",
+        "server/test/seed-reference.test.js"
+      ],
+      "e2e": []
+    },
+    "qa-session": {
+      "paths": [
+        "server/scripts/qa-session.js",
+        "server/test/qa-session*.test.js",
+        "scripts/live-check.mjs"
+      ],
+      "e2e": []
+    },
+    "docs": {
+      "paths": [
+        "**/*.md",
+        "docs/**"
+      ],
+      "e2e": []
+    },
+    "clan": {
+      "paths": [
+        "web/js/branches.js",
+        "web/js/codes.js",
+        "server/test/codes.test.js",
+        "web/js/shortid.js",
+        "server/test/shortid.test.js",
+        "server/scripts/person-ids-backfill.js",
+        "server/migrations/*_person_short_id.sql",
+        "web/js/famlabel.js",
+        "server/migrations/018_family_clan.sql",
+        "server/test/branches.test.js",
+        "server/test/famlabel.test.js",
+        "server/test/family-clan.test.js",
+        "server/clan-*.js",
+        "server/test/clan*.test.js",
+        "web/js/clan.js",
+        "web/js/clan-core.js"
+      ],
+      "e2e": [
+        "test/e2e/clan-*.test.js",
+        "test/e2e/tim-search-codes.test.js"
+      ]
+    },
+    "crest": {
+      "paths": [
+        "web/js/ui.js",
+        "web/js/emblem.js",
+        "web/js/surnames-vi.js",
+        "server/test/crest-guard.test.js",
+        "web/tokens.css"
+      ],
+      "e2e": [
+        "test/e2e/tim-search.test.js",
+        "test/e2e/links-treeup.test.js",
+        "test/e2e/profile-tabs.test.js",
+        "test/e2e/book-entries.test.js",
+        "test/e2e/succession.test.js"
+      ]
+    }
+  },
+  "smoke": [
+    "test/e2e/e2e-signin.test.js",
+    "test/e2e/minimal-ui.test.js",
+    "test/e2e/profile-tabs.test.js",
+    "test/e2e/tim-search.test.js",
+    "test/e2e/form-clearance.test.js"
+  ],
+  "full": [
+    "server/package.json",
+    "server/package-lock.json",
+    "scripts/ci-db.sh",
+    "scripts/test-map.json",
+    "scripts/affected-tests.mjs",
+    ".github/workflows/**",
+    "server/migrations/**",
+    "server/core.js",
+    "web/js/store.js",
+    "web/sw.js",
+    "test/e2e/_*.js"
+  ]
+}
