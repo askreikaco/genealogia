@@ -132,6 +132,11 @@ const CHEV_SVG = '<svg class="calm-c" viewBox="0 0 24 24" aria-hidden="true" fil
 // Used by Quan hệ (Chắt and deeper) and Tổ tiên (generations past four). label: plain text; body: HTML.
 const CHEV_DOWN = '<svg class="ic more-chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
 export const moreFold = (label, body, open = false) => `<details class="more-fold"${open ? ' open' : ''}><summary class="btn ter more-sum"><span class="more-closed">${esc(label)}</span><span class="more-open">Thu gọn</span>${CHEV_DOWN}</summary><div class="more-body">${body}</div></details>`;
+// The ghost row: a fold drawn as a person row (the same height and indent), a dashed tile with up to 3 overlapping mini
+// crests of the folded people, the closed text in muted type, and a chevron that turns when open (the text then reads
+// "Thu gọn"). Native details: the hidden part (body, HTML) opens in place. Shared by every fold of people.
+//   closed: text when shut. tiles: the surnames of the folded people (up to 3 are drawn). open: start open.
+export const ghostRow = ({ closed, tiles = [], body = '', open = false }) => `<details class="ghost"${open ? ' open' : ''}><summary class="calm ghost-row"><span class="ghost-tile" aria-hidden="true">${tiles.slice(0, 3).map((s) => surnameTileOf(s, { size: 'sm' })).join('')}</span><span class="calm-t"><b class="calm-n ghost-n"><span class="gh-closed">${esc(closed)}</span><span class="gh-open">Thu gọn</span></b></span><svg class="calm-c gh-chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary>${body ? `<div class="ghost-body">${body}</div>` : ''}</details>`;
 // The one list row (people, relations, menus, settings, pickers). A link when href is set, else a button (attrs: data-* or id).
 //   icon: svg HTML (the caller's icon()), or tile: surnameTile HTML. title: plain text. subtitle: HTML the caller has escaped.
 //   trailing: 'chevron' (default), 'none', or HTML the caller built. badge: HTML (a count) placed after the title.

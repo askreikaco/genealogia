@@ -97,6 +97,8 @@
       ],
       "e2e": [
         "test/e2e/descendants*.test.js",
+        "test/e2e/tothien-root.test.js",
+        "test/e2e/tothien-mother.test.js",
         "test/e2e/tree-roots-order.test.js"
       ]
     },

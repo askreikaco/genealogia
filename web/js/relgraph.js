@@ -258,3 +258,74 @@ export function pedigreeRows(ix, rootId, depth = 4, nameOf = () => '', labelOf =
   walk(pedigree(ix, rootId, depth, nameOf));
   return out;
 }
+
+// The direct father line of id, father first: at each step the parent recorded as a man (sex 'm'), until a generation has
+// none. [] when the person has no father on record; the last id is the root (the farthest known ancestor up the line).
+export function paternalLine(ix, id, sexOf = () => '') {
+  const seen = new Set([id]); const line = []; let cur = id;
+  for (;;) {
+    const f = (ix.parentsOf.get(cur) || []).find((r) => sexOf(r.parent_id) === 'm' && !seen.has(r.parent_id));
+    if (!f) return line;
+    seen.add(f.parent_id); line.push(f.parent_id); cur = f.parent_id;
+  }
+}
+
+// Tổ tiên groups (pure), in walk order: { id, gen, repeat, ref, ghost }. A woman whose father is recorded gets a ghost: her
+// own line (her parents, walked the same way) folded under her, with line = her paternal line (its last id is her line's
+// root). Any other ancestor is followed by its own parents, inline.
+export function ancestorGroups(ix, rootId, sexOf = () => '', depth = 60) {
+  const tree = pedigree(ix, rootId, depth, () => '');
+  const hasFather = (n) => (n.parents || []).some((p) => !p.repeat && sexOf(p.id) === 'm');
+  const groupsOf = (node) => {
+    const out = [];
+    for (const c of node.parents || []) {
+      const g = { id: c.id, gen: c.gen, repeat: !!c.repeat, ref: c.ref || '', ghost: null };
+      out.push(g);
+      if (c.repeat) continue;
+      if (sexOf(c.id) === 'f' && hasFather(c)) g.ghost = { line: paternalLine(ix, c.id, sexOf), groups: groupsOf(c) };
+      else out.push(...groupsOf(c));
+    }
+    return out;
+  };
+  return groupsOf(tree);
+}
+
+// One level of the chain laid out (pure). base: the generation of the level's owner (0 for the person); line: the level's
+// paternal line (root last); shown: the visible generations below base. Rows keep the walk order, except:
+// - the root (the Thủy tổ) is drawn one indent deeper than the line member at generation base + shown, not at its own depth;
+// - the generations deeper than base + shown (except the root) fold into one block, placed right after that member: a fold
+//   item (indent base + shown + 1), the hidden rows in walk order, then the root.
+// With nothing hidden there is no fold and the root is a plain row at its own generation.
+// Items: { type: 'row' | 'root', id, gen, d, repeat, ref, mother, ghost } | { type: 'fold', d, gens, people, tiles, body }.
+// ghost: { d, n, root, tiles, items } when the row's woman has her own line (n generations, drawn at d = gen + 1; root: the line's Thủy tổ).
+export function layoutLevel(groups, base, line, shown) {
+  const rootId = line.length ? line[line.length - 1] : null;
+  const threshold = base + shown;
+  const root = rootId ? groups.find((g) => g.id === rootId && !g.repeat) || null : null;
+  const hidden = groups.filter((g) => g !== root && g.gen > threshold);
+  const blockRoot = root && hidden.length && root.gen > threshold ? root : null;
+  const anchorId = shown > 0 && line.length >= shown ? line[shown - 1] : null;
+  const ghostOf = (g) => (g.ghost ? { d: g.gen + 1, n: g.ghost.line.length, tiles: g.ghost.line.slice(0, 3), root: g.ghost.line[g.ghost.line.length - 1], items: layoutLevel(g.ghost.groups, g.gen, g.ghost.line, shown) } : null);
+  const plain = (g) => ({ type: 'row', id: g.id, gen: g.gen, d: g.gen, repeat: g.repeat, ref: g.ref, mother: false, ghost: ghostOf(g) });
+  const rootItem = (g, d) => ({ type: 'root', id: g.id, gen: g.gen, d, repeat: false, ref: '', mother: base > 0, ghost: ghostOf(g) });
+  const items = [];
+  let placed = false;
+  const block = () => {
+    const d = threshold + 1;
+    items.push({ type: 'fold', d, gens: Math.max(...hidden.map((g) => g.gen)) - threshold, people: hidden.length, tiles: hidden.slice(0, 3).map((g) => g.id), body: hidden.map(plain) });
+    if (blockRoot) items.push(rootItem(blockRoot, d));
+  };
+  for (const g of groups) {
+    if (g === blockRoot) continue;
+    if (g !== root && g.gen > threshold) continue;
+    items.push(g === root ? rootItem(g, g.gen) : plain(g));
+    if (hidden.length && !placed && anchorId && !g.repeat && g.id === anchorId && g.gen === threshold) { block(); placed = true; }
+  }
+  if (hidden.length && !placed) block();
+  return items;
+}
+
+// The whole Tổ tiên chain of a person (pure): layoutLevel over ancestorGroups with the person's paternal line.
+export function ancestorChain(ix, id, sexOf = () => '', shown = 4) {
+  return layoutLevel(ancestorGroups(ix, id, sexOf), 0, paternalLine(ix, id, sexOf), shown);
+}

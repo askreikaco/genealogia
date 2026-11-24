@@ -102,7 +102,7 @@ test('reviewer: #gop-y opens Cần duyệt (N); compact rows, ×2 duplicates, pe
       await page.waitForSelector('.mg-g');
       assert.deepStrictEqual(await page.$$eval('.mg-h', (els) => els.map((e) => e.textContent.trim())), ['Xem', 'Dòng họ', 'Ứng dụng'], 'groups by intent');
       const fr = await famRows(page);
-      assert.ok(/Góp ý/.test(fr[0]) && /4/.test(fr[0]) && fr.some((t) => /Thành viên & quyền/.test(t)), 'Dòng họ: Góp ý with count first, Thành viên for admins');
+      assert.ok(/Tìm \/ lập dòng họ/.test(fr[0]) && /Góp ý/.test(fr[1]) && /4/.test(fr[1]) && fr.some((t) => /Thành viên & quyền/.test(t)), 'Dòng họ: Tìm / lập dòng họ first, then Góp ý with count, Thành viên for admins');
       assert.ok(!(await page.locator('main .calm').allTextContents()).some((t) => /Duyệt đóng góp|Góp ý của tôi/.test(t)), 'old rows gone');
       await shot(page, `gopy-more-390-${scheme}.png`);
       assert.deepStrictEqual(errors, []);
@@ -166,7 +166,7 @@ test('member: only Của tôi, no tabs; old #review link goes to #mine; Thêm D�
       if (hash === 'mine') {
         await page.goto(base + '/#/duong/more'); await page.waitForSelector('.mg-g');
         const fr = await famRows(page);
-        assert.ok(/Góp ý/.test(fr[0]) && !fr.some((t) => /Thành viên & quyền/.test(t)), 'member: Góp ý, no Thành viên');
+        assert.ok(/Tìm \/ lập dòng họ/.test(fr[0]) && /Góp ý/.test(fr[1]) && !fr.some((t) => /Thành viên & quyền/.test(t)), 'member: Tìm / lập dòng họ, then Góp ý, no Thành viên');
         await shot(page, 'gopy-more-member-390-light.png');
       }
       assert.deepStrictEqual(errors, []);

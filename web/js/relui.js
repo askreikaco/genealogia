@@ -2,9 +2,9 @@
 // Data: store.relOf(family) (server rows for this viewer) + relgraph.js (pure rules). Icons are plain line icons (no Hán).
 import * as S from './store.js';
 import { esc, rank, years, isDead } from './model.js';
-import { index, siblingsOf, descendantLevels, pedigreeRows, coupleNotes, PC_LABEL, CP_LABEL, PC_KINDS, CP_KINDS } from './relgraph.js';
+import { index, siblingsOf, descendantLevels, pedigreeRows, ancestorChain, coupleNotes, PC_LABEL, CP_LABEL, PC_KINDS, CP_KINDS } from './relgraph.js';
 import { kinPath, lineDesc, term as kinTerm, resolveRegion, KIN_REGION_KEY } from './kin/index.js';
-import { calmRow, calmAct, popMenu, cic, surnameTile, moreFold, lbar, ltags, fpanel, addBtn, setUntag } from './ui.js';
+import { calmRow, calmAct, popMenu, cic, surnameTile, surnameOf, ghostRow, moreFold, lbar, ltags, fpanel, addBtn, setUntag } from './ui.js';
 import { relPrefill, nextOrder } from './prefill.js';
 
 const cache = new WeakMap();
@@ -161,25 +161,34 @@ function relBody(M, p, ctx) {
   return `${ltags(tags)}${body || `<p class="sub rel-empty">${none}</p>`}`;
 }
 
-// Pedigree: ancestors up to 4 generations as a flat list, one tappable row per ancestor (opens the Hồ sơ) — the same
-// shared person row as Quan hệ (calmRow: tile, name, sex mark, subline, chevron), indented one step per generation. The label comes from the path (Cha, Mẹ, Ông nội, Bà ngoại, Ông cố...). A repeated
-// ancestor is a row too (it opens the same person) with the place it was first drawn.
+// Pedigree: the ancestors as one chain, one tappable row per ancestor (opens the Hồ sơ): the same shared person row as
+// Quan hệ (calmRow), indented one step per generation. Labels come from the path (Cha, Mẹ, Ông nội, Bà ngoại...); a repeated
+// ancestor is a row too (it opens the same person) with the place it was first drawn. The Thủy tổ (the root of the father
+// line) is labelled with its generation; the deeper generations fold into a ghost row (ui.js ghostRow) right after the last
+// visible father-line ancestor. A woman whose father is recorded has her own father line under her, behind a ghost row
+// "Họ X · N đời" that ends with her line's Thủy tổ ("Thủy tổ họ X"). The chain itself is built in relgraph.js (ancestorChain).
 export function pedigreeHtml(M, id, shown = 4, ctx = {}) {
   const { ix } = relsOf(M);
-  const nm = (x) => pname(M, x);
   const region = kinRegion(); const kin = kinOpts(M);
-  // one entry per drawn ancestor: link id, name and label all come from the same person (relgraph pedigreeRows)
-  const entries = pedigreeRows(ix, id, 60, nm, (x) => kinTerm(kinPath(ix, id, x, kin), { locale: 'vi', region }) || 'Tổ tiên');
-  const rows = entries.map((e) => {
-    const ref = e.repeat ? `<span class="sub ped-ref">↗ xem ở nhánh ${esc(e.ref)}</span>` : '';
-    return { gen: e.gen, html: `<li style="--d:${e.gen}">${calmRow({ href: ctx.personHref ? ctx.personHref(e.id) : '#', tile: surnameTile(e.name), title: e.name, subtitle: esc(e.label) + ref, sex: M.byId.get(e.id)?.data.sex })}</li>` };
-  });
-  if (!rows.length) return '';
-  const top = rows.filter((r) => r.gen <= shown).map((r) => r.html).join('');
-  const deep = rows.filter((r) => r.gen > shown);
-  const gens = deep.length ? Math.max(...deep.map((r) => r.gen)) - shown : 0;
-  const more = deep.length ? moreFold(`Xem thêm ${gens} đời · ${deep.length} người`, `<ul class="ped">${deep.map((r) => r.html).join('')}</ul>`) : '';
-  return `<section class="relsec" aria-label="Tổ tiên"><h2>Tổ tiên</h2><ul class="ped">${top}</ul>${more}</section>`;
+  const sexOfId = (x) => M.byId.get(x)?.data.sex || '';
+  const nameOf = (x) => pname(M, x);
+  const items = ancestorChain(ix, id, sexOfId, shown);
+  if (!items.length) return '';
+  const kinLabel = (x) => kinTerm(kinPath(ix, id, x, kin), { locale: 'vi', region }) || 'Tổ tiên';
+  const row = (it) => {
+    const ref = it.repeat ? `<span class="sub ped-ref">↗ xem ở nhánh ${esc(it.ref)}</span>` : '';
+    const gen = M.byId.get(it.id)?.data.gen;
+    let label;
+    if (it.type === 'root') label = it.mother ? `Thủy tổ họ ${surnameOf(nameOf(it.id))}` : `Thủy tổ${gen ? ' · Đời ' + gen : ''}`;
+    else { label = kinLabel(it.id); if (label === 'Thủy tổ') label = `Tổ đời ${it.gen}`; } // a line top that is not a father-line root is "Tổ đời N"
+    return `<li style="--d:${it.d}">${calmRow({ href: ctx.personHref ? ctx.personHref(it.id) : '#', tile: surnameTile(nameOf(it.id)), title: nameOf(it.id), subtitle: esc(label) + ref, sex: sexOfId(it.id) })}</li>`;
+  };
+  const list = (its) => its.map((it) => {
+    if (it.type === 'fold') return `<li class="ped-fold" style="--d:${it.d}">${ghostRow({ closed: `${it.gens} đời ẩn · ${it.people} người`, tiles: it.tiles.map((x) => surnameOf(nameOf(x))), body: `<ul class="ped ped-hid">${list(it.body)}</ul>` })}</li>`;
+    const own = it.ghost ? `<li class="ped-fold" style="--d:${it.ghost.d}">${ghostRow({ closed: `Họ ${surnameOf(nameOf(it.ghost.root))} · ${it.ghost.n} đời`, tiles: it.ghost.tiles.map((x) => surnameOf(nameOf(x))), body: `<ul class="ped ped-hid">${list(it.ghost.items)}</ul>` })}</li>` : '';
+    return row(it) + own;
+  }).join('');
+  return `<section class="relsec" aria-label="Tổ tiên"><h2>Tổ tiên</h2><ul class="ped">${list(items)}</ul></section>`;
 }
 
 // ---------- sheets ----------

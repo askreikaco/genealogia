@@ -175,18 +175,14 @@ test('pedigree rows: label per path, 44 px tap height, the row opens the ancesto
       depth: li.style.getPropertyValue('--d'), name: li.querySelector('.calm-n')?.textContent.trim(), label: li.querySelector('.calm-s')?.textContent.trim(),
       href: li.querySelector('a')?.getAttribute('href') || '', h: li.querySelector('a').getBoundingClientRect().height,
     })));
-    // four generations shown; the fifth sits behind one in-place expander
+    // four generations, then the Thủy tổ (the father line's root, the last row); nothing is hidden, so no fold row
     assert.deepEqual(rows.map((r) => [r.depth, r.name, r.label]), [
       ['1', 'Dương Văn Chín', 'Cha'], ['2', 'Dương Văn Bảy', 'Ông nội'], ['3', 'Dương Văn Năm', 'Ông cụ'], ['4', 'Dương Văn Hai', 'Ông kỵ'],
-    ], 'ancestor rows with labels per path');
+      ['5', 'Dương Văn Gốc', 'Thủy tổ · Đời 1'],
+    ], 'ancestor rows with labels per path, the Thủy tổ last');
     assert.ok(rows.every((r) => r.h >= 44), 'tap height at least 44 px');
     assert.ok(rows.every((r) => /#person\/P\d+$/.test(r.href)), 'each row opens the person');
-    const more = page.locator('section[aria-label="Tổ tiên"] summary.more-sum');
-    assert.equal((await more.innerText()).trim(), 'Xem thêm 1 đời · 1 người', 'the fold names the generations beyond four');
-    await more.click();
-    assert.equal((await more.innerText()).trim(), 'Thu gọn', 'open, the same button reads Thu gọn');
-    const fifth = await page.evaluate(() => [...document.querySelectorAll('section[aria-label="Tổ tiên"] .more-fold .calm-n')].map((x) => x.textContent.trim()));
-    assert.deepEqual(fifth, ['Dương Văn Gốc'], 'the fifth generation opens in place');
+    assert.equal(await page.locator('section[aria-label="Tổ tiên"] .ped-fold').count(), 0, 'no fold row when nothing is hidden');
     await page.locator('section.relsec ul.ped a').first().click();
     await page.waitForURL(/#person\/P809/, { timeout: 10000 });
   } finally { await ctx.close(); }

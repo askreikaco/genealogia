@@ -279,3 +279,74 @@ test('Tổ tiên rows: each row link, name and label are one person (second pare
   assert.equal(mother.name, 'Võ Thị Sen');
   for (const r of rows) assert.equal(r.name, nameOf(r.id), `row ${r.id}: link, name and label come from one person`);
 });
+
+// Tổ tiên chain: the fold ghost and the Thủy tổ sit right after the last visible father-line ancestor (the Thủy tổ one
+// indent deeper), the hidden generations between them; a woman with a recorded father has her own line under her.
+test('Tổ tiên chain: fold ghost and Thủy tổ in the slot after the last visible father, hidden rows between', async () => {
+  const { R } = await load();
+  // C -> F1 -> G2 -> G3 -> G4 -> G5 -> G6 (fathers, all 'm'); each father has a mother beside him (M1..M6); MG5 is the
+  // mother of M5, so ancestors deeper than the root are hidden with the middle
+  const pcC = []; const sexC = { C: 'f' };
+  const line = ['F1', 'G2', 'G3', 'G4', 'G5', 'G6'];
+  let k = 1; let child = 'C';
+  for (const f of line) { sexC[f] = 'm'; pcC.push({ id: k++, parent_id: f, child_id: child, kind: 'ruot', birth_order: 1 }); child = f; }
+  line.forEach((f, i) => { const m = 'M' + (i + 1); sexC[m] = 'f'; pcC.push({ id: k++, parent_id: m, child_id: f, kind: 'ruot', birth_order: 2 }); });
+  sexC.MG5 = 'f'; pcC.push({ id: k++, parent_id: 'MG5', child_id: 'M5', kind: 'ruot', birth_order: 1 });
+  const ix = R.index(pcC, []);
+  const sexOf = (x) => sexC[x] || '';
+  assert.deepEqual(R.paternalLine(ix, 'C', sexOf), line, 'the father line, father first');
+  assert.deepEqual(R.paternalLine(R.index([], []), 'C', sexOf), [], 'no father on record: empty line');
+  const items = R.ancestorChain(ix, 'C', sexOf, 4);
+  const shape = items.map((it) => (it.type === 'fold' ? `fold@${it.d}` : `${it.type} ${it.id}@${it.d}`));
+  assert.deepEqual(shape, [
+    'row F1@1', 'row G2@2', 'row G3@3', 'row G4@4',
+    'fold@5', 'root G6@5',
+    'row M3@4', 'row M2@3', 'row M1@2',
+  ], 'Ông kỵ, fold, Thủy tổ (one deeper), then the wives as before');
+  const fold = items.find((it) => it.type === 'fold');
+  const body = fold.body.map((it) => it.id);
+  assert.deepEqual(body, ['G5', 'M6', 'M5', 'MG5', 'M4'], 'hidden rows in walk order');
+  assert.deepEqual([fold.gens, fold.people], [3, 5], 'generations 5 to 7 are folded; five people');
+  assert.deepEqual(fold.tiles, ['G5', 'M6', 'M5'], 'the ghost shows up to three of the folded people');
+  assert.equal(items.find((it) => it.type === 'root').mother, false, 'the person\'s own Thủy tổ, not a mother line');
+  // short chain: nothing hidden, no fold, the root is a plain row at its own generation
+  const short = R.layoutLevel(R.ancestorGroups(ix, 'C', sexOf).filter((g) => g.gen <= 3 || g.id === 'G6'), 0, line, 4);
+  assert.ok(!short.some((it) => it.type === 'fold'), 'no fold');
+  assert.deepEqual(short.filter((it) => it.type === 'root').map((it) => [it.id, it.d]), [['G6', 6]], 'root kept at its own depth');
+  // no father on record: no root, the fold closes the chain
+  const none = R.layoutLevel(R.ancestorGroups(ix, 'C', sexOf), 0, [], 4);
+  assert.equal(none.at(-1).type, 'fold', 'the fold closes the chain');
+  assert.ok(!none.some((it) => it.type === 'root'), 'no root row');
+});
+
+// A woman with a recorded father has her own line under her (a ghost row "Họ X · N đời" that ends with her Thủy tổ).
+test('Tổ tiên chain: a mother line under her, ending with her own Thủy tổ; a woman without a father gets nothing extra', async () => {
+  const { R } = await load();
+  // C (f) <- F1 (m) <- G2 (m) <- G3 (m, the Thủy tổ); F1's wife M2 (f, no parents); C's mother W1 (f) <- V1 (m) <- V2 (m) <- V3 (m)
+  const sex = { C: 'f', F1: 'm', G2: 'm', G3: 'm', M2: 'f', W1: 'f', V1: 'm', V2: 'm', V3: 'm' };
+  const pc = [
+    { id: 1, parent_id: 'F1', child_id: 'C', kind: 'ruot', birth_order: 1 },
+    { id: 2, parent_id: 'W1', child_id: 'C', kind: 'ruot', birth_order: 2 },
+    { id: 3, parent_id: 'G2', child_id: 'F1', kind: 'ruot', birth_order: 1 },
+    { id: 4, parent_id: 'M2', child_id: 'F1', kind: 'ruot', birth_order: 2 },
+    { id: 5, parent_id: 'G3', child_id: 'G2', kind: 'ruot', birth_order: 1 },
+    { id: 6, parent_id: 'V1', child_id: 'W1', kind: 'ruot', birth_order: 1 },
+    { id: 7, parent_id: 'V2', child_id: 'V1', kind: 'ruot', birth_order: 1 },
+    { id: 8, parent_id: 'V3', child_id: 'V2', kind: 'ruot', birth_order: 1 },
+  ];
+  const ix = R.index(pc, []);
+  const sexOf = (x) => sex[x] || '';
+  const items = R.ancestorChain(ix, 'C', sexOf, 4);
+  const top = items.map((it) => `${it.type} ${it.id}@${it.d}${it.ghost ? ' +ghost' : ''}`);
+  assert.deepEqual(top, ['row F1@1', 'row G2@2', 'root G3@3', 'row M2@2', 'row W1@1 +ghost'], 'the mother W1 carries a ghost; M2 (no father) has none');
+  assert.equal(items.at(-1).ghost.d, 2, 'her ghost sits one indent under her');
+  assert.equal(items.at(-1).ghost.n, 3, 'Họ X · 3 đời');
+  assert.equal(items.at(-1).ghost.root, 'V3', 'her line ends with its Thủy tổ');
+  assert.deepEqual(items.at(-1).ghost.items.map((it) => `${it.type} ${it.id}@${it.d}${it.mother ? ' mother' : ''}`),
+    ['row V1@2', 'row V2@3', 'root V3@4 mother'], 'her line in place: father, grandfather, then the Thủy tổ họ');
+  assert.equal(items.find((it) => it.id === 'M2').ghost, null, 'a woman without a recorded father shows nothing extra');
+  // her line folds inside its own depth limit: with one visible generation below her, V2 folds and V3 is her Thủy tổ
+  const inner = R.layoutLevel(R.ancestorGroups(ix, 'C', sexOf).find((g) => g.id === 'W1').ghost.groups, 1, R.paternalLine(ix, 'W1', sexOf), 1);
+  assert.deepEqual(inner.map((it) => (it.type === 'fold' ? `fold@${it.d} gens ${it.gens} people ${it.people}` : `${it.type} ${it.id}@${it.d}`)),
+    ['row V1@2', 'fold@3 gens 1 people 1', 'root V3@3'], 'the fold inside her line, the Thủy tổ after it');
+});
