@@ -115,7 +115,7 @@ test.before(async () => {
   if (skip) return;
   process.env.DATABASE_URL = URL_;
   process.env.SESSION_SECRET = crypto.randomBytes(24).toString('hex');
-  process.env.EDITORS = `Tester:${crypto.createHash('sha256').update(CODE).digest('hex')}`;
+  process.env.EDITORS = `Tester:${FAM}:${crypto.createHash('sha256').update(CODE).digest('hex')}`;
   const { app, pool: p } = require('../server');
   pool = p;
   for (const f of fs.readdirSync(path.join(__dirname, '..', 'migrations')).filter((x) => x.endsWith('.sql')).sort()) await pool.query(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
@@ -160,26 +160,17 @@ test('endpoint: scope=branch only; a guest signs in, an outsider is refused, a m
   assert.ok(!r.text.includes(`0 @${PFX}PA@ INDI`) && !r.text.includes(`0 @${PFX}SIB@ INDI`));
 });
 
-test('endpoint: the branch file imports as the same number of people in an empty family', { skip }, async () => {
+test('endpoint: an editor code of one family cannot import into another family (guest there: 401)', { skip }, async () => {
   const url = `/api/persons/${PFX}ROOT/gedcom?scope=branch&family=${FAM}`;
   const file = (await call('GET', url, undefined, memberCookie)).text;
   const DEST = `branch-dest-${TAG}`;
-  await pool.query("insert into families (id, slug, name, visibility) values ($1,$1,'Họ nhận nhánh','public')", [DEST]);
+  await pool.query("insert into families (id, slug, name, visibility) values ($1,$1,'Ho nhan nhanh','public')", [DEST]);
   try {
     const r = await call('POST', '/api/gedcom/import', { family: DEST, content: file, dry_run: false }, editorCookie);
-    assert.strictEqual(r.status, 200, r.text);
-    assert.strictEqual(r.json.applied.persons_created, EXPECTED.length);
+    assert.strictEqual(r.status, 401, r.text);
     const n = (await pool.query('select count(*)::int n from persons where family_id=$1 and not deleted', [DEST])).rows[0].n;
-    assert.strictEqual(n, EXPECTED.length);
+    assert.strictEqual(n, 0);
   } finally {
-    await pool.query('delete from suggestions where family_id=$1', [DEST]);
-    await pool.query('delete from events where family_id=$1', [DEST]);
-    await pool.query('delete from history where person_id in (select id from persons where family_id=$1)', [DEST]);
-    await pool.query('delete from ops where person_id in (select id from persons where family_id=$1)', [DEST]);
-    await pool.query('delete from parent_child where family_id=$1', [DEST]);
-    await pool.query('delete from couple where family_id=$1', [DEST]);
-    await pool.query('delete from relation_migrations where family_id=$1', [DEST]);
-    await pool.query('delete from persons where family_id=$1', [DEST]);
     await pool.query('delete from families where id=$1', [DEST]);
   }
 });

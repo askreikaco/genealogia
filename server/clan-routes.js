@@ -79,11 +79,10 @@ function mount(app, d) {
     const C = await core();
     const base = await baseFor(slug, C);
     if (!base) throw new HttpError(404, 'Chưa có dòng họ nào mang họ này.');
-    const s = readSession(req);
-    const code = !!s && !s.email && !s.dev; // editor-code session: admin in every family
-    const roles = code ? {} : await rolesByFamily(req);
-    const member = (f) => code || !!roles[f.id];
-    const roleOf = (f) => (code ? 'admin' : roles[f.id] || null);
+    // rolesByFamily: a signed-in member's roles, and an editor code's own family as editor (never admin)
+    const roles = await rolesByFamily(req);
+    const member = (f) => !!roles[f.id];
+    const roleOf = (f) => roles[f.id] || null;
     // Họ gốc: a viewer sees it only as its visibility allows (all | members | editors). A carried tree whose origin this
     // viewer may not see is not listed at all, and not counted either.
     const originOk = (f) => !!f.origin_surname && SR.originVisibleTo(f.origin_visibility, roleOf(f));
@@ -114,7 +113,7 @@ function mount(app, d) {
       kpis: { groups: grouped.groups.length, trees: trees.length, people: trees.reduce((n, t) => n + t.people, 0) },
       private_count: seen.length - vis.length, countries, country: qc,
       // Historical hints (surname-hints.json): editors only, a suggestion ("có thể liên quan"), never assigned.
-      hints: (code || Object.values(roles).some((r) => r === 'owner' || r === 'admin' || r === 'editor')) ? SR.hintsFor(base.surname) : [],
+      hints: Object.values(roles).some((r) => r === 'owner' || r === 'admin' || r === 'editor') ? SR.hintsFor(base.surname) : [],
       ...out,
     });
   }));

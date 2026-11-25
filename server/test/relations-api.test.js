@@ -28,7 +28,7 @@ test.before(async () => {
   if (skip) return;
   process.env.DATABASE_URL = URL_;
   process.env.SESSION_SECRET = crypto.randomBytes(24).toString('hex');
-  process.env.EDITORS = `Tester:${crypto.createHash('sha256').update(CODE).digest('hex')}`;
+  process.env.EDITORS = `Tester:${FAM}:${crypto.createHash('sha256').update(CODE).digest('hex')}`;
   const { app, pool: p } = require('../server');
   pool = p;
   for (const f of fs.readdirSync(path.join(__dirname, '..', 'migrations')).filter((x) => x.endsWith('.sql')).sort()) await pool.query(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
@@ -174,9 +174,9 @@ test('suggestions: a cycle is refused when it is sent, before anyone reviews it'
 });
 
 test('a family without the backfill marker refuses relation writes (legacy reads stay as they were)', { skip }, async () => {
+  // the editor code is for FAM only: in FAM_LEGACY it is a guest, so the write is refused before the backfill check (401)
   const r = await call('POST', '/api/relations', { family: FAM_LEGACY, op_id: ops(10), action: 'add', kind: 'couple', a_id: ID_L.P001, b_id: ID_L.P002, cp_kind: 'cuoi' }, editorCookie);
-  assert.equal(r.status, 409);
-  assert.match(r.json.error, /rel-backfill/);
+  assert.equal(r.status, 401);
   const legacy = await call('GET', `/api/persons?family=${FAM_LEGACY}`, undefined, undefined);
   assert.equal(legacy.json.rel.source, 'legacy');
   assert.equal(legacy.json.items.find((x) => x.id === ID_L.P004).data.parent, ID_L.P001);

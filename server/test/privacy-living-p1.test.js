@@ -28,7 +28,7 @@ const session = async (email) => (await fetch(base + '/api/test/session', { meth
 test.before(async () => {
   if (skip) return;
   process.env.DATABASE_URL = URL_; process.env.NODE_ENV = 'test'; process.env.SESSION_SECRET = crypto.randomBytes(24).toString('hex');
-  process.env.EDITORS = `Tester:${crypto.createHash('sha256').update(CODE).digest('hex')}`;
+  process.env.EDITORS = `Tester:${PUB}:${crypto.createHash('sha256').update(CODE).digest('hex')}`;
   const { app, pool: p } = require('../server'); pool = p;
   const dir = path.join(__dirname, '..', 'migrations');
   for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) await pool.query(fs.readFileSync(path.join(dir, f), 'utf8'));

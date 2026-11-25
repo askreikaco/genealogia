@@ -35,8 +35,11 @@ const { mountMcp } = require('./ai-mcp');
 const PORT = Number(process.env.PORT || 3090);
 const SECRET = process.env.SESSION_SECRET || '';
 // EDITORS="Tên hiển thị:sha256(code),Tên khác:sha256(code)" — codes are never stored in plain text.
+// Optional family per entry: "Name:familyId:sha256(code)". Without it the code works in DEFAULT_FAMILY only (family null here).
 const EDITORS = (process.env.EDITORS || '').split(',').map((s) => s.trim()).filter(Boolean).map((s) => {
-  const i = s.lastIndexOf(':'); return { name: s.slice(0, i), hash: s.slice(i + 1).toLowerCase() };
+  const i = s.lastIndexOf(':'); const head = s.slice(0, i); const j = head.lastIndexOf(':');
+  return j < 0 ? { name: head, family: null, hash: s.slice(i + 1).toLowerCase() }
+    : { name: head.slice(0, j), family: head.slice(j + 1), hash: s.slice(i + 1).toLowerCase() };
 });
 if (!SECRET || SECRET.length < 32) console.warn('SESSION_SECRET missing or short: logins disabled');
 
@@ -133,6 +136,8 @@ const { ROLE_RANK } = require('./ai-perm'); // one order for web and AI (guest <
 const ROLES = ['owner', 'admin', 'editor', 'member'];
 const isTop = (r) => r === 'owner' || r === 'admin';
 const DEFAULT_FAMILY = 'duong';
+// The family an editor code works in: its EDITORS entry's family, DEFAULT_FAMILY when it names none, null if unknown.
+const codeFamily = (name) => { const e = EDITORS.find((x) => x.name === name); return e ? (e.family || DEFAULT_FAMILY) : null; };
 class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
 // Route wrapper: HttpError -> its status and message; anything else -> the error handler.
 const H = (fn) => async (req, res, next) => {
@@ -169,8 +174,10 @@ async function whoFor(s, famId = DEFAULT_FAMILY) {
     const { rows } = await pool.query('select id, person_id, name from device_accounts where id = $1 and family_id = $2 and revoked_at is null and expires_at > now()', [s.dev, famId]);
     const d = rows[0];
     w = { role: d ? 'member' : 'guest', status: d ? 'active' : null, person_id: d ? d.person_id : null, email: null, name: d ? d.name : null, editor: null, code: false, memberId: null, family: famId, device: d ? d.id : null, devicePerson: d ? d.person_id : null };
-  } else if (s && !s.email) {
-    w = { role: 'admin', status: 'active', person_id: null, email: null, name: s.name, editor: s.name, code: true, memberId: null, family: famId };
+  } else if (s && !s.email) { // editor code: the same rights as before (admin), in its own family only; guest everywhere else
+    const own = codeFamily(s.name) === famId;
+    w = own ? { role: 'admin', status: 'active', person_id: null, email: null, name: s.name, editor: s.name, code: true, memberId: null, family: famId }
+      : { role: 'guest', status: null, person_id: null, email: null, name: s.name, editor: null, code: false, memberId: null, family: famId };
   } else if (s) {
     const emails = s.aid ? [...new Set([s.email, ...await ACC.emailsOf(pool, s.aid)])] : [s.email];
     const { rows } = await pool.query(`select id, role, status, person_id, name, email from members where family_id = $2 and (email = any($1) or ($3::uuid is not null and account_id = $3::uuid))
@@ -195,7 +202,10 @@ async function rolesByFamily(req) {
     const { rows } = await pool.query('select family_id from device_accounts where id = $1 and revoked_at is null and expires_at > now()', [s.dev]);
     return Object.fromEntries(rows.map((r) => [r.family_id, 'member']));
   }
-  if (!s?.email) return {};
+  if (!s?.email) { // editor code: its own family only, as admin (as before this change)
+    const own = s && !s.dev && s.name ? codeFamily(s.name) : null;
+    return own ? { [own]: 'admin' } : {};
+  }
   const emails = s.aid ? [...new Set([s.email, ...await ACC.emailsOf(pool, s.aid)])] : [s.email];
   const { rows } = await pool.query("select family_id, role from members where status='active' and (email = any($1) or ($2::uuid is not null and account_id = $2::uuid))", [emails, s.aid || null]);
   const out = {}; // the highest role per family when several emails of the account are members
