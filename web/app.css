@@ -660,7 +660,12 @@ a.tl-band:focus-visible{outline:2px solid var(--c-focus, var(--c-accent));outlin
 .stry h3{margin:0;font-size:var(--fs-3);font-weight:600}
 .stry p{margin:0;font-size:var(--fs-2);line-height:var(--lh-3);white-space:pre-line}
 .stry-ph{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
-.stry-ph img{width:96px;height:96px;object-fit:cover;border-radius:var(--r-md,6px)}
+.stry-ph img,.ev-ph img,.evx-ph1 img{width:96px;height:96px;object-fit:cover;border-radius:var(--r-md,6px)}
+/* event photos: thumbnails on the timeline card and in the editor (same size as a story photo); the editor's list has remove buttons */
+.ev-ph,.evx-phs{display:flex;flex-wrap:wrap;gap:var(--sp-2)}.ev-ph{margin-top:var(--sp-2)}
+.evx-ph{display:flex;flex-direction:column;gap:var(--sp-2)}
+.evx-ph1{position:relative}.evx-ph1 img{display:block}
+.evx-ph1 .linkbtn{position:absolute;top:0;right:0;min-width:var(--sz-touch);min-height:var(--sz-touch)}
 /* Câu chuyện đời on top of Dòng đời: flush to the tab's top, the timeline follows below */
 .lifeblock{margin:0 0 var(--sp-5)}
 .lifeblock .lifestory{margin-top:0}

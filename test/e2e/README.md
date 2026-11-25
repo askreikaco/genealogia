@@ -33,6 +33,7 @@ Tests skip (with a reason) when playwright, Chrome or the database URL is missin
 | `book-tools.test.js` | book toolbar: one row (search, Filters, Share), old print/embed buttons gone; accent-insensitive search jumps to the person's entry; Share sheet (print, iframe code) and Filters sheet open and close | no (mocked API) |
 | `tatca-combined.test.js` | "Tất cả" with two families: combined Duyệt and Thành viên with chips and per-family actions, form Dòng họ field and picker scope, mixed map clusters, Đời filter after sync, book update bar | no (mocked API) |
 | `tim-search.test.js` | Tìm: the top-bar search button (Tìm kiếm) and "/" and Ctrl+K open it focused; a giỗ date ("3/8", "3-8", "mồng 3 tháng 8") lists people by giỗ with line 2 "Giỗ 3/8 ÂL"; recent searches are rows with a 44 px remove button and "Xoá tất cả" | no (mocked API) |
+| `events-photos.test.js` | life events: the editor attaches a photo on the event page and it shows on Dòng đời (a guest does not see it); offline an event is saved, shown as "Chưa gửi", and sent once when the network is back; screenshot `ev2-photo.png` with `GP_SHOT_DIR` | yes |
 | `keep-mounted.test.js` | a sync re-render keeps the book iframe (same element, scroll kept), the map instance (zoom kept) and the tree canvas scroll | no |
 | `descendants.test.js` | Hồ sơ lineage rows and ancestor list (own schema `e2e_descendants`) | yes |
 | `relations.test.js` | relationships: add spouse, child, relative couple, edit and remove (own schema `e2e_relations`) | yes |

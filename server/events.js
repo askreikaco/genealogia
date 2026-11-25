@@ -10,14 +10,14 @@ let rulesMod = null;
 // The shared rules module (ESM in web/js), loaded once.
 const rules = () => rulesMod || (rulesMod = import(pathToFileURL(path.join(__dirname, '..', 'web', 'js', 'events.js')).href));
 
-const EV_COLS = 'id, family_id, person_id, type, date_text, date_kind, date_from, date_to, lunar, place, place_new, description, people, sources, is_preferred, alt_of, created_by, created_at, updated_at';
+const EV_COLS = 'id, family_id, person_id, type, date_text, date_kind, date_from, date_to, lunar, place, place_new, description, people, sources, photos, is_preferred, alt_of, created_by, created_at, updated_at';
 const ST_COLS = 'id, family_id, person_id, kind, title, body, photos, created_by, created_at, updated_at';
 const iso = (d) => (d instanceof Date ? d.toISOString() : d);
 
 function eventOut(r) {
   return { id: r.id, person_id: r.person_id, type: r.type, date_text: r.date_text || '', date_kind: r.date_kind || null, date_from: r.date_from || null,
     date_to: r.date_to || null, lunar: r.lunar || '', place: r.place || '', place_new: r.place_new || '', description: r.description || '',
-    people: r.people || [], sources: r.sources || [], is_preferred: r.is_preferred !== false, alt_of: r.alt_of || null,
+    people: r.people || [], sources: r.sources || [], photos: r.photos || [], is_preferred: r.is_preferred !== false, alt_of: r.alt_of || null,
     created_by: r.created_by || '', created_at: iso(r.created_at), updated_at: iso(r.updated_at) };
 }
 function storyOut(r) {
@@ -36,6 +36,7 @@ function cleanEvent(e) {
     description: s(e.description).slice(0, 2000),
     people: Array.isArray(e.people) ? e.people.slice(0, 20) : [],
     sources: Array.isArray(e.sources) ? e.sources.slice(0, 20).map((x) => ({ title: s(x.title).slice(0, 300), url: s(x.url).slice(0, 2000), quality: x.quality || null })) : [],
+    photos: Array.isArray(e.photos) ? e.photos.slice(0, 10).filter((u) => typeof u === 'string') : [],
     is_preferred: e.is_preferred !== false,
   };
 }
@@ -76,10 +77,10 @@ async function insertEvent(client, famId, personId, input, byUser) {
   const c = cleanEvent(input);
   const id = 'E' + crypto.randomBytes(6).toString('hex');
   const { rows } = await client.query(
-    `insert into events (id, family_id, person_id, type, date_text, date_kind, date_from, date_to, lunar, place, place_new, description, people, sources, is_preferred, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) returning ${EV_COLS}`,
+    `insert into events (id, family_id, person_id, type, date_text, date_kind, date_from, date_to, lunar, place, place_new, description, people, sources, is_preferred, created_by, photos)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning ${EV_COLS}`,
     [id, famId, personId, c.type, c.date_text, c.date_kind, c.date_from, c.date_to, c.lunar, c.place, c.place_new, c.description,
-      JSON.stringify(c.people), JSON.stringify(c.sources), c.is_preferred, byUser]);
+      JSON.stringify(c.people), JSON.stringify(c.sources), c.is_preferred, byUser, JSON.stringify(c.photos)]);
   await writeHistory(client, personId, 'su_kien', null, evSummary(rows[0]), byUser);
   return eventOut(rows[0]);
 }
@@ -89,9 +90,9 @@ async function updateEvent(client, famId, eventId, input, byUser) {
   const c = cleanEvent(input);
   const { rows } = await client.query(
     `update events set type=$2, date_text=$3, date_kind=$4, date_from=$5, date_to=$6, lunar=$7, place=$8, place_new=$9, description=$10,
-       people=$11, sources=$12, is_preferred=$13, updated_at=now() where id=$1 returning ${EV_COLS}`,
+       people=$11, sources=$12, photos=$14, is_preferred=$13, updated_at=now() where id=$1 returning ${EV_COLS}`,
     [eventId, c.type, c.date_text, c.date_kind, c.date_from, c.date_to, c.lunar, c.place, c.place_new, c.description,
-      JSON.stringify(c.people), JSON.stringify(c.sources), c.is_preferred]);
+      JSON.stringify(c.people), JSON.stringify(c.sources), c.is_preferred, JSON.stringify(c.photos)]);
   await writeHistory(client, cur.rows[0].person_id, 'su_kien', evSummary(cur.rows[0]), evSummary(rows[0]), byUser);
   return eventOut(rows[0]);
 }

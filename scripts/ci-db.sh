@@ -52,6 +52,7 @@ wait_ready() { # $1 = url
 
 # Prints what the database printed (docker logs or the local server log) so a failed CI run shows the cause.
 dump_logs() {
+  echo "--- initdb log (tail) ---" >&2; tail -n 40 "$BASE/initdb.log" >&2 2>/dev/null || true
   echo "--- database log (tail) ---" >&2
   if [ -f "$STATE_FILE" ] && grep -q '^BACKEND=docker' "$STATE_FILE"; then
     . "$STATE_FILE"; docker logs --tail 80 "$NAME" >&2 2>&1 || true
