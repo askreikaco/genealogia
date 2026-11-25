@@ -1,9 +1,9 @@
 // Tin họ (family news) and the gatherings on Lịch (server/news.js). Thông báo = notice, Họp mặt = gathering.
 // Members only. Pages: feed #/<fam>/tin, detail #/<fam>/tin/<id>, editor #/<fam>/tin-sua[/<id>][?kind=gathering] (a page).
-// Shared pieces: lbar + addBtn (toolbar), .li rows, danger components (dangerButton, dangerZone, confirmDanger).
+// Shared pieces: toolbar + addBtn, .li rows, danger components (dangerButton, dangerZone, confirmDanger).
 // Pure helpers live in lich-merge.js.
 import { esc } from './model.js';
-import { toast, lbar, addBtn, calmRow } from './ui.js';
+import { toast, toolbar, addBtn, calmRow, tag } from './ui.js';
 import { icsCalendar, icsDay, icsText, saveIcs } from './ics.js';
 import { ico, choiceRow } from './choice.js';
 import { collapsedGroups } from './groups.js';
@@ -57,7 +57,7 @@ export const gatheringRow = (p, hf, today, hidden = false) => {
   const when = left === 0 ? 'Hôm nay' : left === 1 ? 'Ngày mai' : `Còn ${left} ngày`;
   return `<div class="gior" data-k="gath"${hidden ? ' hidden' : ''} data-q="${esc((p.title + ' ' + (p.place || '') + ' họp mặt').toLowerCase())}"><a class="li gio" href="${esc(hf('tin/' + p.id))}">`
     + `<span class="date"><b>${new Date(d).getDate()}/${new Date(d).getMonth() + 1}</b><span>DL</span></span>`
-    + `<span class="grow"><b>${esc(p.title)}</b> <span class="tag sm">Họp mặt</span>`
+    + `<span class="grow"><b>${esc(p.title)}</b> ${tag(`Họp mặt`, { sm: true })}`
     + `<span class="sub">${[p.lunar ? p.lunar + ' ÂL' : '', p.time, p.place].filter(Boolean).map(esc).join(' · ')} · ${when}</span></span></a></div>`;
 };
 
@@ -116,11 +116,11 @@ export async function feedPage(main, { fam, hf, getPrefs, setPrefs, isMember }) 
     const unread = p.status === 'live' && Date.parse(p.created_at) > seen;
     const date = p.kind === 'gathering' ? fmtDay(p.starts_at) : new Date(p.created_at).toLocaleDateString('vi-VN');
     return `<a class="li" href="${esc(hf('tin/' + p.id))}" data-q="${esc((p.title + ' ' + p.body).toLowerCase())}"><span class="grow"><b>${esc(p.title)}</b>`
-      + ` <span class="tag sm">${kindLabel(p)}</span>${badges(p)}${unread ? ' <span class="tag sm yellow">Mới</span>' : ''}`
+      + ` ${tag(`${kindLabel(p)}`, { sm: true })}${badges(p)}${unread ? ' <span class="tag sm yellow">Mới</span>' : ''}`
       + `<span class="sub">${esc(p.created_by)} · ${esc(date)}</span></span>›</a>`;
   }).join('');
   main.innerHTML = `<h1>Tin họ</h1>${reviewHtml}
-    ${lbar('nq', 'Tìm tiêu đề hoặc nội dung', st.q, 0, '', c.can_post ? addBtn(`data-tin-go="${esc(hf('tin-sua'))}"`, 'Đăng tin mới') : '')}
+    ${toolbar({ id: 'nq', ph: 'Tìm tiêu đề hoặc nội dung', val: st.q, active: 0, add: c.can_post ? addBtn(`data-tin-go="${esc(hf('tin-sua'))}"`, 'Đăng tin mới') : '' })}
     <div class="cd" id="nlist">${rows || '<p class="sub pad">Chưa có tin nào.</p>'}</div>`;
   if (setPrefs) setPrefs({ [SEEN_KEY]: { ...((getPrefs?.() || {})[SEEN_KEY] || {}), [fam]: Date.now() } }); // seen once the feed is open
   main.querySelector('#nq')?.addEventListener('input', (e) => {

@@ -76,7 +76,7 @@ const opaque = (bg) => !/rgba\(.*,\s*0\)$/.test(bg) && bg !== 'transparent';
 const PAGES = [
   ['list', '.lbar', 'Tìm'],
   ['gio', '.lbar', 'Giỗ'],
-  ['tree', '.tbar2', 'Cây'],
+  ['tree', '.lbar', 'Cây'],
   ['mine', '.lbar', 'Góp ý của tôi'],
 ];
 for (const [width, scheme] of [[390, 'light'], [390, 'dark'], [1280, 'light']]) {

@@ -100,14 +100,33 @@ test('Tìm: a giỗ date lists the people whose giỗ is that lunar day; line 2 
     const { page, ctx } = await open(browser, { phone: true, hash: '/#/duong/list' });
     for (const q of ['3/8', '3-8', 'mồng 3 tháng 8', 'Mong 3 thang 8']) {
       await page.locator('#q').fill(q);
-      await page.waitForFunction((n) => document.querySelectorAll('.card').length === n, 2, { timeout: 3000 });
-      const names = await page.locator('.card b').allInnerTexts();
+      await page.waitForFunction((n) => document.querySelectorAll('.pi-card').length === n, 2, { timeout: 3000 });
+      const names = await page.locator('.pi-card b').allInnerTexts();
       assert.deepEqual(names.map((n) => n.replace(/^(Ông|Bà) \S+ /, '')).sort(), ['Dương Hoàng Chín', 'Dương Thị Hai'], q);
-      assert.deepEqual(await page.locator('.card .sub').allInnerTexts(), ['Giỗ 3/8 ÂL', 'Giỗ 3/8 ÂL'], q + ': line 2');
+      assert.deepEqual(await page.locator('.pi-card .sub').allInnerTexts(), ['Giỗ 3/8 ÂL', 'Giỗ 3/8 ÂL'], q + ': line 2');
     }
     await page.locator('#q').fill('3/9');
-    await page.waitForFunction(() => document.querySelectorAll('.card').length === 0, null, { timeout: 3000 });
+    await page.waitForFunction(() => document.querySelectorAll('.pi-card').length === 0, null, { timeout: 3000 });
     await ctx.close();
   } finally { await browser.close(); }
 });
 
+
+// A re-render while the person types (a sync, a navigation) must not drop the text typed so far: the field is rebuilt
+// from the last committed value, so the typed text and the focus are carried over.
+test('Tìm: a re-render between keystrokes keeps the typed text and the focus', { skip }, async () => {
+  const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox'] });
+  try {
+    const { page, ctx } = await open(browser, { phone: false });
+    await page.click('#topsearch');
+    await page.waitForFunction(() => location.hash === '#list', null, { timeout: 3000 });
+    await page.waitForFunction(() => document.activeElement?.id === 'q', null, { timeout: 3000 });
+    for (const ch of 'Dương') {
+      await page.keyboard.type(ch);
+      await page.evaluate(() => window.dispatchEvent(new HashChangeEvent('hashchange'))); // a same-route re-render
+    }
+    await page.waitForFunction(() => document.activeElement?.id === 'q' && document.getElementById('q').value === 'Dương', null, { timeout: 3000 });
+    assert.equal(await page.evaluate(() => document.getElementById('q').value), 'Dương', 'the typed text survives the re-renders');
+    await ctx.close();
+  } finally { await browser.close(); }
+});

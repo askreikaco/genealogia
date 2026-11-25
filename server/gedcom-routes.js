@@ -10,6 +10,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const G = require('./gedcom');
 const REL = require('./relations');
+const BRN = require('./branch-routes'); // a branch exports its scope (exportRows)
 const EV = require('./events');
 const { validateOp } = require('./core');
 
@@ -99,20 +100,51 @@ module.exports = function mountGedcom(app, deps) {
     return out;
   }
 
+  // The family's rows for an export (full or branch): people, events, stories and relations.
+  // A branch exports its scope of the home tree (the same rows as the branch export below); other families, all rows.
+  async function exportRows(f) {
+    const view = await BRN.viewOf(pool, f, true);
+    const ids = view.ids ? new Set(view.ids) : null;
+    const pick = (rs, key) => (ids ? rs.filter((r) => ids.has(r[key])) : rs);
+    const { rows: persons } = await pool.query('select id, data from persons where family_id = $1 and not deleted order by id', [view.famId]);
+    const { rows: events } = await pool.query(
+      'select id, person_id, type, date_kind, date_from, date_to, place, description, lunar, sources from events where family_id = $1', [view.famId]);
+    const { rows: stories } = await pool.query('select person_id, kind, title, body from stories where family_id = $1 order by created_at', [view.famId]);
+    const rel = view.rel || await REL.readRel(pool, f.id, true);
+    return { persons: pick(persons, 'id'), events: pick(events, 'person_id'), stories: pick(stories, 'person_id'), rel };
+  }
+
   app.get('/api/gedcom', need('member'), async (req, res, next) => {
     try {
       const f = req.fam;
       const living = req.query.living === 'hide' ? 'hide' : 'show';
       const R = await EV.rules();
-      const { rows: persons } = await pool.query('select id, data from persons where family_id = $1 and not deleted order by id', [f.id]);
-      const { rows: events } = await pool.query(
-        'select id, person_id, type, date_kind, date_from, date_to, place, description, lunar, sources from events where family_id = $1', [f.id]);
-      const { rows: stories } = await pool.query('select person_id, kind, title, body from stories where family_id = $1 order by created_at', [f.id]);
-      const rel = await REL.readRel(pool, f.id, true);
+      const { persons, events, stories, rel } = await exportRows(f);
       const text = G.buildExport({ R, family: f, persons, events, pc: rel.pc, cp: rel.cp, stories, living });
       res.set('Cache-Control', 'no-store');
       res.set('Content-Type', 'text/plain; charset=utf-8');
       res.set('Content-Disposition', `attachment; filename="${String(f.slug || f.id).replace(/[^a-z0-9-]/g, '')}.ged"`);
+      res.send(text);
+    } catch (e) { next(e); }
+  });
+
+  // One branch as GEDCOM: the person, blood descendants and their spouses (G.branchIds). Same privacy as the full export.
+  app.get('/api/persons/:id/gedcom', need('member'), async (req, res, next) => {
+    try {
+      if (req.query.scope !== 'branch') return res.status(400).json({ error: 'Chỉ có xuất nhánh (scope=branch).' });
+      const f = req.fam;
+      const living = req.query.living === 'hide' ? 'hide' : 'show';
+      const id = String(req.params.id || '');
+      const R = await EV.rules();
+      const { persons: all, events, stories, rel } = await exportRows(f);
+      const root = all.find((p) => p.id === id);
+      if (!root) return res.status(404).json({ error: 'Không tìm thấy người này.' });
+      const set = G.branchIds(id, rel.pc, rel.cp);
+      const persons = all.filter((p) => set.has(p.id));
+      const text = G.buildExport({ R, family: f, persons, events, pc: rel.pc, cp: rel.cp, stories, living });
+      res.set('Cache-Control', 'no-store');
+      res.set('Content-Type', 'text/plain; charset=utf-8');
+      res.set('Content-Disposition', `attachment; filename="${G.asciiBase(root.data?.name)}-nhanh.ged"`);
       res.send(text);
     } catch (e) { next(e); }
   });

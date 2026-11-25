@@ -8,12 +8,17 @@ const FIELDS = {
   spouse: 'text', spouse_of: 'text', spouse_n: 'int', other_parent: 'text', born: 'text', died: 'text', death_lunar: 'text', gio_lunar: 'text',
   place: 'text', alias: 'text', name_han: 'text', title_name: 'text', job: 'text', religion: 'text', married: 'text',
   burial: 'text', photo: 'text', phone: 'text', email: 'text', address: 'text', facebook: 'text',
-  zalo: 'text', social: 'text', contact_public: { enum: ['', 'yes', 'no'] },
+  zalo: 'text', social: 'text', contacts: 'contacts', contact_public: { enum: ['', 'yes', 'no'] }, // contacts: a list (contact-rules.js); the flat fields are read as before
+
   living: { enum: ['', 'living', 'dead', 'unknown'] }, note: 'text', verify: 'text', source: 'text',
   lat: 'text', lon: 'text', geo_precision: { enum: ['', 'exact', 'approx', 'province'] },
+  names: 'names', // surname over time (surname-rules.js): a list, written whole
 };
+const { namesError, publicNames } = require('./surname-rules');
+const { contactsError, contactsOf } = require('./contact-rules');
 const DELETE = '_deleted';
-const CONTACT = ['phone', 'email', 'address', 'facebook', 'zalo', 'social'];
+// Contact data: the list and the flat fields it replaces (read compat). Hidden from guests and from the dead.
+const CONTACT = ['contacts', 'phone', 'email', 'address', 'facebook', 'zalo', 'social'];
 const MAX_TEXT = 5000;
 const MAX_SKEW = 5 * 60 * 1000;
 
@@ -25,15 +30,25 @@ function isDead(d) {
 // opts.flag: when a living person's contacts are hidden, say so with has_contact: true (a boolean, never a value),
 // so the profile can show the Liên hệ card with a sign-in prompt. Only the persons API asks for it.
 function publicView(d, opts = {}) {
-  const out = { ...d };
+  const out = withContacts(d);
   delete out.has_contact;
   const showContact = d.contact_public === 'yes' && !isDead(d);
   if (!showContact) {
-    if (opts.flag && !isDead(d) && CONTACT.some((k) => d[k])) out.has_contact = true;
+    if (opts.flag && !isDead(d) && contactsOf(d).length) out.has_contact = true;
     for (const k of CONTACT) delete out[k];
   }
   delete out.birth_date; delete out.birth_lunar; delete out.death_date; // public sees the YEARS only; full dates for signed-in family members
+  if (Array.isArray(d.names)) out.names = publicNames(d.names); // the reason and source of a change: members only
   if (isDead(d)) for (const k of CONTACT) delete out[k];
+  return out;
+}
+
+// The person as the client reads it: the list (built from the flat fields when no list is written yet). Full records
+// (members) and the public view both go through here, so the client sees one shape.
+function withContacts(d) {
+  const out = { ...d };
+  const list = contactsOf(d);
+  if (list.length || Array.isArray(d.contacts)) out.contacts = list; else delete out.contacts;
   return out;
 }
 
@@ -56,6 +71,8 @@ function validateValue(field, v) {
   if (t === 'int') return Number.isInteger(v) ? null : `${field} must be an integer`;
   if (t === 'num') return Number.isFinite(v) ? null : `${field} must be a number`;
   if (field === 'name_han') return hanNameError(v);
+  if (t === 'names') return namesError(v);
+  if (t === 'contacts') return contactsError(v);
   if (t === 'text') return typeof v === 'string' && v.length <= MAX_TEXT ? null : `${field} must be text <= ${MAX_TEXT}`;
   if (t.enum) return t.enum.includes(v) ? null : `${field} must be one of ${t.enum.join(', ')}`;
   return null;
@@ -98,4 +115,4 @@ function mergeOp(row, op, now = Date.now()) {
   return { data, fieldTs, deleted, changes };
 }
 
-module.exports = { FIELDS, CONTACT, DELETE, MAX_HAN, HAN_RE, hanNameError, isDead, publicView, validateValue, validateOp, mergeOp };
+module.exports = { FIELDS, CONTACT, DELETE, MAX_HAN, HAN_RE, hanNameError, isDead, publicView, withContacts, validateValue, validateOp, mergeOp };

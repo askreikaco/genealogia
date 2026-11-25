@@ -7,6 +7,7 @@
 // Lunar dates: NOTE "Âm lịch: ..."; giỗ lunar date under DEAT: NOTE "Giỗ (âm lịch): ...".
 'use strict';
 const { isDead, hanNameError } = require('./core');
+const { contactsOf } = require('./contact-rules');
 
 const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const LUNAR_PREFIX = 'Âm lịch: ';
@@ -424,12 +425,8 @@ function buildExport({ R, family, persons, events = [], pc = [], cp = [], storie
     for (const st of storiesBy.get(p.id) || []) emit(lines, 1, 'NOTE', `${STORY_PREFIX[st.kind] || STORY_PREFIX.chuyen}${st.title || ''}${st.body ? '\n' + st.body : ''}`);
     if (d.source) lines.push(`1 SOUR @${srcRef(String(d.source).trim(), '')}@`);
     if (d.contact_public === 'yes' && !isDead(d)) {
-      if (d.phone) tagLine(lines, 1, 'PHON', d.phone);
-      if (d.email) tagLine(lines, 1, 'EMAIL', d.email);
-      if (d.address) tagLine(lines, 1, 'ADDR', d.address);
-      if (d.facebook) tagLine(lines, 1, '_FB', d.facebook);
-      if (d.zalo) tagLine(lines, 1, '_ZALO', d.zalo);
-      if (d.social) tagLine(lines, 1, '_SOCIAL', d.social);
+      const TAG = { phone: ['PHON'], email: ['EMAIL'], address: ['ADDR'], facebook: ['_FB'], zalo: ['_ZALO'], other: ['_SOCIAL'] };
+      for (const c of contactsOf(d)) if (TAG[c.type]) tagLine(lines, 1, TAG[c.type][0], c.value); // the list (or the flat fields it replaces)
     }
   }
 
@@ -695,5 +692,28 @@ function planImport(doc, ctx) {
   return out;
 }
 
+// The branch of one person for export: the person, the blood descendants (parent-child kind ruot, down the line only),
+// and the spouses of those people. Ancestors, siblings and adopted or step children are left out. pc / cp: relation rows.
+function branchIds(rootId, pc = [], cp = []) {
+  const kids = new Map();
+  for (const r of pc) if (r.kind === 'ruot') { if (!kids.has(r.parent_id)) kids.set(r.parent_id, []); kids.get(r.parent_id).push(r.child_id); }
+  const down = new Set([rootId]); const queue = [rootId];
+  while (queue.length) {
+    for (const c of kids.get(queue.shift()) || []) if (!down.has(c)) { down.add(c); queue.push(c); }
+  }
+  const set = new Set(down);
+  for (const r of cp) {
+    if (down.has(r.a_id) && !down.has(r.b_id)) set.add(r.b_id);
+    else if (down.has(r.b_id) && !down.has(r.a_id)) set.add(r.a_id);
+  }
+  return set;
+}
+
+// A file name part that is plain ASCII: "Nguyễn Văn Ất" -> "nguyen-van-at". Falls back to "nhanh".
+function asciiBase(name) {
+  return String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
+    .replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'nhanh';
+}
+
 module.exports = { parseGedDate, gedDateOut, readGedcom, buildExport, planImport, partsOf, personName, parseTree, dateFromText, dmyOut, yearOfIso,
-  storyOf, LUNAR_PREFIX, GIO_PREFIX, EVEN_LABEL, CP_KINDS, PC_KINDS };
+  storyOf, LUNAR_PREFIX, GIO_PREFIX, EVEN_LABEL, CP_KINDS, PC_KINDS, branchIds, asciiBase };

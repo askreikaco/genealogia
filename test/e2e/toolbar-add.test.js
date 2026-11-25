@@ -46,8 +46,8 @@ test.before(async () => {
 });
 test.after(() => { srv?.close(); });
 
-async function open(browser, hash) {
-  const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 } });
+async function open(browser, hash, colorScheme = 'light', width = 390) {
+  const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width, height: 844 }, colorScheme });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -94,8 +94,12 @@ test('Tìm: the "+" is in the toolbar after Bộ lọc; a search that found no o
     assert.equal(await page.locator('#acbox:visible').count(), 0, 'no type-ahead popup when nothing matches: one empty state');
     await shot(page, 'tb-list-390.png');
     await page.click('[data-add="list"]');
-    await page.waitForSelector('#fpform input[name="name"]', { timeout: 8000 });
-    assert.equal(await page.inputValue('#fpform input[name="name"]'), 'Giả Quang Nghĩa');
+    // step 1: the search text is in the search field; nobody matches, so "Không thấy" goes on to the basic form
+    await page.waitForSelector('#add-q', { timeout: 8000 });
+    assert.equal(await page.inputValue('#add-q'), 'Giả Quang Nghĩa');
+    await page.click('[data-new]');
+    await page.waitForSelector('#add-f input[name="name"]', { timeout: 8000 });
+    assert.equal(await page.inputValue('#add-f input[name="name"]'), 'Giả Quang Nghĩa');
     assert.deepStrictEqual(errors, []);
   } finally { await b.close(); }
 });
@@ -148,10 +152,67 @@ test('Quan hệ: search and Mức narrow every level; "+" with Mức = Con prefi
     assert.equal(await page.inputValue('.rel-sheet #rel-q'), 'Giả Quang Nghĩa');
     assert.match(await page.textContent('.rel-sheet h2'), /Con/);
     await page.click('.rel-sheet [data-newp]');
-    await page.waitForSelector('#fpform input[name="name"]', { timeout: 8000 });
-    assert.equal(await page.inputValue('#fpform input[name="name"]'), 'Giả Quang Nghĩa');
-    assert.match(await page.textContent('[data-acc-btn="gd"]'), /đời 7/i, 'next generation (Cha is 6)');
+    await page.waitForSelector('#add-f input[name="name"]', { timeout: 8000 });
+    assert.equal(await page.inputValue('#add-f input[name="name"]'), 'Giả Quang Nghĩa');
+    // the basic form has no Đời field: the generation (Cha is 6, so 7) is saved with the child (form-fields.test.js)
     await shot(page, 'tb-rel-form-390.png');
     assert.deepStrictEqual(errors, []);
+  } finally { await b.close(); }
+});
+
+// The toolbar fields (search input, Bộ lọc, +) use a translucent tint (tokens.css --c-field-tint), so they show on any layer.
+// The field's computed background must differ from the background behind it (nearest non-transparent ancestor), in both themes.
+test('Hồ sơ Quan hệ and Tìm: the toolbar search field has its own background on the card (dark and light)', { skip }, async () => {
+  const b = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox'] });
+  const bgUnder = (page, sel) => page.evaluate((s) => {
+    const field = document.querySelector(s);
+    const behind = (el) => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)') return c; } return 'none'; };
+    return { field: getComputedStyle(field).backgroundColor, behind: behind(field.parentElement), scheme: getComputedStyle(document.documentElement).colorScheme };
+  }, sel);
+  try {
+    for (const scheme of ['dark', 'light']) {
+      const q = await open(b, 'person/PA', scheme);
+      await q.page.waitForSelector('section.relsec #relq', { timeout: 8000 });
+      await q.page.mouse.move(1, 1);
+      const rel = await bgUnder(q.page, 'section.relsec #relq');
+      assert.notEqual(rel.field, rel.behind, `Quan hệ ${scheme}: the search field differs from the card behind it`);
+      assert.notEqual(rel.field, 'none');
+      if (SHOT_DIR) { await q.page.locator('#reltb').evaluate((el) => el.scrollIntoView({ block: 'start' })); await q.page.waitForTimeout(200); }
+      if (SHOT_DIR) await q.page.screenshot({ path: path.join(SHOT_DIR, `tbar-quanhe-${scheme}.png`) });
+      assert.deepStrictEqual(q.errors, []);
+      await q.ctx.close();
+
+      const t = await open(b, 'list', scheme);
+      await t.page.waitForSelector('.lbar #q', { timeout: 8000 });
+      await t.page.mouse.move(1, 1);
+      const tim = await bgUnder(t.page, '.lbar #q');
+      assert.notEqual(tim.field, tim.behind, `Tìm ${scheme}: the search field differs from the bar behind it`);
+      if (SHOT_DIR) await t.page.screenshot({ path: path.join(SHOT_DIR, `tbar-tim-${scheme}.png`) });
+      assert.deepStrictEqual(t.errors, []);
+      await t.ctx.close();
+    }
+  } finally { await b.close(); }
+});
+
+// Desktop (1280): the inline quick-filter select (.lq, Lịch "Hiển thị") uses the same field tint as the search field, inside a card.
+test('Lịch at 1280 in a card: the inline quick-filter select has the field tint, not the card layer (dark and light)', { skip }, async () => {
+  const b = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox'] });
+  try {
+    for (const scheme of ['dark', 'light']) {
+      const q = await open(b, 'lich', scheme, 1280);
+      await q.page.waitForSelector('#gallq', { timeout: 8000 });
+      // the owner's case: the toolbar inside a card (.cd, layer colour). Lịch has no card around its bar, so wrap the real bar in one.
+      await q.page.evaluate(() => { const bar = document.querySelector('#gq').closest('.lbar'); const card = document.createElement('div'); card.className = 'cd'; bar.parentNode.insertBefore(card, bar); card.appendChild(bar); });
+      await q.page.mouse.move(1, 1);
+      const st = await q.page.evaluate(() => {
+        const field = document.querySelector('#gallq');
+        const behind = (el) => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)') return c; } return 'none'; };
+        return { field: getComputedStyle(field).backgroundColor, behind: behind(field.parentElement) };
+      });
+      assert.notEqual(st.field, 'none');
+      assert.notEqual(st.field, st.behind, `Lịch 1280 ${scheme}: the quick-filter select differs from the bar behind it`);
+      assert.deepStrictEqual(q.errors, []);
+      await q.ctx.close();
+    }
   } finally { await b.close(); }
 });

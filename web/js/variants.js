@@ -3,7 +3,7 @@
 // reliable. Editors choose the value the profile shows ("Dùng giá trị này"), add another value with its source, or
 // remove one that is not shown. Fetched per person when a profile is drawn (cached a minute), not stored offline.
 import { esc } from './model.js';
-import { toast } from './ui.js';
+import { toast, sheet, KEEP } from './ui.js';
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger } from './danger.js';
 
 export const FIELDS = { name: 'Họ tên', born: 'Năm sinh', died: 'Năm mất', birth_place: 'Nơi sinh', place: 'Nơi sống', burial: 'An táng' };
@@ -58,17 +58,15 @@ const addForm = (field) => `<details class="var-add"><summary class="btn sm gh">
 export function openSheet({ fam, personId, personName, field, done }) {
   const c = cache.get(personId); const v = fieldOf(personId, field); if (!v) return;
   const canEdit = !!c?.can_edit;
-  const d = document.createElement('dialog'); d.className = 'dlg var-sheet'; d.setAttribute('aria-labelledby', 'var-h');
-  const draw = () => {
-    const cur = fieldOf(personId, field) || v;
-    d.innerHTML = `<div class="form-stack"><h2 id="var-h">${esc(FIELDS[field])} · ${esc(personName)}</h2>
+  const cur = fieldOf(personId, field) || v;
+  // Shared sheet(): no submit here (the buttons below act); Enter in a field keeps the sheet open.
+  const d = sheet(`<div class="form-stack"><h2 id="var-h">${esc(FIELDS[field])} · ${esc(personName)}</h2>
       <p class="sub">Ứng dụng không chọn đâu là đúng: mọi giá trị đều được giữ cùng nguồn của nó.${canEdit ? ' Chọn giá trị hồ sơ sẽ hiển thị.' : ''}</p>
       <ul class="var-list">${cur.items.map((x) => itemHtml(x, canEdit)).join('')}</ul>
       <p class="err" hidden></p>
       ${canEdit ? addForm(field) : ''}
-      <div class="row end"><button type="button" class="btn gh" data-var-close>Đóng</button></div></div>`;
-  };
-  draw(); document.body.append(d); d.showModal();
+      <div class="row end"><button type="button" class="btn gh" data-var-close>Đóng</button></div></div>`, () => KEEP, { cls: 'var-sheet' });
+  d.setAttribute('aria-labelledby', 'var-h');
   const close = () => { d.close(); d.remove(); };
   const fail = (e) => { const p = d.querySelector('.err'); p.textContent = e.message; p.hidden = false; };
   const reload = async (msg) => { toast(msg); cache.delete(personId); ensure(fam, personId, true); close(); done?.(); };

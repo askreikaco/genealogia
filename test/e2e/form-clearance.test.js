@@ -57,7 +57,11 @@ for (const [w, h] of [[390, 844], [1280, 800]]) {
       await page.goto(base + '/#them');
       await page.waitForSelector('#fpform', { timeout: 15000 });
       await page.click('button[data-acc-btn="lien"]');
-      await page.waitForSelector('#fpform input[name="email"]', { state: 'visible', timeout: 5000 });
+      // contacts are rows [type][value][×] (#113): add a phone row, then an email row
+      await page.click('#fpform [data-ct-add]');
+      await page.click('#fpform [data-ct-add]');
+      await page.locator('#fpform [data-ct-row="1"] [data-ct-type]').selectOption('email');
+      await page.waitForSelector('#fpform [data-ct-row="1"] [data-ct-val][type="email"]', { state: 'visible', timeout: 5000 });
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
       await page.waitForTimeout(300);
       const r = await page.evaluate(() => {
@@ -70,10 +74,10 @@ for (const [w, h] of [[390, 844], [1280, 800]]) {
       assert.ok(r.lastBottom < r.barTop, `${w}px: last field (${r.last}) bottom ${Math.round(r.lastBottom)} is above the bar top ${Math.round(r.barTop)}`);
       assert.equal(Math.round(r.barH), 64, 'the bar is --fp-bar-h tall');
       // a field that is under the bar is brought to the middle of the viewport when it takes focus
-      await page.evaluate(() => { document.querySelector('#fpform input[name="email"]').focus(); });
+      await page.evaluate(() => { document.querySelector('#fpform [data-ct-row="1"] [data-ct-val]').focus(); });
       await page.waitForTimeout(400);
       const mid = await page.evaluate(() => {
-        const el = document.querySelector('#fpform input[name="email"]').getBoundingClientRect();
+        const el = document.querySelector('#fpform [data-ct-row="1"] [data-ct-val]').getBoundingClientRect();
         return Math.abs((el.top + el.bottom) / 2 - innerHeight / 2);
       });
       assert.ok(mid < 80, `focused field centred (off by ${Math.round(mid)} px)`);

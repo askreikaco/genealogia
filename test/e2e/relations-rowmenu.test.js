@@ -65,18 +65,15 @@ async function ownerPage(width = 390) {
 test('list row ⋯ "Thêm con" in a relation-table family: form without parent, then the relation; the child shows in Quan hệ', { skip }, async () => {
   const { ctx, page, errors } = await ownerPage(390);
   try {
-    const parent = FIX.find((x) => x.id === 'P001');
     await page.goto(base + '/#list');
     await page.waitForSelector('[data-menu="P001"]', { timeout: 15000 });
     await page.locator('[data-menu="P001"]').first().click();
     await page.locator('.menu [data-act="child"][data-id="P001"]').click();
-    // the person form: generation prefilled from the parent, no parent field sent
-    await page.waitForSelector('input[name=name]', { timeout: 8000 });
-    const gen = Number(parent.data.gen) || 0;
-    if (gen) assert.equal((await page.textContent('[data-au="gen"] .fp-ro-v')).trim(), String(gen + 1), 'Đời = parent + 1');
-    await page.locator('input[name=name]').fill('Dương Văn Hàng');
-    await page.locator('input[name=sex][value="m"]').check();
-    await page.locator('.fp-bar button[type=submit]').click();
+    // the basic form (web/js/addflow.js): name, sex, dates; the generation from the parent is saved with it, no parent field
+    await page.waitForSelector('#add-f input[name=name]', { timeout: 8000 });
+    await page.locator('#add-f input[name=name]').fill('Dương Văn Hàng');
+    await page.locator('#add-f select[name=sex]').selectOption('m');
+    await page.locator('#add-f button[type=submit]').click();
     // the relation sheet opens at its last step for the new person
     await page.waitForSelector('.rel-sheet #ord', { timeout: 10000 });
     assert.equal(await page.locator('.rel-sheet .err').count(), 0, 'no error on the relation sheet');

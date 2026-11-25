@@ -6,11 +6,12 @@ const fs = require('fs');
 const path = require('path');
 const { skip, launch, startWeb, SHOTS } = require('./_e2e-harness');
 const { setBase, open, openIn, expand, editName } = require('./_form-mock');
+const { FONTS, mockApi } = require('./_book-mock');
 
-let srv;
+let srv, base = '';
 test.before(async () => {
   if (skip) return;
-  const w = await startWeb(); srv = w.srv; setBase(w.base);
+  const w = await startWeb(); srv = w.srv; base = w.base; setBase(w.base);
 });
 test.after(() => { srv?.close(); });
 
@@ -19,10 +20,9 @@ test('screenshots (only with GP_SHOT_DIR)', { skip: skip || !SHOTS }, async () =
   fs.mkdirSync(SHOTS, { recursive: true });
   const browser = await launch();
   try {
-    const a = await open(browser, { role: 'editor', path: '#person/PA' });
-    await a.page.locator('[data-menu="PA"]').first().click();
-    await a.page.locator('.menu [data-act="child"][data-id="PA"]').click();
-    await a.page.waitForSelector('#fpform');
+    // the new-person form (#them). The child add from a row's ⋯ or Quan hệ now opens a short basic dialog, not this form.
+    const a = await open(browser, { role: 'editor', path: '#them' });
+    await a.page.waitForSelector('#fpform', { timeout: 15000 });
     await expand(a.page, 'sinh');
     await a.page.fill('input[name=birth_smart]', '1958');
     await a.page.waitForTimeout(200);
@@ -79,9 +79,14 @@ test('book screenshots and print PDF (GP_SHOT_DIR)', { skip: skip || !SHOTS }, a
   const browser = await launch();
   try {
     for (const [file, vp] of [['book-390.png', { width: 390, height: 844 }], ['book-1280.png', { width: 1280, height: 900 }]]) {
-      const s = await open(browser, { role: 'editor', path: '#sua/K2', viewport: vp });
-      await s.page.goto(base + '/book');
-      await s.page.waitForSelector('.pg', { timeout: 8000 });
+      // the book reads /api/book/outline and the persons: the book mock serves them (the form mock does not)
+      const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: vp });
+      const page = await ctx.newPage();
+      await page.route(FONTS, (r) => r.abort());
+      await mockApi(page);
+      const s = { page, ctx };
+      await s.page.goto(base + '/book?embed=1');
+      await s.page.waitForSelector('.pg .cover', { timeout: 8000 });
       await s.page.waitForTimeout(300);
       await s.page.screenshot({ path: path.join(SHOTS, file), fullPage: true });
       if (file === 'book-390.png') {

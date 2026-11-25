@@ -1,11 +1,15 @@
 /* List toolbar (ListToolbar: search, Filters button, active tags) and the filter sheet. Shared by app.css pages and book.html. */
 .lbar{display:flex;gap:var(--sp-3);align-items:stretch;min-width:0}.lbar .srch{flex:1;min-width:0;margin:0}
-.srch input,.fp-body select,.tbar2 select,.lq select{box-sizing:border-box;width:100%;height:48px;border-radius:0;-webkit-appearance:none;appearance:none;background-color:var(--c-layer);border:0;border-bottom:1px solid var(--c-border-strong);padding:0 var(--sp-5);font-size:var(--fs-2);color:var(--c-text)}
-.fp-body select,.tbar2 select,.lq select{padding-right:40px;background-image:linear-gradient(45deg,transparent 50%,var(--c-text) 50%),linear-gradient(135deg,var(--c-text) 50%,transparent 50%);background-position:calc(100% - 20px) 21px,calc(100% - 15px) 21px;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.srch input,.fp-body select,.lq select{box-sizing:border-box;width:100%;height:48px;border-radius:0;-webkit-appearance:none;appearance:none;background-color:var(--c-layer);border:0;border-bottom:1px solid var(--c-border-strong);padding:0 var(--sp-5);font-size:var(--fs-2);color:var(--c-text)}
+/* the toolbar search field: translucent tint (tokens.css --c-field-tint), so it shows inside a card too */
+.srch input{background-color:var(--c-field-tint)}.srch input:hover,.srch input:focus{background-color:var(--c-field-tint-2)}
+/* desktop inline quick-filter selects (.lq): the same tint as the search field */
+.lq select{background-color:var(--c-field-tint)}.lq select:hover,.lq select:focus{background-color:var(--c-field-tint-2)}
+.fp-body select,.lq select{padding-right:40px;background-image:linear-gradient(45deg,transparent 50%,var(--c-text) 50%),linear-gradient(135deg,var(--c-text) 50%,transparent 50%);background-position:calc(100% - 20px) 21px,calc(100% - 15px) 21px;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
 .fp-body select{background-color:var(--c-bg)}
 .srch input:focus,.fp-body select:focus,.fld select:focus{outline:2px solid var(--c-accent);outline-offset:-2px}
-.fbtn{position:relative;width:48px;height:48px;flex:none;display:grid;place-items:center;background:var(--c-layer);border:0;border-bottom:1px solid var(--c-border-strong);color:var(--c-text);cursor:pointer}
-.fbtn:hover{background:var(--c-layer-2)}.fbtn:focus-visible{outline:2px solid var(--c-accent);outline-offset:-2px}
+.fbtn{position:relative;width:48px;height:48px;flex:none;display:grid;place-items:center;background:var(--c-field-tint);border:0;border-bottom:1px solid var(--c-border-strong);color:var(--c-text);cursor:pointer}
+.fbtn:hover{background:var(--c-field-tint-2)}.fbtn:focus-visible{outline:2px solid var(--c-accent);outline-offset:-2px;background:var(--c-field-tint-2)}
 .fbadge{position:absolute;top:6px;right:6px;min-width:16px;height:16px;padding:0 var(--sp-2);border-radius:8px;background:var(--c-accent);color:var(--c-on-color);font-size:11px;line-height:var(--lh-1);text-align:center}
 .ltags{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center}
 .tagx{height:24px;padding:0 var(--sp-3);border:0;border-radius:12px;background:var(--blue-b);color:var(--blue-f);font:inherit;font-size:var(--fs-1);cursor:pointer}
@@ -23,8 +27,6 @@ dialog.fpanel::backdrop{background:var(--c-scrim)}
 .fp-hd{display:flex;justify-content:space-between;align-items:flex-start;padding-left:var(--sp-5)}.fp-hd h2{margin:0;padding-top:var(--sp-5);font-size:var(--fs-4);font-weight:400;line-height:var(--lh-4)}
 .fp-body{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:var(--sp-5);padding:var(--sp-3) var(--sp-5) var(--sp-6)}.fp-body label:not(.radio){display:flex;flex-direction:column;gap:var(--sp-2);font-size:var(--fs-1);color:var(--c-text-2)}
 .fset{border:0;padding:0;margin:0}.fset legend{font-size:var(--fs-1);color:var(--c-text-2);margin-bottom:var(--sp-2)}
-.tbar2 .lbar{flex:1}
-.tbar2{padding:0!important;margin:0!important;align-items:stretch}
 /* desktop inline quick filters: same controls as the sheet,phone keeps everything in the sheet */
 .lq{display:flex;gap:var(--sp-3);align-items:stretch}.lq select{width:auto;min-width:180px;max-width:260px}
 
@@ -64,8 +66,8 @@ dialog.fpanel::backdrop{background:var(--c-scrim)}
    only while stuck ([data-stuck], set by ui.js), no layout shift. Inside a card it releases when the card scrolls away
    (sticky is bounded by its parent). On the profile the tab bar sticks too and toolbars stick just below it. */
 .lbar,.stk{position:sticky;top:var(--sticky-top);z-index:var(--z-sticky);background:var(--stk-bg,var(--c-bg))}
-.stk .lbar,.tbar2 .lbar,.tbar .lbar{position:static;background:none}
+.stk .lbar{position:static;background:none}
 .cd,.relsec,.grpsec,.mg-g{--stk-bg:var(--c-layer)}
-.lbar[data-stuck],.stk[data-stuck],.tbar2[data-stuck],.ptabs[data-stuck]{box-shadow:0 1px 0 var(--c-border)}
+.lbar[data-stuck],.stk[data-stuck],.ptabs[data-stuck]{box-shadow:0 1px 0 var(--c-border)}
 .ptabs{position:sticky;top:var(--topbar-h);z-index:var(--z-sticky);background:var(--c-bg)}
 .ptabs~*{--sticky-top:calc(var(--topbar-h) + var(--tabs-h))}

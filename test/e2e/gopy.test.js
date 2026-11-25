@@ -104,7 +104,8 @@ test('reviewer: #gop-y opens Cần duyệt (N); compact rows, ×2 duplicates, pe
       await page.waitForSelector('.mg-g');
       assert.deepStrictEqual(await page.$$eval('.mg-h', (els) => els.map((e) => e.textContent.trim())), ['Xem', 'Dòng họ', 'Ứng dụng'], 'groups by intent');
       const fr = await famRows(page);
-      assert.ok(/Tìm \/ lập dòng họ/.test(fr[0]) && /Góp ý/.test(fr[1]) && /4/.test(fr[1]) && fr.some((t) => /Thành viên & quyền/.test(t)), 'Dòng họ: Tìm / lập dòng họ first, then Góp ý with count, Thành viên for admins');
+      // Dòng họ order for an admin (editor): Tìm / lập, Nhập danh bạ (contacts import, editors only), Góp ý with count, Thành viên, ...
+      assert.ok(/Tìm \/ lập dòng họ/.test(fr[0]) && /Nhập danh bạ/.test(fr[1]) && /Góp ý/.test(fr[2]) && /4/.test(fr[2]) && fr.some((t) => /Thành viên & quyền/.test(t)), 'Dòng họ: Tìm / lập dòng họ first, Nhập danh bạ for editors, then Góp ý with count, Thành viên for admins');
       assert.ok(!(await page.locator('main .calm').allTextContents()).some((t) => /Duyệt đóng góp|Góp ý của tôi/.test(t)), 'old rows gone');
       await shot(page, `gopy-more-390-${scheme}.png`);
       assert.deepStrictEqual(errors, []);

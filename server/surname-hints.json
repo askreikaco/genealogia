@@ -1,0 +1,23 @@
+[
+  {
+    "id": "ly-nguyen-1232",
+    "from": "Lý", "from_han": "李",
+    "to": "Nguyễn", "to_han": "阮",
+    "year": "1232",
+    "title": "Đổi họ Lý sang họ Nguyễn",
+    "note": "Truyền thống ghi nhận việc đổi họ trong các dòng hoàng tộc nhà Lý sau 1225. Chưa có danh sách người hay cây cụ thể: chỉ dùng để gợi ý đối chiếu.",
+    "confidence": "tradition",
+    "source": "Truyền thống họ tộc; cần đối chiếu sử liệu trước khi gán"
+  },
+  {
+    "id": "mac-dispersal-1592",
+    "from": "Mạc", "from_han": "莫",
+    "to": "", "to_han": "",
+    "to_label": "nhiều họ khác nhau",
+    "year": "1592",
+    "title": "Họ Mạc phân tán sau 1592",
+    "note": "Sau khi nhà Mạc mất ngôi, nhiều nhánh họ Mạc đổi họ hoặc đi xa. Không có danh sách chung: mỗi cây cần tự đối chiếu.",
+    "confidence": "tradition",
+    "source": "Truyền thống họ tộc; cần đối chiếu sử liệu trước khi gán"
+  }
+]

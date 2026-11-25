@@ -13,7 +13,7 @@ import { nextAnniversary } from './lunar.js';
 import { locate } from './geo.js';
 import { chartLayout, chartSvg } from './treechart.js';
 import { emblemField, bindEmblem } from './emblem.js';
-import { isWide, isDesk, emptyState, cic, lbar, addBtn, ltags, fpanel, fsheet, setUntag, deviceNote, toast, fmtTime, fmtDate, fieldDiff, frow, accItem, accToggle, confirmModal, famChip, familyCrest, calmRow, calmAct, surnameTile, surnameTileOf, popMenu, closeMenu, sexMark, sexClass, SEX_LABEL } from './ui.js';
+import { isWide, isDesk, emptyState, cic, iconButton, toolbar, addBtn, ltags, fpanel, fsheet, sheet, closeSheets, setUntag, deviceNote, toast, fmtTime, fmtDate, fieldDiff, frow, accItem, accToggle, confirmModal, famChip, familyCrest, calmRow, calmAct, surnameTile, surnameTileOf, popMenu, closeMenu, sexMark, sexClass, SEX_LABEL, tag, section } from './ui.js';
 import { BUILD, BUILD_DATE, createUpdater, updateNotice, buildLabel } from './update.js';
 import { searchPeople } from './fuzzy.js';
 import { nameHit, listPrefill, gioPrefill, eventPrefill } from './prefill.js';
@@ -25,14 +25,19 @@ import * as SUC from './succession.js';
 import * as CLM from './claim.js';
 import * as elder from './elder.js';
 import * as LK from './links.js';
+import * as BT from './branch-trees.js';
+import { personItem } from './person-item.js';
 import { openContactImport } from './contacts-import.js';
+import { CONTACT_TYPES, TYPE as CTYPE, listOf as contactList, contactHref, itemError as contactError, cleanList, sameList } from './contacts-model.js';
 import * as CL from './clan.js';
+import * as SN from './surnames.js';
 import { COUNTRIES, countryName, countryCode } from './countries.js';
 import * as PL from './places.js';
 import { accountPage } from './account.js';
 import { twoStepPage } from './twostep.js';
 import * as MT from './match.js';
 import * as DP from './dupes.js';
+import { addSearch, addBasic } from './addflow.js';
 import * as VR from './variants.js';
 import { KIN_REGION_KEY, resolveRegion } from './kin/index.js';
 import { EVENT_TYPES, SOURCE_QUALITY, formatEventDate, sortEvents, birthIso, autoSummary, canSeeEventsOf, parseEventDate } from './events.js';
@@ -73,8 +78,8 @@ const IC = {
   invite: '<circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 12 0v1M19 8v6M16 11h6"/>',
 };
 // Carbon icons 11.90 (32 grid, filled) for the shell: switcher, nav, toggle.
-const NAV_GROUPS = [['tree', 'list', 'book', 'map', 'lich', 'stats'], ['gop-y', 'members', 'verify', 'export', 'settings']];
-const NAV_CI = { 'gop-y': 'sheet', mine: 'sheet', tree: 'tree', list: 'search', book: 'book', map: 'map', lich: 'gio', stats: 'chart', review: 'pencil', members: 'user', verify: 'flag', export: 'dl', settings: 'gear' };
+const NAV_GROUPS = [['tree', 'list', 'book', 'map', 'lich', 'stats'], ['gop-y', 'members', 'nhan-quan-ly', 'verify', 'export', 'settings']];
+const NAV_CI = { 'gop-y': 'sheet', mine: 'sheet', tree: 'tree', list: 'search', book: 'book', map: 'map', lich: 'gio', stats: 'chart', review: 'pencil', members: 'user', 'nhan-quan-ly': 'tree', verify: 'flag', export: 'dl', settings: 'gear' };
 // Switcher = switch family (one family today; more families become more rows). Subtitle: size and your role, like an organisation list.
 // ---------- families: one row component for the switcher, the settings list and the "Mở khi vào" sheet ----------
 // Hash: #/<family>/<page> for every family; old #page links are the default family (duong). Family id = slug.
@@ -170,7 +175,7 @@ const isDark = () => (document.documentElement.dataset.theme || (matchMedia('(pr
 function setTheme(t) { S.setPrefs({ theme: t }); if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; document.querySelector('meta[name=theme-color]')?.setAttribute('content', '#161616'); render(); }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!themePref()) render(); });
 // Side nav: rail (icons) or expanded. A stored choice wins ('1' rail, '0' expanded); with none, desktop (>= 66rem) starts
-// expanded and tablet (42-65.98rem) starts as rail. Same rule as reika-app (app/src/shell.tsx).
+// expanded and tablet (42-65.98rem) starts as rail.
 const railPref = () => { const v = localStorageGet('gp_rail'); return v === '1' || (v !== '0' && !matchMedia('(min-width:1056px)').matches); };
 function applyRail() { document.body.classList.toggle('rail', railPref()); }
 const icon = (n) => { if (!IC[n]) console.warn('giapha: no icon for key', n); return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n] || ''}</svg>`; };
@@ -178,7 +183,7 @@ const icon = (n) => { if (!IC[n]) console.warn('giapha: no icon for key', n); re
 const NAV = [
   ['list', 'Tìm / Danh sách', 'Tìm', 'search', 'Xem'], ['tree', 'Cây gia phả', 'Cây', 'tree', 'Xem'], ['lich', 'Lịch', 'Lịch', 'gio', 'Xem'],
   ['book', 'Sách gia phả', 'Sách', 'book', 'Xem'], ['map', 'Bản đồ', 'Bản đồ', 'map', 'Xem'], ['stats', 'Thống kê', 'Thống kê', 'chart', 'Xem'],
-  ['gop-y', 'Góp ý', 'Góp ý', 'note', 'Dữ liệu'], ['mine', 'Góp ý của tôi', 'Góp ý', 'note', 'Dữ liệu'], ['review', 'Duyệt đóng góp', 'Duyệt', 'pencil', 'Dữ liệu'], ['members', 'Thành viên & quyền', 'Thành viên', 'user', 'Dữ liệu'], ['verify', 'Cần bổ sung', 'Bổ sung', 'flag', 'Dữ liệu'], ['export', 'Tải về', 'Tải về', 'dl', 'Dữ liệu'], ['settings', 'Cài đặt', 'Cài đặt', 'gear', 'Dữ liệu'],
+  ['gop-y', 'Góp ý', 'Góp ý', 'note', 'Dữ liệu'], ['mine', 'Góp ý của tôi', 'Góp ý', 'note', 'Dữ liệu'], ['review', 'Duyệt đóng góp', 'Duyệt', 'pencil', 'Dữ liệu'], ['members', 'Thành viên & quyền', 'Thành viên', 'user', 'Dữ liệu'], ['nhan-quan-ly', 'Nhận quản lý cây', 'Nhận cây', 'tree', 'Dữ liệu'], ['verify', 'Cần bổ sung', 'Bổ sung', 'flag', 'Dữ liệu'], ['export', 'Tải về', 'Tải về', 'dl', 'Dữ liệu'], ['settings', 'Cài đặt', 'Cài đặt', 'gear', 'Dữ liệu'],
 ];
 const MOBILE_TABS = ['list', 'tree', 'lich', 'book', 'more'];
 // Suggestions waiting for an editor (badge on Duyệt đóng góp). Refreshed by render(), throttled.
@@ -216,7 +221,7 @@ function chrome() {
   const cur = r === 'person' ? 'list' : (r === 'mine' || r === 'review') ? 'gop-y' : r;
   const tl = railPref() ? 'Mở rộng menu' : 'Thu gọn menu';
   const nav = $('#nav'); nav.className = isWide() ? 'side' : 'tabs';
-  nav.innerHTML = isWide() ? `<div class="sn-items">${NAV_GROUPS.map((grp) => grp.filter((k) => !['review', 'members'].includes(k) || canAdminHere()).map((k) => { const n = NAV.find((x) => x[0] === k);
+  nav.innerHTML = isWide() ? `<div class="sn-items">${NAV_GROUPS.map((grp) => grp.filter((k) => (!['review', 'members'].includes(k) || canAdminHere()) && (k !== 'nhan-quan-ly' || S.signedIn())).map((k) => { const n = NAV.find((x) => x[0] === k);
       return `<a href="${hf(`${k}`)}" class="sn-link${cur === k ? ' on' : ''}" ${cur === k ? 'aria-current="page"' : ''} title="${n[1]}">${cic(NAV_CI[k])}<span class="sn-tx">${n[1]}</span>${(k === 'review' || k === 'gop-y') && sugCount ? ` <b class="badge">${sugCount}</b>` : ''}${k === 'lich' && lichN ? ` <b class="badge">${lichN}</b>` : ''}${k === 'members' && joinCount ? ` <b class="badge">${joinCount}</b>` : ''}</a>`; }).join('')).join('<hr class="sn-div">')}</div>
     <div class="sn-foot"><button type="button" class="sn-toggle" data-acct="${S.signedIn() ? 'sheet' : 'in'}" title="${S.signedIn() ? 'Tài khoản' : 'Đăng nhập'}">${cic('user')}<span class="sn-tx">${S.signedIn() ? esc(accName()) + ' · Tài khoản' : 'Đăng nhập'}</span></button><button type="button" class="sn-toggle" id="sntoggle" aria-controls="nav" aria-label="${tl}" aria-expanded="${!railPref()}">${cic(railPref() ? 'chevR' : 'chevL')}<span class="sn-tx">${tl}</span></button></div>` : MOBILE_TABS.map((k) => { if (k === 'more') { const on = ['map', 'stats', 'gop-y', 'mine', 'review', 'members', 'join', 'verify', 'export', 'more'].includes(navLevel().tab); return `<a href="${hf(`more`)}" class="${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''}>${cic('more', 20)}<span>Thêm</span></a>`; }
     const n = NAV.find((x) => x[0] === k); return `<a href="${hf(`${k}`)}" class="${navLevel().tab === k ? 'on' : ''}" ${navLevel().tab === k ? 'aria-current="page"' : ''}>${cic(NAV_CI[k], 20)}<span>${n[2]}</span>${k === 'lich' && lichN ? ` <b class="badge">${lichN}</b>` : ''}</a>`; }).join('');
@@ -252,7 +257,7 @@ function route() {
   return { view: view || 'tree', arg: decodeURIComponent(arg || ''), qs: new URLSearchParams(qi < 0 ? '' : raw.slice(qi + 1)), fam };
 }
 // Level of the current page: root pages (the bottom tabs and the desktop primaries) or inner pages with a parent.
-const MORE_KIDS = ['map', 'stats', 'verify', 'export', 'gop-y', 'mine', 'review', 'members', 'join', 'settings', 'tai-khoan'];
+const MORE_KIDS = ['map', 'stats', 'verify', 'export', 'gop-y', 'mine', 'review', 'members', 'join', 'settings', 'tai-khoan', 'nhan-quan-ly'];
 function navLevel(r = route()) {
   const { view, arg } = r;
   if (view === 'person') return { root: false, parent: hf('list'), tab: 'list' };
@@ -320,7 +325,7 @@ function render() {
   // same page drawn again (a sync, families arriving): the focused text field gets its focus and caret back after
   const fa = document.activeElement;
   const refocus = render.hash === location.hash && fa?.id && main.contains(fa) && /^(INPUT|TEXTAREA)$/.test(fa.tagName)
-    ? { id: fa.id, s: fa.selectionStart, e: fa.selectionEnd } : null;
+    ? { id: fa.id, s: fa.selectionStart, e: fa.selectionEnd, v: fa.value } : null; // v: the text as typed (the new field is built from the last committed route value)
   render.hash = location.hash;
   const cvOld = main.querySelector('#cv'); const treePos = cvOld && key === mounted ? { l: cvOld.scrollLeft, t: cvOld.scrollTop } : null;
   mounted = null;
@@ -347,7 +352,12 @@ function render() {
   SUC.succBar();
   const back = refocus && document.getElementById(refocus.id);
   if (timFocus) { timFocus = false; $('#q')?.focus({ preventScroll: true }); } // "/" lands in the Tìm field
-  else if (back && /^(INPUT|TEXTAREA)$/.test(back.tagName)) { back.focus({ preventScroll: true }); try { back.setSelectionRange(refocus.s, refocus.e); } catch { /* type=search etc. */ } }
+  else if (back && /^(INPUT|TEXTAREA)$/.test(back.tagName)) {
+    back.focus({ preventScroll: true });
+    // the text typed since the last committed value is kept; one input event re-filters the page for it
+    if (back.value !== refocus.v) { back.value = refocus.v; back.dispatchEvent(new Event('input')); }
+    try { back.setSelectionRange(refocus.s, refocus.e); } catch { /* type=search etc. */ }
+  }
   else main.focus({ preventScroll: true });
   { const key = ['list', 'tree'].includes(view) && !/^@/.test(arg) ? view : location.hash; if (key !== render.last) { render.last = key; if (!/^@/.test(arg)) scrollTo(0, 0); } else if (!/^@/.test(arg)) scrollTo(0, keepY); }
   stripTitles();
@@ -418,11 +428,9 @@ function tree(arg) {
   if (isDesk() && mode === 'chart' && !(q && !jump)) return treeDesk(jump);
   const chi = S.getPrefs().filters?.chi || '';
   const branches = branchesOf(M);
-  main.innerHTML = `<h1 class="vh">Cây gia phả</h1><div class="tbar2">
-
-    ${soonBanner()}<div class="lbar grow"><div class="srch"><input id="q" type="search" placeholder="Tìm trong cây" value="${jump ? '' : esc(arg)}" aria-label="Tìm tên" autocomplete="off"></div><button type="button" class="fbtn" data-fp aria-label="Bộ lọc" title="Bộ lọc">${cic('filter', 20)}${chi ? '<span class="fbadge">1</span>' : ''}</button></div>
-    ${isDesk() ? '<span class="seg"><button id="mchart">Sơ đồ</button><button class="on" id="mlist">Danh sách</button></span>' : ''}
-    <button class="ib" id="tmore" aria-haspopup="menu" aria-label="Tùy chọn cây">⋯</button></div>
+  BT.ensureInfo(S.curFamily()); BT.ensureBranches(S.curFamily());
+  main.innerHTML = `<h1 class="vh">Cây gia phả</h1>${BT.bannerHtml(S.curFamily())}
+    ${soonBanner()}${toolbar({ id: 'q', ph: 'Tìm trong cây', val: jump ? '' : arg, active: chi ? 1 : 0, extra: `${isDesk() ? '<span class="seg"><button id="mchart">Sơ đồ</button><button class="on" id="mlist">Danh sách</button></span>' : ''}${iconButton({ icon: 'more', label: 'Tùy chọn cây', attrs: 'id="tmore" aria-haspopup="menu"' })}` })}
     ${ltags(chi && M.byId.get(chi) ? [['chi', 'Chi ' + rank(M.byId.get(chi).data) + ' ' + M.byId.get(chi).data.name]] : [])}
     ${fpanel(`<label>Chi<select id="chi"><option value="">Cả họ</option>${branches.map((b) => `<option value="${b.id}" ${b.id === chi ? 'selected' : ''}>Chi ${esc(rank(b.data))} ${esc(chiName(b.data.name))}</option>`).join('')}</select></label>`)}
     <div class="tree" id="tr"></div>`;
@@ -439,9 +447,9 @@ function tree(arg) {
     if (show.size && !show.has(p.id)) return;
     const ks = M.kids(p.id); const isOpen = hits && !jump ? true : open.has(p.id) || depth < 2 && !open.has('!' + p.id);
     const d = p.data;
-    out.push(`<div class="tn ${sexClass(d.sex)} ${hits?.has(p.id) ? 'hit' : ''}" style="--d:${depth}">
-      <a href="${hf(`person/${p.id}`)}" class="tnm"><b>${esc(rank(d))} · ${esc(d.name)}${sexMark(d.sex)}</b>${d.name_han ? ` <span class="nhan" lang="zh-Hant">${esc(d.name_han)}</span>` : ''}<span class="sub">${[depth ? '' : 'Đời ' + (d.gen || '?'), yearsHtml(d), d.gio_lunar || d.death_lunar ? 'Giỗ ' + esc(d.gio_lunar || d.death_lunar) + ' ÂL' : ''].filter(Boolean).join(' · ')}</span></a>
-      ${ks.length ? `<button class="tg ${isOpen ? 'op' : ''}" data-tg="${p.id}" aria-expanded="${isOpen}" aria-label="${isOpen ? 'Đóng' : 'Mở'} nhánh">${isOpen ? '−' : '+' + ks.length}</button>` : ''}</div>`);
+    const sub = [depth ? '' : 'Đời ' + (d.gen || '?'), yearsHtml(d), d.gio_lunar || d.death_lunar ? 'Giỗ ' + esc(d.gio_lunar || d.death_lunar) + ' ÂL' : ''].filter(Boolean).join(' · ');
+    const toggle = ks.length ? `<button class="tg ${isOpen ? 'op' : ''}" data-tg="${p.id}" aria-expanded="${isOpen}" aria-label="${isOpen ? 'Đóng' : 'Mở'} nhánh">${isOpen ? '−' : '+' + ks.length}</button>` : '';
+    out.push(personItem({ rank: rank(d), name: d.name, sex: d.sex }, { variant: 'tree', depth, href: hf(`person/${p.id}`), hit: !!hits?.has(p.id), badge: d.name_han ? ` <span class="nhan" lang="zh-Hant">${esc(d.name_han)}</span>` : '', sub, action: toggle }));
     for (const s of (M.inlaws(p.id).length ? M.inlaws(p.id).map((q) => ({ n: q.data.spouse_n, name: q.data.name, note: years(q.data), id: q.id })) : spousesOf(d))) out.push(`<${s.id ? 'a href="' + hf('person/' + s.id) + '"' : 'div'} class="tsp${s.id && s.id === inlawJump ? ' hit' : ''} ${d.sex === 'f' ? 'm' : 'f'}" style="--d:${depth}"><span class="tsl">${d.sex === 'f' ? 'Chồng' : 'Vợ'}${spousesOf(d).length > 1 ? ' ' + s.n : ''}</span><b>${esc(s.name)}</b>${s.note ? `<span class="sub">${esc(s.note)}</span>` : ''}</${s.id ? 'a' : 'div'}>` + (plain ? spouseTree(s, depth) : ''));
     if (plain) out.push(lowerCards(p, depth));
     if (isOpen && ks.length) out.push(`<div class="tgen" style="--d:${depth + 1}">Đời ${(d.gen || 0) + 1} · ${ks.length} người con</div>`);
@@ -455,7 +463,7 @@ function tree(arg) {
   $('#tr').innerHTML = html || '<p class="sub">Không tìm thấy.</p>';
   $('#tr').querySelector('[data-tier-more]')?.addEventListener('click', () => { localStorageSet('gp_tier', tierOpen() ? '0' : '1'); render(); });
   $('#chi').onchange = (e) => { setChi(e.target.value); render(); };
-  $('#tmore').onclick = (e) => { e.stopPropagation(); popMenu(e.currentTarget, [['Mở hết', () => { M.ps.forEach((p) => M.kids(p.id).length && open.add(p.id)); saveOpen(); render(); }], ['Đóng hết', () => { open.clear(); saveOpen(); render(); }], ['Ý nghĩa các đường nối', treeLinesSheet], ...(S.isEditor() ? [['Thêm người', () => goForm({ kind: 'them' })]] : [])], '<span class="dot m"></span> Nam · <span class="dot f"></span> Nữ · <b class="badge">+6</b> nhánh đóng'); };
+  $('#tmore').onclick = (e) => { e.stopPropagation(); popMenu(e.currentTarget, [['Mở hết', () => { M.ps.forEach((p) => M.kids(p.id).length && open.add(p.id)); saveOpen(); render(); }], ['Đóng hết', () => { open.clear(); saveOpen(); render(); }], ['Ý nghĩa các đường nối', treeLinesSheet], ...(S.isEditor() ? [['Thêm người', () => startAdd({})]] : [])], '<span class="dot m"></span> Nam · <span class="dot f"></span> Nữ · <b class="badge">+6</b> nhánh đóng'); };
   if (jump) { const el = $(inlawJump ? '#tr .tsp.hit' : '#tr .tn.hit'); el?.scrollIntoView({ block: 'center' }); }
   $('#q').oninput = (e) => { clearTimeout(tree.t); tree.t = setTimeout(() => { history.replaceState(null, '', hf('tree/' + encodeURIComponent(e.target.value))); render(); const i = $('#q'); i.focus({ preventScroll: true }); const v = i.value; i.setSelectionRange(v.length, v.length); }, 250); };
 }
@@ -463,7 +471,7 @@ const saveOpen = () => localStorageSet('gp_open', JSON.stringify([...open]));
 main.addEventListener('click', (e) => {
   const t = e.target.closest('[data-tg]'); if (t) { const id = t.dataset.tg; const wasOpen = t.classList.contains('op') || t.getAttribute('aria-expanded') === 'true'; if (wasOpen) { open.delete(id); open.add('!' + id); } else { open.add(id); open.delete('!' + id); } saveOpen(); render(); return; }
   const a = e.target.closest('[data-act]'); if (a) { act(a.dataset.act, a.dataset.id); return; }
-  const ci = e.target.closest('[data-contact-import]'); if (ci) { const p = S.get(ci.dataset.contactImport); openContactImport({ fam: ci.dataset.fam || S.curFamily(), person: p ? { id: p.id, name: p.data?.name || '' } : null, done: render }); return; }
+  const ce = e.target.closest('[data-ct-edit]'); if (ce) { const p = M.byId.get(ce.dataset.ctEdit); if (p) goForm({ kind: 'sua', p, open: 'lien' }); return; }
   if (e.target.closest('[data-contact-import-fam]')) { openContactImport({ fam: S.curFamily(), done: render }); return; }
   const add = e.target.closest('[data-add]'); if (add) { addFromBar(add.dataset.add); return; }
   const mn = e.target.closest('[data-menu]'); if (mn) { rowMenu(mn.dataset.menu, mn, mn.dataset.menuCtx); }
@@ -473,11 +481,19 @@ main.addEventListener('click', (e) => {
 // A search that matched no name, alias or place becomes the name; everything stays editable until Lưu / Gửi góp ý.
 function addFromBar(kind) {
   const hit = (q) => nameHit(M.all.flatMap((p) => [p.data.name, p.data.alias || '', p.data.place || '']), q);
-  if (kind === 'gio') { const q = $('#gq')?.value || ''; return goForm({ kind: 'them', prefill: gioPrefill({ q, qMatched: hit(q) }), title: 'Thêm người đã mất' }); }
-  if (kind === 'map') { const q = MF.qRaw || ''; return goForm({ kind: 'them', prefill: listPrefill({ gen: MF.gen, living: MF.living, place: mapSel || '', q, qMatched: hit(q) }) }); }
+  if (kind === 'gio') { const q = $('#gq')?.value || ''; const prefill = gioPrefill({ q, qMatched: hit(q) }); return startAdd({ prefill, title: 'Thêm người đã mất', q: prefill.gio_lunar ? '' : q }); }
+  if (kind === 'map') { const q = MF.qRaw || ''; return startAdd({ prefill: listPrefill({ gen: MF.gen, living: MF.living, place: mapSel || '', q, qMatched: hit(q) }), q }); }
   const F = listView.f || {}; const q = $('#q')?.value || '';
-  return goForm({ kind: 'them', prefill: listPrefill({ gen: F.gen, living: F.living, q, qMatched: hit(q) }) });
+  return startAdd({ prefill: listPrefill({ gen: F.gen, living: F.living, q, qMatched: hit(q) }), q });
 }
+// Every "add new person" entry point (toolbar +, the tree's Thêm người, add relative): step 1 search, then the basic
+// form with the duplicate check (web/js/addflow.js). In "Tất cả" the full form still asks for the family first.
+// onPicked(id, how): the person used or created (how: 'existing' | 'created'), or null for a suggestion.
+function startAdd({ prefill = {}, title = 'Thêm người', q = '', onPicked = openAfterAdd }) {
+  if (S.isAll()) return goForm({ kind: 'them', prefill, title });
+  return addSearch({ fam: S.curFamily(), people: M.all, q, prefill, title, onPicked, model: { people: M.ps, byId: M.byId } });
+}
+function openAfterAdd(id) { location.hash = id ? hf(`person/${id}`) : hf('mine'); }
 
 // ---------- list with row actions ----------
 function listView(arg) {
@@ -493,7 +509,7 @@ function listView(arg) {
   const gens = [...new Set(M.all.map((p) => genOf(M, p)).filter(Boolean))].sort((a, b) => a - b);
   const branches = branchesOf(M);
   main.innerHTML = `<h1>Tìm</h1>
-   ${lbar('q', 'Tìm tên, tên khác, nơi sống, mã', arg, [F.chi, F.gen, F.living, F.flag, F.fam].filter(Boolean).length, multiFam() ? famSelect('ffam', F.fam) : '', addBtn('data-add="list"', 'Thêm người'))}
+   ${toolbar({ id: 'q', ph: 'Tìm tên, tên khác, nơi sống, mã', val: arg, active: [F.chi, F.gen, F.living, F.flag, F.fam].filter(Boolean).length, quick: multiFam() ? famSelect('ffam', F.fam) : '', add: addBtn('data-add="list"', 'Thêm người') })}
    ${ltags([F.fam && ['fam', 'Dòng họ: ' + S.familyLabel(F.fam)], F.chi && ['chi', 'Chi ' + (M.byId.get(F.chi)?.data.name || '')], F.gen && ['gen', 'Đời ' + F.gen], F.living && ['living', 'Còn sống'], F.flag && ['flag', 'Cần xác minh']].filter(Boolean))}
    <p class="sub lcount">${rows.length} / ${M.all.length} người</p>
    ${arg && !rows.length ? `<p class="sub lempty">Không thấy “${esc(String(arg).trim())}”. Bấm + để thêm người này.</p>` : ''}
@@ -501,11 +517,10 @@ function listView(arg) {
    <label>Đời<select id="fgen"><option value="">Mọi đời</option>${gens.map((g) => `<option ${String(g) === F.gen ? 'selected' : ''}>${g}</option>`).join('')}</select></label>
    <div class="row wrap"><button type="button" class="chip ${F.living ? 'on' : ''}" id="fliv" aria-pressed="${F.living}">Còn sống</button><button type="button" class="chip ${F.flag ? 'on' : ''}" id="fflag" aria-pressed="${F.flag}">Cần xác minh</button></div>`)}
    ${isWide() ? `<div class="kpis lk">${[['Tổng số', M.all.length, 'ia'], ['Nam / Nữ', M.all.filter((p) => p.data.sex !== 'f').length + ' / ' + M.all.filter((p) => p.data.sex === 'f').length, 'c2'], ['Có ngày giỗ', M.all.filter((p) => gioOf(p.data)).length, 'c3'], ['Cần xác minh', M.all.filter((p) => p.data.verify).length, 'warn']].map(([l, v, c]) => `<div class="kpi" style="border-top-color:var(--${c})"><span class="sub">${l}</span><b>${v}</b></div>`).join('')}</div>` : ''}
-   ${!isWide() ? `<div class="cards">${rows.slice(0, 400).map((p) => { const d = p.data; return `<div class="card ${d.verify ? 'flag' : ''}"><a href="${ph(p, `person/${p.id}`)}" class="grow"><b>${esc(rank(d))} ${esc(d.name)}${sexMark(d.sex)}</b>${famChipIf(p)}
-     <span class="sub">${sidHits.length && d.sid ? esc(formatSid(d.sid)) + ' · ' : cq && codeOf(M, p.id) ? esc(codeOf(M, p.id)) + ' · ' : ''}${gd ? `Giỗ ${esc(gioOf(d).label)} ÂL` : `Đời ${genOf(M, p) || '?'}${years(d) ? ' · ' + yearsHtml(d) : ''}${d.place ? ' · ' + esc(d.place) : ''}`}</span>${d.verify ? `<span class="tag yellow sm">${esc(d.verify)}</span>` : ''}</a><button class="ib" data-menu="${p.id}" aria-label="Thao tác">⋯</button></div>`; }).join('')}</div>` : `<div class="scroll"><table class="tb"><thead><tr><th></th><th>Đời</th><th>Họ tên</th><th>Cha/Mẹ</th><th>Sinh</th><th>Mất</th><th>Giỗ ÂL</th><th>Nơi sống</th><th>Cần xác minh</th><th>Thao tác</th></tr></thead><tbody>
+   ${!isWide() ? `<div class="cards">${rows.slice(0, 400).map((p) => { const d = p.data; return personItem({ rank: rank(d), name: d.name, sex: d.sex }, { variant: 'card', href: ph(p, `person/${p.id}`), flag: !!d.verify, badge: famChipIf(p), sub: `${sidHits.length && d.sid ? esc(formatSid(d.sid)) + ' · ' : cq && codeOf(M, p.id) ? esc(codeOf(M, p.id)) + ' · ' : ''}${gd ? `Giỗ ${esc(gioOf(d).label)} ÂL` : `Đời ${genOf(M, p) || '?'}${years(d) ? ' · ' + yearsHtml(d) : ''}${d.place ? ' · ' + esc(d.place) : ''}`}`, foot: d.verify ? `${tag(`${esc(d.verify)}`, { tone: 'yellow', sm: true })}` : '', action: iconButton({ icon: 'more', label: 'Thao tác', attrs: `data-menu="${p.id}" aria-haspopup="menu"` }) }); }).join('')}</div>` : `<div class="scroll"><table class="tb"><thead><tr><th></th><th>Đời</th><th>Họ tên</th><th>Cha/Mẹ</th><th>Sinh</th><th>Mất</th><th>Giỗ ÂL</th><th>Nơi sống</th><th>Cần xác minh</th><th>Thao tác</th></tr></thead><tbody>
    ${rows.map((p) => { const d = p.data; const par = M.byId.get(d.parent); return `<tr class="${d.verify ? 'flag' : ''}"><td>${sexMark(d.sex)}</td><td class="num">${genOf(M, p) || ''}</td>
    <td><a href="${ph(p, `person/${p.id}`)}"><b>${esc(rank(d))} ${esc(d.name)}</b></a>${famChipIf(p)}</td><td>${esc(par?.data.name || '')}</td><td class="num">${esc(d.born || '')}</td><td class="num">${esc(d.died || '')}</td><td class="num">${esc(d.gio_lunar || d.death_lunar || '')}</td><td>${esc(d.place || '')}</td><td>${esc(d.verify || '')}</td>
-   <td class="acts">${S.isEditor() ? `<button class="ib" data-act="edit" data-id="${p.id}" title="Sửa">✎</button><button class="ib" data-act="child" data-id="${p.id}" title="Thêm con">+con</button>` : ''}<button class="ib" data-menu="${p.id}" title="Thao tác" aria-haspopup="menu">⋯</button></td></tr>`; }).join('')}
+   <td class="acts">${S.isEditor() ? `${iconButton({ icon: 'pencil', label: 'Sửa', attrs: `data-act="edit" data-id="${p.id}"` })}${iconButton({ icon: 'plus', label: 'Thêm con', attrs: `data-act="child" data-id="${p.id}"` })}` : ''}${iconButton({ icon: 'more', label: 'Thao tác', attrs: `data-menu="${p.id}" aria-haspopup="menu"` })}</td></tr>`; }).join('')}
    </tbody></table></div>`}`;
   $('#q').oninput = (e) => { clearTimeout(listView.t); listView.t = setTimeout(() => { history.replaceState(null, '', hf('list/' + encodeURIComponent(e.target.value))); render(); const i = $('#q'); i.focus({ preventScroll: true }); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
   $('#fchi').onchange = (e) => { F.chi = e.target.value; render(); };
@@ -513,23 +528,31 @@ function listView(arg) {
   $('#fliv').onclick = () => { F.living = !F.living; render(); }; $('#fflag').onclick = () => { F.flag = !F.flag; render(); };
   setUntag((k) => { if (k === '*') Object.assign(F, { chi: '', gen: '', living: false, flag: false, fam: '' }); else F[k] = k === 'living' || k === 'flag' ? false : ''; render(); });
 }
-// ctx 'prof': the ⋯ on the profile, which leaves out what the page already shows (Xem hồ sơ, the Sửa button, and the
-// Thêm cha / con / vợ chồng / anh chị em that "＋ Thêm quan hệ" in Quan hệ covers). List rows keep every item.
+// ctx 'prof': the ⋯ on the profile, which leaves out what the page already shows (Xem hồ sơ and the Sửa button). The
+// add-relative items come from profRelItems below. List rows keep every item.
+// The profile ⋯ adds relatives only where Quan hệ cannot: in a legacy-relations family the Quan hệ card is read-only,
+// so Thêm con / anh chị em / cha mẹ go through the same search-first add flow as the list row. In a relation-table family
+// Quan hệ already adds them (its "+"), so the menu leaves them out.
+function profRelItems(p) {
+  return relTable(p.fam || S.curFamily()) ? [] : [['parent', 'Thêm cha / mẹ'], ['child', 'Thêm con'], ['sibling', 'Thêm anh chị em']];
+}
 function rowMenu(id, anchor, ctx = '') {
   const p = M.byId.get(id); const ed = S.isEditor(); const prof = ctx === 'prof';
-  const items = [...(prof ? [] : [['view', 'Xem hồ sơ']]), ['treeview', 'Xem trên cây'], ...(gioOf(p.data) ? [['ics', 'Thêm vào lịch']] : []), ['history', 'Lịch sử sửa'],
+  const items = [...(prof ? [] : [['view', 'Xem hồ sơ']]), ['treeview', 'Xem trên cây'], ...(gioOf(p.data) ? [['ics', 'Thêm vào lịch']] : []), ...(S.isMember() && !S.isAll() ? [['gedcom', 'Xuất nhánh (GEDCOM)']] : []), ...(S.isAdmin() && !S.isAll() && !BT.isBranch(S.curFamily()) ? [['branch', 'Tạo cây cho nhánh này']] : []), ['history', 'Lịch sử sửa'],
     ...(S.signedIn() ? elder.MENU_ITEMS : []),
-    ...(ed ? [...(prof ? [] : [['edit', 'Sửa thông tin'], ['parent', 'Thêm cha / mẹ'], ['child', 'Thêm con'], ['spouse', 'Thêm vợ / chồng'], ['sibling', 'Thêm anh chị em']]), ['xlink', 'Liên kết với người ở cây khác'], ['xvar', 'Thêm giá trị từ nguồn khác'], ['flag', 'Đánh dấu cần xác minh'], ['delete', dangerLabel('Gỡ khỏi gia phả…')]]
+    ...(ed ? [...(prof ? profRelItems(p) : [['edit', 'Sửa thông tin'], ['parent', 'Thêm cha / mẹ'], ['child', 'Thêm con'], ['spouse', 'Thêm vợ / chồng'], ['sibling', 'Thêm anh chị em']]), ['xlink', 'Liên kết với người ở cây khác'], ['xvar', 'Thêm giá trị từ nguồn khác'], ['flag', 'Đánh dấu cần xác minh'], ['delete', dangerLabel('Gỡ khỏi gia phả…')]]
       : [...(prof ? [] : [['suggest', 'Sửa']]), ['login', 'Đăng nhập để sửa']])];
   popMenu(anchor, items.map(([k, l]) => [l, () => act(k, id), k === 'delete', `data-act="${k}" data-id="${id}"${k === 'delete' ? ' data-danger' : ''}`]), '', { title: `${rank(p.data)} ${p.data.name}` });
 }
-addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMenu({ focus: true }); closeDialog(); } });
+addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMenu({ focus: true }); closeSheets(); } });
 
 function act(k, id) {
   const p = M.byId.get(id);
   if (k === 'view') location.hash = hf('person/' + id);
   else if (k === 'treeview') { setChi(''); location.hash = hf('tree/@' + id); }
   else if (k === 'ics') { const a = document.createElement('a'); a.href = calUrl([id]); a.download = `gio-${id}.ics`; a.click(); }
+  else if (k === 'gedcom') gedBranch(id, p.fam || S.curFamily());
+  else if (k === 'branch') BT.openCreate({ fam: S.curFamily(), personId: id, personName: p.data.name, done: () => renderSoon() });
   else if (k === 'history') historyDialog(id);
   else if (k === 'login') loginDialog();
   else if (elder.MENU_ITEMS.some(([x]) => x === k)) elder.personAct(k, id);
@@ -538,10 +561,13 @@ function act(k, id) {
   // a relation-table family: no legacy parent / spouse field on the new person (the server refuses it); the relation sets it
   else if (['child', 'sibling', 'parent', 'spouse'].includes(k) && relTable(p.fam || S.curFamily()))
     addNewRelated(M, id, k, k === 'child' ? { order: (M.kids(id).at(-1)?.data.order ?? p.data.order ?? 0) + 0.5 } : k === 'sibling' ? { order: (p.data.order ?? 0) + 0.5 } : {});
-  else if (k === 'child') goForm({ kind: 'them', prefill: { parent: id, gen: (p.data.gen || 0) + 1, order: (M.kids(id).at(-1)?.data.order ?? p.data.order ?? 0) + 0.5 }, title: `Thêm con của ${p.data.name}` });
-  else if (k === 'sibling') goForm({ kind: 'them', prefill: { parent: p.data.parent || '', gen: p.data.gen, order: (p.data.order ?? 0) + 0.5 }, title: `Thêm anh chị em của ${p.data.name}` });
+  else if (k === 'child') startAdd({ prefill: { parent: id, gen: (p.data.gen || 0) + 1, order: (M.kids(id).at(-1)?.data.order ?? p.data.order ?? 0) + 0.5 }, title: `Thêm con của ${p.data.name}`,
+    onPicked: (pid, how) => { if (pid && how === 'existing') S.edit(pid, { parent: id }); openAfterAdd(pid); } });
+  else if (k === 'sibling') startAdd({ prefill: { parent: p.data.parent || '', gen: p.data.gen, order: (p.data.order ?? 0) + 0.5 }, title: `Thêm anh chị em của ${p.data.name}`,
+    onPicked: (pid, how) => { if (pid && how === 'existing' && p.data.parent) S.edit(pid, { parent: p.data.parent }); openAfterAdd(pid); } });
   else if (k === 'spouse') goForm({ kind: 'sua', p, only: ['spouse', 'married'], title: `Vợ / chồng của ${p.data.name}` });
-  else if (k === 'parent') goForm({ kind: 'them', prefill: { parent: p.data.parent || '', order: p.data.order ?? 0 }, title: `Thêm cha / mẹ của ${p.data.name}`, afterSave: (newId) => S.edit(id, { parent: newId }) });
+  else if (k === 'parent') startAdd({ prefill: { parent: p.data.parent || '', order: p.data.order ?? 0 }, title: `Thêm cha / mẹ của ${p.data.name}`,
+    onPicked: (pid) => { if (pid) S.edit(id, { parent: pid }); openAfterAdd(pid); } });
   else if (k === 'xlink') { const fam = p.fam || S.curFamily(); LK.openSheet({ fam, personId: id, personName: p.data.name, families: S.scopeFams().filter((f) => f !== fam).map((f) => ({ id: f, label: S.familyLabel(f) })), done: render }); }
   else if (k === 'xvar') VR.openAdd({ fam: p.fam || S.curFamily(), personId: id, personName: p.data.name, done: () => { S.sync(); renderSoon(); } });
   else if (k === 'flag') { const why = prompt2('Cần xác minh điều gì?', p.data.verify || '', (v) => S.edit(id, { verify: v })); }
@@ -572,13 +598,16 @@ function person(id) {
       row('Nghề', esc(d.job)),
       row('Tôn giáo', esc(d.religion))] },
     { title: 'Ghi chú & nguồn', rows: [row('Ghi chú', esc(d.note)), row('Nguồn', esc(d.source))] }];
-  main.innerHTML = `<div class="prof">${d.photo ? `<img src="${esc(d.photo)}" alt="" class="photo">` : ''}<div><div class="row wrap">${sp ? `<span class="tag purple">${esc(inLaw(p))}</span>` : `<span class="tag blue">Đời ${d.gen || '?'}</span>`}${SEX_LABEL[d.sex] ? `<span class="tag gray sxtag">${sexMark(d.sex)}${SEX_LABEL[d.sex]}</span>` : ''}${d.sid ? `<button type="button" class="tag gray pcode" data-copy-code="${esc(formatSid(d.sid))}" title="${esc(SID_HELP)} Bấm để chép." aria-label="Mã người ${esc(formatSid(d.sid))}. Bấm để chép.">${esc(formatSid(d.sid))}</button>` : ''}${br ? `<span class="tag gray">Chi ${esc(rank(br.data))} ${esc(br.data.name)}</span>` : ''}${S.myPersonId() === id ? '<span class="tag green">Đây là bạn</span>' : ''}</div>
+  const surnG = SN.surnameGroup(id, d, M, { editor: S.isEditor() }); if (surnG) groups.splice(groups.length - 1, 0, surnG); // Họ qua các thời kỳ, before Ghi chú
+  main.innerHTML = `<div class="prof">${d.photo ? `<img src="${esc(d.photo)}" alt="" class="photo">` : ''}<div><div class="row wrap">${sp ? `${tag(`${esc(inLaw(p))}`, { tone: 'purple' })}` : `${tag(`Đời ${d.gen || '?'}`, { tone: 'blue' })}`}${SEX_LABEL[d.sex] ? `<span class="tag gray sxtag">${sexMark(d.sex)}${SEX_LABEL[d.sex]}</span>` : ''}${d.sid ? `<button type="button" class="tag gray pcode" data-copy-code="${esc(formatSid(d.sid))}" title="${esc(SID_HELP)} Bấm để chép." aria-label="Mã người ${esc(formatSid(d.sid))}. Bấm để chép.">${esc(formatSid(d.sid))}</button>` : ''}${br ? `${tag(`Chi ${esc(rank(br.data))} ${esc(br.data.name)}`, { tone: 'gray' })}` : ''}${S.myPersonId() === id ? '<span class="tag green">Đây là bạn</span>' : ''}</div>
    <h1 class="big keep">${esc(rank(d))} ${esc(d.name)}</h1>${d.name_han ? `<div class="nhan nhan-h" lang="zh-Hant">${esc(d.name_han)}</div>` : ''}${vt('name') ? `<div class="var-name">${vt('name')}</div>` : ''}<div class="sub">${esc(sp ? (d.sex === 'm' ? 'chồng ' : 'vợ ') + rank(sp.data).toLowerCase() + ' ' + sp.data.name : relation(M, p))}${d.alias ? ' · ' + esc(d.alias) : ''}</div></div></div>
    <div class="kpis">${[['Mất', d.died || (d.death_lunar ? d.death_lunar + ' ÂL' : '—'), 'c2'], ['Giỗ (ÂL)', d.gio_lunar || d.death_lunar || '—', 'c3'], ['Con', ks.length, 'c5'], ['Cháu chắt', M.desc(sp ? sp.id : id) - ks.length, 'c1']].filter(([, v]) => v && v !== '—').map(([l, v]) => `<div class="kpi"><span class="sub">${l}</span><b>${esc(v)}</b></div>`).join('')}</div>
    <div class="row acts2"><div class="acts2-go">${gioOf(d) ? followBar(p) : ''}<button class="btn sm" data-act="${S.isEditor() ? 'edit' : 'suggest'}" data-id="${id}">${icon('pencil')}Sửa</button></div><button class="ib" data-menu="${id}" data-menu-ctx="prof" aria-label="Thêm thao tác">⋯</button></div>
    ${profTabsHtml()}
+   ${!surnG && S.isEditor() ? SN.surnameAddBlock() : ''}
    ${profBody(p, { groups, id, d })}`;
   relWire(main, () => M);
+  if (S.isEditor()) SN.bindSurnames(main, id, d, { edit: (pid, fields) => S.edit(pid, fields) });
   main.querySelector('[data-copy-code]')?.addEventListener('click', (e) => { const c = e.currentTarget.dataset.copyCode; (navigator.clipboard?.writeText(c) || Promise.reject()).then(() => toast(`Đã chép mã ${c}`), () => toast(`Mã người: ${c}`)); });
   if (profTab === 'life' || profTab === 'src' || profTab === 'info') evEnsure(p); // info: the Câu chuyện đời block reads the events too
   if (profTab === 'life') setUntag(lifeUntag);
@@ -787,15 +816,18 @@ async function evApiSave({ fam, p, kind, id, item, direct, action }) {
 // Liên hệ: its own group card on the profile. Values when the viewer may see them (members, or the person made them
 // public); otherwise, when the server says there are some (has_contact), a sign-in prompt. No card when nothing to show.
 function contactCard(d, id, fam) {
-  const f = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : '';
-  const fb = d.facebook && (d.facebook.startsWith('http') ? d.facebook : 'https://' + d.facebook);
-  const rows = `${f('Điện thoại', d.phone && `<a href="tel:${esc(d.phone)}">${esc(d.phone)}</a>`)}${f('Email', d.email && `<a href="mailto:${esc(d.email)}">${esc(d.email)}</a>`)}${f('Zalo', esc(d.zalo))}${f('Facebook', fb && `<a href="${esc(fb)}" target="_blank" rel="noopener">${esc(d.facebook.replace(/^https?:\/\/(www\.)?/, ''))}</a>`)}${f('Mạng xã hội', esc(d.social))}${f('Địa chỉ', esc(d.address))}`;
+  const items = contactList(d);
+  const rows = items.map((c) => {
+    const t = CTYPE[c.type]; const h = contactHref(c);
+    const val = h ? `<a href="${esc(h)}"${/^https?:/.test(h) ? ' target="_blank" rel="noopener"' : ''}>${esc(c.value)}</a>` : esc(c.value);
+    return `<dt>${esc(c.type === 'other' && c.label ? c.label : t.label)}</dt><dd>${val}</dd>`;
+  }).join('');
   const body = rows ? `<dl class="facts">${rows}</dl>`
     : !d.has_contact ? ''
     : !S.signedIn() ? '<p class="sub">Thông tin liên hệ chỉ hiện cho người trong họ đã đăng nhập.</p><p><button type="button" class="btn sm" data-acct="in">Đăng nhập</button></p>'
     : '<p class="sub">Bạn cần được thêm vào dòng họ để xem liên hệ.</p>';
-  const imp = S.isEditor() && id ? `<p><button type="button" class="btn ter sm" data-contact-import="${esc(id)}" data-fam="${esc(fam || '')}">Nhập từ danh bạ</button></p>` : '';
-  return body || imp ? `<section class="grpsec consec" aria-label="Liên hệ"><div class="relhead"><h2>Liên hệ</h2></div>${body}${imp}</section>` : '';
+  const edit = S.isEditor() && id ? `<p><button type="button" class="btn ter sm" data-ct-edit="${esc(id)}">${items.length ? 'Sửa liên hệ' : 'Thêm liên hệ'}</button></p>` : '';
+  return body || edit ? `<section class="grpsec consec" aria-label="Liên hệ"><div class="relhead"><h2>Liên hệ</h2></div>${body}${edit}</section>` : '';
 }
 // Câu chuyện đời on Thông tin (after the facts and contact, before Quan hệ): the events are loaded for this tab too.
 function storiesOnInfo(p) {
@@ -809,7 +841,7 @@ function profBody(p, { groups, id, d }) {
   LIFE = { p }; // the Câu chuyện đời actions (add, edit, Đọc tiếp, Xem tất cả) read the person from LIFE
   const facts = factCardHtml(factGroups(groups));
   return `${d.verify ? `<div class="ntc warn"><b>Cần xác minh</b><span class="sub">${esc(d.verify)}</span></div>` : ''}${facts}${codeOf(M, id) ? `<p class="sub">Vị trí trong cây <span class="ppos" title="${esc(CODE_HELP)}">${esc(codeOf(M, id))}</span></p>` : ''}${contactCard(d, id, p.fam || S.curFamily())}${storiesOnInfo(p)}`
-    + `${(LK.ensure(p.fam || S.curFamily()), '')}${relSection(M, p, { editable: S.isEditor(), treeHref: hf(`tree/@${id}`), treeOf: (x) => hf(`tree/@${x}`), personHref: (x) => hf(`person/${x}`), links: LK.linesHtml(p.fam || S.curFamily(), id, { clan: CL.clanLinkHtml(S.familyName(p.fam || S.curFamily()), 'clan-in', S.familyMeta(p.fam || S.curFamily())?.country) }) })}${pedigreeHtml(M, id, 4, { personHref: (x) => hf(`person/${x}`) })}`;
+    + `${(LK.ensure(p.fam || S.curFamily()), '')}${relSection(M, p, { editable: S.isEditor(), treeHref: hf(`tree/@${id}`), treeOf: (x) => hf(`tree/@${x}`), personHref: (x) => hf(`person/${x}`), links: LK.linesHtml(p.fam || S.curFamily(), id, { clan: CL.clanLinkHtml(S.familyName(p.fam || S.curFamily()), 'clan-in', S.familyMeta(p.fam || S.curFamily())?.country) }) + (BT.ensureBranches(p.fam || S.curFamily()), BT.rootLinkHtml(p.fam || S.curFamily(), id)) })}${pedigreeHtml(M, id, 4, { personHref: (x) => hf(`person/${x}`) })}`;
 }
 // Delegated clicks for the profile tabs, the timeline and the event/story dialogs.
 document.addEventListener('click', (e) => {
@@ -1036,7 +1068,7 @@ function gio() {
   setUntag(() => setGioAll('1'));
   main.innerHTML = `<h1>Lịch</h1>${soonBanner()}
   ${feed ? NW.topCardsHtml(fam, hf, S.getPrefs) : ''}
-  ${lbar('gq', 'Tìm tên hoặc ngày (ví dụ 3/8)', '', mine ? 1 : 0, `<select id="gallq" aria-label="Hiển thị"><option value="0" ${mine ? 'selected' : ''} ${f.length ? '' : 'disabled'}>★ Người tôi theo dõi (${f.length})</option><option value="1" ${mine ? '' : 'selected'}>Cả họ</option></select>`, addBtn('data-add="gio"', 'Thêm người đã mất'))}
+  ${toolbar({ id: 'gq', ph: 'Tìm tên hoặc ngày (ví dụ 3/8)', active: mine ? 1 : 0, quick: `<select id="gallq" aria-label="Hiển thị"><option value="0" ${mine ? 'selected' : ''} ${f.length ? '' : 'disabled'}>★ Người tôi theo dõi (${f.length})</option><option value="1" ${mine ? '' : 'selected'}>Cả họ</option></select>`, add: addBtn('data-add="gio"', 'Thêm người đã mất') })}
   ${NW.chipsHtml()}
   ${ltags(mine ? [['mine', '★ Người tôi theo dõi (' + f.length + ')']] : [])}
   ${fpanel(`<fieldset class="fset"><legend>Hiển thị</legend><label class="radio"><input type="radio" name="gall" data-gioall="0" ${mine ? 'checked' : ''} ${f.length ? '' : 'disabled'}> ★ Người tôi theo dõi (${f.length})</label><label class="radio"><input type="radio" name="gall" data-gioall="1" ${mine ? '' : 'checked'}> Cả họ</label></fieldset>`)}
@@ -1045,7 +1077,7 @@ function gio() {
   ${feed ? '<div id="calcard"></div>' : ''}
   ${items[0] ? `<div class="cd hl"><div class="sub">Gần nhất · còn ${days(items[0].at)} ngày</div><h2><a class="plink" href="${ph(items[0].p, `person/${items[0].p.id}`)}">Giỗ ${esc(rank(items[0].p.data))} ${esc(items[0].p.data.name)}</a></h2><div class="sub">${items[0].g.label} âm lịch · ${fmt(items[0].day)}</div><div class="row wrap"><button class="btn sm" id="ics">Thêm vào lịch</button><button class="btn ter sm" id="share">Gửi cả họ</button></div></div>` : ''}
   <div class="cd">${rows.map((r) => (r.k === 'gath' ? NW.gatheringRow(r.p, hf, today, kind !== 'all' && kind !== 'gath')
-    : `<div class="gior" data-k="gio"${kind !== 'all' && kind !== 'gio' ? ' hidden' : ''} data-q="${esc(fold(rank(r.p.data) + ' ' + r.p.data.name + ' ' + r.g.label + ' ' + (r.p.data.spouse_of ? 'dau re' : '')))}"><a class="li gio" href="${ph(r.p, `person/${r.p.id}`)}"><span class="date"><b>${r.g.label}</b><span>ÂL</span></span><span class="grow"><b>${esc(rank(r.p.data))} ${esc(r.p.data.name)}</b> <span class="tag sm">Giỗ</span>${famChipIf(r.p)}<span class="sub">${r.p.data.spouse_of ? esc(inLaw(r.p)) : 'Đời ' + r.p.data.gen} · ${fmt(r.day)} · còn ${days(r.at)} ngày</span></span></a><button type="button" class="star" data-follow="${r.p.id}" aria-pressed="${isFollow(r.p.id)}" aria-label="${isFollow(r.p.id) ? 'Bỏ theo dõi' : 'Theo dõi'} giỗ ${esc(r.p.data.name)}">${isFollow(r.p.id) ? '★' : '☆'}</button></div>`)).join('')}</div>`;
+    : `<div class="gior" data-k="gio"${kind !== 'all' && kind !== 'gio' ? ' hidden' : ''} data-q="${esc(fold(rank(r.p.data) + ' ' + r.p.data.name + ' ' + r.g.label + ' ' + (r.p.data.spouse_of ? 'dau re' : '')))}"><a class="li gio" href="${ph(r.p, `person/${r.p.id}`)}"><span class="date"><b>${r.g.label}</b><span>ÂL</span></span><span class="grow"><b>${esc(rank(r.p.data))} ${esc(r.p.data.name)}</b> ${tag(`Giỗ`, { sm: true })}${famChipIf(r.p)}<span class="sub">${r.p.data.spouse_of ? esc(inLaw(r.p)) : 'Đời ' + r.p.data.gen} · ${fmt(r.day)} · còn ${days(r.at)} ngày</span></span></a>${iconButton({ icon: isFollow(r.p.id) ? 'starOn' : 'star', label: `${isFollow(r.p.id) ? 'Bỏ theo dõi' : 'Theo dõi'} giỗ ${r.p.data.name}`, size: 22, attrs: `data-follow="${r.p.id}" aria-pressed="${isFollow(r.p.id)}"` })}</div>`)).join('')}</div>`;
   $('#gallq')?.addEventListener('change', (e) => setGioAll(e.target.value));
   if (feed) NW.fillCalCard(main, fam, f);
   if (feed && !NW.cached(fam)) NW.loadPosts(fam).then(() => { if (route().view === 'lich') render(); }, () => {});
@@ -1060,11 +1092,11 @@ function verify() {
   const show = rows.filter((p) => (!st.fam || p.fam === st.fam) && (!st.k || kind(p.data.verify) === st.k) && (!st.q || fold(rank(p.data) + ' ' + p.data.name + ' ' + p.data.verify).includes(st.q)));
   const setKind = (k) => { st.k = k; render(); };
   const quick = `<select id="vkq" aria-label="Loại">${[['', 'Tất cả loại'], ...K].map(([k, l]) => `<option value="${k}" ${st.k === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
-  main.innerHTML = `<h1>Cần bổ sung</h1>${lbar('vq', 'Tìm tên hoặc nội dung cần bổ sung', st.qRaw || '', (st.k ? 1 : 0) + (st.fam ? 1 : 0), quick + (multiFam() ? famSelect('vfam', st.fam) : ''))}
+  main.innerHTML = `<h1>Cần bổ sung</h1>${toolbar({ id: 'vq', ph: 'Tìm tên hoặc nội dung cần bổ sung', val: st.qRaw || '', active: (st.k ? 1 : 0) + (st.fam ? 1 : 0), quick: quick + (multiFam() ? famSelect('vfam', st.fam) : '') })}
   ${ltags([st.fam && ['fam', 'Dòng họ: ' + S.familyLabel(st.fam)], st.k && ['k', K.find((x) => x[0] === st.k)[1]]].filter(Boolean))}
   <p class="sub lcount">${show.length}${show.length !== rows.length ? ' / ' + rows.length : ''} chỗ còn thiếu</p>
   ${fpanel(`<fieldset class="fset"><legend>Loại</legend>${[['', 'Tất cả'], ...K].map(([k, l]) => `<label class="radio"><input type="radio" name="vk" value="${k}" ${st.k === k ? 'checked' : ''}> ${l} (${rows.filter((p) => !k || kind(p.data.verify) === k).length})</label>`).join('')}</fieldset>`)}
-  <div class="cd">${show.map((p) => `<a class="li" href="${ph(p, `person/${p.id}`)}"><span class="grow"><b>${esc(rank(p.data))} ${esc(p.data.name)}</b>${famChipIf(p)}<span class="sub">${esc(p.data.verify)}</span></span>›</a>`).join('') || emptyState('Không có mục nào.')}</div>`;
+  <div class="cd">${show.map((p) => personItem({ rank: rank(p.data), name: p.data.name, sex: p.data.sex }, { href: ph(p, `person/${p.id}`), badge: famChipIf(p), sub: esc(p.data.verify) })).join('') || emptyState('Không có mục nào.')}</div>`;
   $('#vq').oninput = (e) => { clearTimeout(verify.t); verify.t = setTimeout(() => { st.qRaw = e.target.value; st.q = fold(e.target.value).trim(); render(); const i = $('#vq'); i.focus({ preventScroll: true }); i.setSelectionRange(i.value.length, i.value.length); }, 200); };
   $('#vkq')?.addEventListener('change', (e) => setKind(e.target.value));
   $('#vfam')?.addEventListener('change', (e) => { st.fam = e.target.value; render(); });
@@ -1094,8 +1126,8 @@ const mapGroups = (people) => {
   return [...groups.values()];
 };
 const fcOf = (groups) => ({ type: 'FeatureCollection', features: groups.map((g, i) => ({ type: 'Feature', id: i, properties: { n: g.people.length, prec: g.precision, i, fi: groupFi(g) }, geometry: { type: 'Point', coordinates: [g.lon, g.lat] } })) });
-const mapRow = (p) => `<a class="li" href="${ph(p, `person/${p.id}`)}"><span><b>${esc(rank(p.data))} ${esc(p.data.name)}</b>${famChipIf(p)}<span class="sub">Đời ${genOf(M, p) || '?'}${years(p.data) ? ' · ' + years(p.data) : ''}${p.data.place ? ' · ' + esc(p.data.place) : ''}</span></span>›</a>`;
-// Filter bar (lbar + fpanel + active tags). Rebuilt when a filter changes; the search box itself is kept.
+const mapRow = (p) => personItem({ rank: rank(p.data), name: p.data.name, sex: p.data.sex }, { href: ph(p, `person/${p.id}`), badge: famChipIf(p), sub: `Đời ${genOf(M, p) || '?'}${years(p.data) ? ' · ' + years(p.data) : ''}${p.data.place ? ' · ' + esc(p.data.place) : ''}` });
+// Filter bar (toolbar + fpanel + active tags). Rebuilt when a filter changes; the search box itself is kept.
 // Chi and Đời options from the people on the map's side (all of them, not only the filtered ones).
 function mapOpts() {
   const branches = branchesOf(M);
@@ -1119,7 +1151,7 @@ function mapTop() {
   const { chi: chiOpts, gen: genOpts } = mapOpts();
   const LIV = { living: 'Còn sống', dead: 'Đã mất' };
   const tags = [MF.fam && ['fam', 'Dòng họ: ' + S.familyLabel(MF.fam)], MF.chi && ['chi', 'Chi ' + (M.byId.get(MF.chi)?.data.name || '')], MF.gen && ['gen', 'Đời ' + MF.gen], MF.living && ['living', LIV[MF.living]]].filter(Boolean);
-  $('#mtop').innerHTML = `${lbar('mq', 'Tìm tên, tên khác, nơi sống', MF.qRaw, tags.length, multiFam() ? famSelect('mfam', MF.fam) : '', addBtn('data-add="map"', 'Thêm người'))}${ltags(tags)}
+  $('#mtop').innerHTML = `${toolbar({ id: 'mq', ph: 'Tìm tên, tên khác, nơi sống', val: MF.qRaw, active: tags.length, quick: multiFam() ? famSelect('mfam', MF.fam) : '', add: addBtn('data-add="map"', 'Thêm người') })}${ltags(tags)}
     ${fpanel(`${multiFam() ? `<label>Dòng họ${famSelect('mfamp', MF.fam)}</label>` : ''}<label>Chi<select id="mchi">${chiOpts}</select></label>
       <label>Đời<select id="mgen">${genOpts}</select></label>
       <label>Tình trạng<select id="mliv"><option value="">Tất cả</option>${Object.entries(LIV).map(([v, l]) => `<option value="${v}" ${MF.living === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`)}`;
@@ -1230,7 +1262,7 @@ function exportView() {
     const cols = ['id', 'gen', 'thu', 'name', 'sex', 'parent', 'spouse', 'born', 'died', 'death_lunar', 'gio_lunar', 'place', 'alias', 'job', 'religion', 'burial', 'phone', 'email', 'zalo', 'facebook', 'note', 'verify', 'source'];
     const head = ['ID', 'Đời', 'Thứ', 'Họ tên', 'Giới tính', 'Cha/Mẹ (ID)', 'Vợ/Chồng', 'Năm sinh', 'Năm mất', 'Ngày mất (ÂL)', 'Ngày giỗ (ÂL)', 'Nơi sống', 'Tên khác', 'Nghề', 'Tôn giáo', 'An táng', 'Điện thoại', 'Email', 'Zalo', 'Facebook', 'Ghi chú', 'Cần xác minh', 'Nguồn'];
     const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const lines = [head.map(q).join(',')].concat(M.everyone.map((p) => cols.map((c) => q(c === 'id' ? p.id : c === 'sex' ? (p.data.sex === 'f' ? 'Nữ' : 'Nam') : p.data[c])).join(',')));
+    const lines = [head.map(q).join(',')].concat(M.everyone.map((p) => cols.map((c) => q(c === 'id' ? p.id : c === 'sex' ? (p.data.sex === 'f' ? 'Nữ' : 'Nam') : ['phone', 'email', 'zalo', 'facebook'].includes(c) ? contactList(p.data).filter((x) => x.type === c).map((x) => x.value).join('; ') : p.data[c])).join(',')));
     download('gia-pha-ho-duong.csv', '﻿' + lines.join('\r\n'), 'text/csv');
   };
   $('#xsvg').onclick = () => download('cay-gia-pha-ho-duong.svg', treeSvg(), 'image/svg+xml');
@@ -1271,7 +1303,7 @@ function review(arg) {
   const SL = [['pending', 'Chờ duyệt'], ['approved', 'Đã duyệt'], ['rejected', 'Từ chối']];
   const quick = `<select id="rst" aria-label="Trạng thái">${SL.map(([v, l]) => `<option value="${v}" ${st.status === v ? 'selected' : ''}>${l}</option>`).join('')}</select>${multiHere() ? famSelect('rfam', st.fam, famsHere()) : ''}`;
   const tags = [st.status !== 'pending' && ['st', SL.find((x) => x[0] === st.status)[1]], st.fam && ['fam', 'Dòng họ: ' + S.familyLabel(st.fam)]].filter(Boolean);
-  main.innerHTML = `${gopyHead('review')}${lbar('rq', 'Tìm tên người hoặc nội dung góp ý', st.qRaw, (st.status !== 'pending' ? 1 : 0) + (st.fam ? 1 : 0), quick)}
+  main.innerHTML = `${gopyHead('review')}${toolbar({ id: 'rq', ph: 'Tìm tên người hoặc nội dung góp ý', val: st.qRaw, active: (st.status !== 'pending' ? 1 : 0) + (st.fam ? 1 : 0), quick: quick })}
    ${ltags(tags)}
    <p class="sub lcount" id="rcount"></p>
    ${fpanel(`${multiHere() ? `<label>Dòng họ${famSelect('rfamp', st.fam, famsHere())}</label>` : ''}<fieldset class="fset"><legend>Trạng thái</legend>${SL.map(([v, l]) => `<label class="radio"><input type="radio" name="rs" value="${v}" ${st.status === v ? 'checked' : ''}> ${l}</label>`).join('')}</fieldset>`)}
@@ -1437,7 +1469,7 @@ main.addEventListener('change', (e) => {
 const ROLE_LBL = { owner: 'Chủ họ', admin: 'Quản trị', editor: 'Biên tập', member: 'Thành viên', guest: 'Khách' };
 const ROLE_TAG = { owner: 'purple', admin: 'blue', editor: 'green', member: 'gray', guest: 'magenta' };
 const ROLE_DESC = [['owner', 'Toàn quyền, giao quyền.'], ['admin', 'Sửa trực tiếp, duyệt đóng góp, mời người.'], ['editor', 'Sửa trực tiếp, có lịch sử và hoàn tác.'], ['member', 'Xem thông tin riêng tư. Sửa = đề xuất chờ duyệt.'], ['guest', 'Chỉ xem năm sinh và người đã mất. Đề xuất chờ duyệt.']];
-const roleTag = (r) => `<span class="tag ${ROLE_TAG[r] || 'gray'}">${ROLE_LBL[r] || r}</span>`;
+const roleTag = (r) => tag(ROLE_LBL[r] || r, { tone: ROLE_TAG[r] || 'gray' });
 // Roles the current user may hand out: only the owner sees Quản trị / Chủ họ.
 const roleChoices = (f = S.curFamily()) => (S.roleIn(f) === 'owner' ? ['owner', 'admin', 'editor', 'member'] : ['editor', 'member']);
 const roleSelect = (id, val, f = S.curFamily()) => `<select id="${id}" name="${id}" aria-label="Vai trò">${roleChoices(f).map((r) => `<option value="${r}" ${r === val ? 'selected' : ''}>${ROLE_LBL[r]}</option>`).join('')}</select>`;
@@ -1453,7 +1485,7 @@ function members() {
   if (!canAdminHere()) { main.innerHTML = `<h1>Thành viên &amp; quyền</h1><p class="sub">${S.isAll() ? 'Bạn chưa có quyền quản trị dòng họ nào.' : 'Chỉ Chủ họ và Quản trị xem được trang này.'}</p>`; return; }
   const n = ROLE_DESC.length;
   main.innerHTML = `<h1>Thành viên &amp; quyền</h1>
-    <div class="tbar2">${lbar('mq2', 'Tìm theo tên hoặc email', mst.q, (mst.role ? 1 : 0) + (mst.fam ? 1 : 0))}<button type="button" class="fbtn" id="minv" aria-label="Mời thành viên" title="Mời thành viên">${icon('invite')}</button></div>
+    ${toolbar({ id: 'mq2', ph: 'Tìm theo tên hoặc email', val: mst.q, active: (mst.role ? 1 : 0) + (mst.fam ? 1 : 0), extra: `<button type="button" class="fbtn" id="minv" aria-label="Mời thành viên" title="Mời thành viên">${icon('invite')}</button>` })}
     ${fpanel(`${multiHere() ? `<label>Dòng họ${famSelect('mfamp2', mst.fam, famsHere())}</label>` : ''}<fieldset class="fset"><legend>Vai trò</legend>${[['', 'Tất cả'], ...ROLE_DESC.slice(0, n - 1)].map(([v, l]) => `<label class="radio"><input type="radio" name="mrole" value="${v}" ${mst.role === v ? 'checked' : ''}> ${ROLE_LBL[v] || l}</label>`).join('')}</fieldset>`)}
     ${mst.fam && multiHere() ? ltags([['fam', 'Dòng họ: ' + S.familyLabel(mst.fam)]]) : ''}
     <div id="mbody"><p class="sub pad">Đang tải…</p></div>
@@ -1478,14 +1510,13 @@ function paintMembers() {
   const pend = membersData.items.filter((m) => m.status === 'pending' && keep(m));
   const act = membersData.items.filter((m) => m.status === 'active' && keep(m));
   const canMenu = (m) => m.role !== 'owner' && (S.roleIn(m.fam) === 'owner' || !isTopRole(m.role));
-  box.innerHTML = `${pend.length ? `<section class="msec" aria-labelledby="h-pend"><h2 id="h-pend">Chờ duyệt (${pend.length})</h2>
+  box.innerHTML = `${pend.length ? section(`Chờ duyệt (${pend.length})`, `
     ${pend.map((m) => `<article class="cd hl pq">${chipOf(m.fam)}<div class="pq-h"><div class="grow"><span class="mname">${esc(m.name || m.email)}</span><span class="sub">${esc(m.email)} · gửi ${sinceDate(m.created_at)}</span></div></div>
       <p class="claim">${claimText(m)}</p>
       <label class="fld">Vai trò khi duyệt ${roleSelect('mrl-' + m.id, 'member', m.fam)}</label>
-      <div class="row end"><button class="btn ter sm" type="button" data-mact="reject" data-id="${m.id}" data-fam="${esc(m.fam)}">Từ chối</button><button class="btn sm" type="button" data-mact="approve" data-id="${m.id}" data-fam="${esc(m.fam)}">Duyệt</button></div></article>`).join('')}</section>` : ''}
-    <section class="msec" aria-labelledby="h-mem"><h2 id="h-mem">Thành viên (${act.length})</h2>
-    <div class="cd mem-list">${act.map((m) => `<div class="li mrow">${chipOf(m.fam)}<div class="grow"><span class="mname">${esc(m.name || m.email)}</span><span class="sub">${esc(m.email)}${m.person_name ? ' · đã gắn với ' + esc(m.person_name) : ''}</span></div>${roleTag(m.role)}
-      ${canMenu(m) ? `<button class="ib" type="button" data-mmenu="${m.id}" aria-label="Tùy chọn cho ${esc(m.name || m.email)}" title="Tùy chọn">⋯</button>` : ''}</div>`).join('') || emptyState('Không có thành viên nào khớp.')}</div></section>`;
+      <div class="row end"><button class="btn ter sm" type="button" data-mact="reject" data-id="${m.id}" data-fam="${esc(m.fam)}">Từ chối</button><button class="btn sm" type="button" data-mact="approve" data-id="${m.id}" data-fam="${esc(m.fam)}">Duyệt</button></div></article>`).join('')}`, { variant: 'members', id: 'h-pend' }) : ''}
+    ${section(`Thành viên (${act.length})`, `<div class="cd mem-list">${act.map((m) => `<div class="li mrow">${chipOf(m.fam)}<div class="grow"><span class="mname">${esc(m.name || m.email)}</span><span class="sub">${esc(m.email)}${m.person_name ? ' · đã gắn với ' + esc(m.person_name) : ''}</span></div>${roleTag(m.role)}
+      ${canMenu(m) ? `${iconButton({ icon: 'more', label: `Tùy chọn cho ${m.name || m.email}`, attrs: `data-mmenu="${m.id}"` })}` : ''}</div>`).join('') || emptyState('Không có thành viên nào khớp.')}</div>`, { variant: 'members', id: 'h-mem' })}`;
 }
 const isTopRole = (r) => r === 'owner' || r === 'admin';
 function memberById(id) { return membersData?.items.find((m) => String(m.id) === String(id)); }
@@ -1583,8 +1614,8 @@ function join() {
     const ho = form.ho.value.trim(); const ten = form.ten.value.trim();
     const hits = ho && ten ? searchPeople(M.all, `${ho} ${ten}`, { limit: 5 }) : [];
     const hint = !(ho && ten) ? '<span class="sub pad">Nhập họ và tên để xem gợi ý.</span>' : !hits.length ? '<span class="sub pad">Chưa thấy tên nào giống. Chọn dòng dưới nếu bạn chưa có trong gia phả.</span>' : '';
-    $('#jsug').innerHTML = hint + hits.map((p) => `<button type="button" class="aco${pick === p.id ? ' on' : ''}" role="option" aria-selected="${pick === p.id}" data-jpick="${p.id}"><b>${esc(rank(p.data) + ' ' + p.data.name)}</b><span>${esc(joinDesc(p))}</span></button>`).join('')
-      + `<button type="button" class="aco sep${pick === 'none' ? ' on' : ''}" role="option" aria-selected="${pick === 'none'}" data-jpick="none"><b>Tôi chưa có trong gia phả</b><span>Quản trị sẽ xem và thêm bạn vào cây</span></button>`;
+    $('#jsug').innerHTML = hint + hits.map((p) => personItem({ rank: rank(p.data), name: p.data.name }, { variant: 'compact', on: pick === p.id, attrs: `role="option" aria-selected="${pick === p.id}" data-jpick="${p.id}"`, sub: esc(joinDesc(p)) })).join('')
+      + personItem({ name: 'Tôi chưa có trong gia phả' }, { variant: 'compact', sep: true, on: pick === 'none', attrs: `role="option" aria-selected="${pick === 'none'}" data-jpick="none"`, sub: esc('Quản trị sẽ xem và thêm bạn vào cây') });
     $('#jrelw').hidden = !(pick && pick !== 'none');
   };
   form.addEventListener('input', paint);
@@ -1720,7 +1751,7 @@ function connectSheet() {
     <h3>Claude</h3>
     <ol class="ai-steps"><li>Mở Settings → Connectors.</li><li>Chọn Add custom connector.</li><li>Dán địa chỉ trên rồi nhấn Add.</li></ol>
     <h3>ChatGPT</h3>
-    <ol class="ai-steps"><li>Mở Settings → Apps, bật Developer mode (Advanced).</li><li>Chọn Create app và dán địa chỉ trên.</li><li>Đăng nhập và cho phép.</li></ol>
+    <ol class="ai-steps"><li>Mở Plugins, chọn dấu + rồi Add custom MCP server.</li><li>Dán địa chỉ trên vào ô Connection, chọn xác thực OAuth nếu được hỏi.</li><li>Xác nhận cảnh báo, chọn Create as a plugin, đăng nhập và cho phép.</li></ol>
     <div class="row end cfm-acts"><button type="button" class="btn gh" data-close>Đóng</button></div></div>`;
   document.body.append(d);
   d.addEventListener('close', () => d.remove());
@@ -1739,10 +1770,10 @@ function more() {
   const tile = (ic) => `<span class="ibox" aria-hidden="true">${ic}</span>`;
   const row = (k, label, badge = '', icn) => calmRow({ href: hf(k), icon: tile(icon(icn || NAV.find((x) => x[0] === k)[3])), title: label, badge, dense: true });
   const bdg = (c) => (c ? ` <b class="badge">${c}</b>` : '');
-  const grp = (title, rows) => (rows.filter(Boolean).length ? `<section class="mg"><h2 class="mg-h">${title}</h2><div class="mg-g">${rows.filter(Boolean).join('')}</div></section>` : '');
+  const grp = (title, rows) => (rows.filter(Boolean).length ? section(title, `<div class="mg-g">${rows.filter(Boolean).join('')}</div>`) : '');
   const view = grp('Xem', [row('map', 'Bản đồ'), row('stats', 'Thống kê'), row('verify', 'Cần bổ sung'), row('export', 'Tải về')]);
   const joinRow = signed && !S.isMember() ? calmRow({ href: hf('join'), icon: tile(icon('user')), title: acct.status === 'pending' ? 'Yêu cầu tham gia đang chờ duyệt' : 'Tham gia dòng họ', dense: true }) : '';
-  const fam = grp('Dòng họ', [calmRow({ href: `#/${S.ALL_FAMS}/tree`, icon: tile(icon('search')), title: 'Tìm / lập dòng họ', dense: true }), S.isEditor() && !S.isAll() ? calmRow({ attrs: 'data-contact-import-fam', icon: tile(icon('user')), title: 'Nhập danh bạ', subtitle: 'vCard (.vcf) hoặc CSV, khớp với người trong họ', dense: true }) : '', row('gop-y', 'Góp ý', canAdminHere() ? bdg(sugCount) : ''), canAdminHere() ? row('members', 'Thành viên & quyền', bdg(joinCount)) : '', joinRow, S.isMember() && !S.isAll() ? row('bieu-quyet', 'Biểu quyết', '', 'user') : '', S.isEditor() && !S.isAll() ? row('thung-rac', 'Thùng rác', '<span data-trash-badge></span>', 'trash') : '']);
+  const fam = grp('Dòng họ', [calmRow({ href: `#/${S.ALL_FAMS}/tree`, icon: tile(icon('search')), title: 'Tìm / lập dòng họ', dense: true }), S.isEditor() && !S.isAll() ? calmRow({ attrs: 'data-contact-import-fam', icon: tile(icon('user')), title: 'Nhập danh bạ', subtitle: 'vCard (.vcf) hoặc CSV, khớp với người trong họ', dense: true }) : '', row('gop-y', 'Góp ý', canAdminHere() ? bdg(sugCount) : ''), canAdminHere() ? row('members', 'Thành viên & quyền', bdg(joinCount)) : '', joinRow, signed ? row('nhan-quan-ly', 'Nhận quản lý cây', '', 'tree') : '', S.isMember() && !S.isAll() ? row('bieu-quyet', 'Biểu quyết', '', 'user') : '', S.isEditor() && !S.isAll() ? row('thung-rac', 'Thùng rác', '<span data-trash-badge></span>', 'trash') : '']);
   // Ứng dụng: settings and the build in use; the check asks the server now (same unsaved-changes guard as the notice)
   const verRow = calmRow({ attrs: 'id="chkupd"', icon: tile(icon('info')), title: 'Phiên bản', subtitle: buildLabel(BUILD), trailing: '<span class="mo-act">Kiểm tra cập nhật</span>', dense: true });
   const app = grp('Ứng dụng', [row('settings', 'Cài đặt'), verRow]);
@@ -1755,11 +1786,11 @@ function more() {
     ? `<button type="button" class="cd acct-card acct-open" data-acct="sheet" aria-haspopup="dialog"><span class="acct"><span class="av" style="background:${accCol(ai)}" aria-hidden="true">${esc((act?.initial) || who.trim().charAt(0).toUpperCase() || '?')}</span><span class="acct-tx"><b>${esc(act?.name || who)}</b>${(act?.email || acct.email) ? `<span class="sub">${esc(act?.email || acct.email)}</span>` : ''}<span class="sub">${esc([roleLine, nFam ? `${nFam} dòng họ` : ''].filter(Boolean).join(' · '))}</span></span><span class="acc-go" aria-hidden="true">›</span></span></button>`
     : `<div class="cd acct-card"><div class="acct"><div class="acct-tx"><b>Chưa đăng nhập</b><span class="sub">Đăng nhập để sửa và xem thông tin riêng tư.</span></div><button type="button" class="btn sm" id="login">Đăng nhập</button></div></div>`;
   // Đăng xuất: its own red row, in a card of its own; opens the confirm (askSignOut)
-  const out = signed ? `<section class="mg"><div class="mg-g">${calmRow({ attrs: 'id="logout"', icon: tile(icon('logout')), title: 'Đăng xuất', trailing: 'none', dense: true, danger: true })}</div></section>` : '';
+  const out = signed ? section('', `<div class="mg-g">${calmRow({ attrs: 'id="logout"', icon: tile(icon('logout')), title: 'Đăng xuất', trailing: 'none', dense: true, danger: true })}</div>`) : '';
   // Quản lý tài khoản: the Account page of the active Google account (emails, sign-in methods, devices)
   const manage = signed && act?.kind === 'google' ? `<div class="mg-g acct-manage">${calmRow({ href: hf('tai-khoan'), icon: tile(icon('user')), title: 'Quản lý tài khoản', subtitle: 'Email, cách đăng nhập, thiết bị', dense: true })}</div>` : '';
   // Signed out: Đăng nhập is the first row (the account card at the bottom keeps its own button)
-  const signInRow = signed ? '' : `<section class="mg"><div class="mg-g">${calmRow({ attrs: 'data-acct="in"', icon: tile(icon('user')), title: 'Đăng nhập', subtitle: 'Để sửa và xem thông tin riêng tư', dense: true })}</div></section>`;
+  const signInRow = signed ? '' : section('', `<div class="mg-g">${calmRow({ attrs: 'data-acct="in"', icon: tile(icon('user')), title: 'Đăng nhập', subtitle: 'Để sửa và xem thông tin riêng tư', dense: true })}</div>`);
   main.innerHTML = `<h1>Thêm</h1>${signInRow}${view}${fam}${app}<section class="mg mg-who">${card}${manage}</section>${out}`;
 }
 // Book inside the app shell (header, side nav, bottom nav); print/PDF from its own toolbar prints only the book.
@@ -1796,7 +1827,7 @@ const MINE = { rows: null };
 function mine() {
   const r = route();
   main.innerHTML = `${gopyHead('mine')}
-    ${lbar('mq3', 'Tìm tên người hoặc nội dung góp ý', MST.qRaw, MST.st ? 1 : 0)}
+    ${toolbar({ id: 'mq3', ph: 'Tìm tên người hoặc nội dung góp ý', val: MST.qRaw, active: MST.st ? 1 : 0 })}
     ${ltags(MST.st ? [['st', mineStat(MST.st)[1]]] : [])}
     ${fpanel(`<fieldset class="fset"><legend>Trạng thái</legend>${[['', 'Tất cả'], ...MSTAT.map(([v, l]) => [v, l])].map(([v, l]) => `<label class="radio"><input type="radio" name="ms" value="${v}" ${MST.st === v ? 'checked' : ''}> ${l}</label>`).join('')}</fieldset>`)}
     ${S.signedIn() ? '' : deviceNote(S.myAccount().google)}
@@ -1854,7 +1885,7 @@ function mineCard(s) {
     : `<a class="plink" href="${hf(`person/${esc(s.person_id)}`)}"><b>${esc(s.person_name || 'Người trong gia phả')}</b></a>`;
   const dif = fieldDiff(Object.entries(s.changes).map(([f, v]) => frow(`<b>${esc(FL(f))}</b> <span>${esc(sugShow(f, v))}</span>`)).join(''));
   return `<div class="cd rv mcard" data-mid="${s.id}">
-    <div class="row btw">${who}<span class="tag ${tone} sm">${label}</span></div>
+    <div class="row btw">${who}${tag(label, { tone, sm: true })}</div>
     ${dif}
     ${s.note ? (s.note.length > NOTE_LONG ? `<p class="rv-note rv-clamp">“${esc(s.note)}”</p><button type="button" class="btn gh sm" data-note-more>Xem thêm</button>` : `<p class="rv-note">“${esc(s.note)}”</p>`) : ''}
     ${s.status === 'rejected' && s.reason ? `<p class="sub"><b>Lý do:</b> ${esc(s.reason)}</p>` : ''}
@@ -1885,16 +1916,11 @@ main.addEventListener('click', (e) => {
 });
 
 // ---------- dialogs ----------
-const KEEP = Symbol('keep-open'); // onSubmit returns KEEP to leave the dialog open (it changed its own content)
-function dialog(html, onSubmit) {
-  closeDialog(); const d = document.createElement('dialog'); d.className = 'dlg'; d.innerHTML = `<form method="dialog" class="form-stack">${html}</form>`;
-  document.body.append(d); d.showModal();
-  d.querySelector('form').onsubmit = async (e) => { e.preventDefault(); try { if ((await onSubmit(new FormData(e.target), d)) === KEEP) return; d.close(); d.remove(); render(); } catch (err) { const m = d.querySelector('.err') || d.querySelector('form').appendChild(Object.assign(document.createElement('p'), { className: 'err' })); m.textContent = err.message; } };
-  d.querySelector('[data-cancel]')?.addEventListener('click', () => { d.close(); d.remove(); });
-  return d;
-}
+const dialog = (html, onSubmit) => sheet(html, onSubmit, { after: () => render() }); // the shared sheet (ui.js)
 elder.init({ loginDialog, render });
 LK.setOnChange(() => renderSoon());
+BT.setOnChange(() => renderSoon());
+main.addEventListener('click', (e) => { if (e.target.closest?.('[data-bt-del]')) BT.deleteBranch(S.curFamily(), () => renderSoon()); });
 PL.setOnChange(() => renderSoon());
 VR.setOnChange(() => renderSoon());
 VR.wire(main, { fam: () => { const pp = M.byId.get(route().arg); return pp?.fam || S.curFamily(); }, nameOf: (pid) => M.byId.get(pid)?.data?.name || '', done: () => { S.sync(); renderSoon(); } });
@@ -1902,7 +1928,6 @@ PL.wire(main, { fam: () => { const pp = M.byId.get(route().arg); return pp?.fam 
 addEventListener('hashchange', () => elder.handleHash());
 elder.handleHash();
 { const m = /^#login-error=(.*)$/.exec(location.hash); if (m) { const t = decodeURIComponent(m[1]); history.replaceState(null, '', '#tree'); setTimeout(() => alert(t), 300); } }
-function closeDialog() { document.querySelectorAll('dialog.dlg').forEach((d) => { d.close(); d.remove(); }); }
 function loginDialog() {
   const dl = dialog(`<h2>Đăng nhập để sửa</h2><p class="sub">Xem thì không cần đăng nhập. Mã sửa do người quản lý gia phả cấp.</p>
    <label class="fld">Mã sửa<input name="code" type="password" autocomplete="current-password" required id="code"></label>
@@ -2047,12 +2072,13 @@ S.hooks.queueFlushed = (r) => { if (r.sent) toast(`Đã gửi ${r.sent} góp ý 
 const FP_WIDE = ['note', 'verify', 'source', 'spouse', 'address', 'birth_place', 'burial', 'contact_public'];
 const FP_AU = { gen: 'Đời', thu: 'Thứ', birth_lunar: 'Âm lịch', death_lunar: 'Âm lịch' };
 const FP_AU_INPUT = { gen: 'Đời (số)', thu: 'Thứ', birth_lunar: 'Âm lịch (ngày/tháng)', death_lunar: 'Âm lịch (ngày/tháng)' };
-const FP_SIMPLE = ['name', 'name_han', 'alias', 'title_name', 'place', 'job', 'religion', 'spouse', 'married', 'birth_place', 'address', 'phone', 'email', 'zalo', 'facebook', 'photo', 'note', 'verify', 'source', 'contact_public'];
+const FP_SIMPLE = ['name', 'name_han', 'alias', 'title_name', 'place', 'job', 'religion', 'spouse', 'married', 'birth_place', 'photo', 'note', 'verify', 'source', 'contact_public'];
 let formSt = null;        // {kind: 'sua'|'them', p, prefill, title, only, patch, note}
 let formDirty = false;    // unsaved changes on the form page
 let formDraftSaved = false; // a draft of this form is on the device (leaving loses nothing)
 let formHash = null;      // hash of the form page (the guard compares against it)
-setNewPersonHandler((o) => goForm(o)); // Quan hệ → Tạo người mới opens this form
+// Quan hệ → Tạo người mới (relui.js): the basic form with the relation's prefill; the relation sheet follows the person
+setNewPersonHandler((o) => (S.isAll() ? goForm(o) : addBasic({ fam: S.curFamily(), prefill: o.prefill, title: o.title, model: { people: M.ps, byId: M.byId }, onPicked: (id) => { if (id) o.afterSave?.(id); } })));
 function goForm(st) {
   formSt = st; formDirty = false;
   // In "Tất cả" a form belongs to one family: the person's (or the parent's), else the family picker comes first.
@@ -2077,14 +2103,54 @@ const fpIn = (k, label, d, wide = false, extra = '') => fpW(k, wide, `<label cla
 const fpParentText = (x) => `${x.data.name}${x.data.gen ? ' · đời ' + x.data.gen : ''}`;
 const fpPickDesc = (x) => [x.data.gen ? 'đời ' + x.data.gen : '', years(x.data), x.data.place && x.data.place.split(/[,→]/)[0].trim()].filter(Boolean).join(' · ');
 
+// The contact list in the person form: rows of [type][value][remove], then "+ Thêm liên hệ" and the import link.
+const ctItems = (st) => { try { const a = JSON.parse(st.v.contacts || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
+const ctIdxOf = (el) => Number(el.closest('[data-ct-row]')?.dataset.ctRow ?? -1);
+const ctInputOf = (c) => CTYPE[c.type] || CTYPE.other;
+function ctRowHtml(c, i) {
+  const t = ctInputOf(c);
+  return `<div class="ct-row" data-ct-row="${i}">
+    <select class="ct-type" data-ct-type aria-label="Loại liên hệ">${CONTACT_TYPES.map((o) => `<option value="${o.id}" ${o.id === c.type ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select>
+    <input class="ct-val" data-ct-val type="${t.input}" inputmode="${t.mode}" autocomplete="${t.ac}" placeholder="${esc(t.ph)}" aria-label="${esc(t.label)}" value="${fpE(c.value)}">
+    <button type="button" class="ct-del" data-ct-del="${i}" aria-label="Bớt dòng ${esc(t.label)}">×</button></div>`;
+}
+const ctListHtml = (items) => items.length ? items.map(ctRowHtml).join('') : '<p class="sub ct-empty">Chưa có liên hệ nào.</p>';
+function ctEditorHtml(st) {
+  return `<div class="ct-wrap wide"><div class="ct-list" data-ct-list>${ctListHtml(ctItems(st))}</div>
+    <p class="fld-err" data-err="contacts" hidden></p>
+    <div class="ct-acts"><button type="button" class="btn gh sm" data-ct-add>+ Thêm liên hệ</button>
+    <button type="button" class="linkbtn" data-ct-import>Nhập từ danh bạ</button></div></div>`;
+}
+// The rows as they are on the page (typed values included).
+function ctReadDom(form) {
+  return [...form.querySelectorAll('[data-ct-row]')].map((r) => ({ type: r.querySelector('[data-ct-type]').value, value: r.querySelector('[data-ct-val]').value }));
+}
+// Redraws the rows from the state; focuses one row's field when asked.
+function ctRedraw(form, st, focusIdx = -1, focusField = 'val') {
+  const host = form.querySelector('[data-ct-list]'); if (!host) return;
+  host.innerHTML = ctListHtml(ctItems(st));
+  if (focusIdx >= 0) host.querySelector(`[data-ct-row="${focusIdx}"] [data-ct-${focusField}]`)?.focus();
+}
+// One change to the list: the typed values first, then the change, then the redraw, the live check and the draft.
+function ctMutate(form, st, fn, focusIdx = -1, focusField = 'val') {
+  fpSync(form, st);
+  const list = ctItems(st); fn(list);
+  st.v.contacts = JSON.stringify(list);
+  ctRedraw(form, st, focusIdx, focusField);
+  formDirty = true; fpLive(form, st); fpDraftSave(form, st);
+}
+// The list as the draft and the conflict check compare it (text), and whether a saved field differs from the record.
+const baseVal = (rec, k) => (k === 'contacts' ? JSON.stringify(contactList(rec)) : String(rec[k] ?? ''));
+const differs = (k, rec, v) => (k === 'contacts' ? !sameList(contactList(rec), v) : String(rec[k] ?? '') !== String(v ?? ''));
+
 // Blocks of the form. Only-mode (a single action such as "Vợ / chồng") gets a plain list of those fields.
 // The form state (st.v) holds a value for every field of the form, drawn or not. An accordion panel is drawn from that
 // state the first time it opens, so a closed section costs no inputs; save, suggest and drafts read the state, so every
 // section counts, drawn or not. Only-mode (a single action such as "Vợ / chồng") draws a plain list of its fields.
-const FP_CONTACT = ['phone', 'email', 'zalo', 'facebook', 'address', 'contact_public'];
+const FP_CONTACT = ['contact_public']; // the contact list ('contacts') is members-only: fpKeys adds it
 // Fields of the form for this viewer (guests have no contact fields); only-mode: the listed fields.
 const fpKeys = (only, member) => (only ? new Set(only) : new Set([...FP_SIMPLE.filter((k) => member || !FP_CONTACT.includes(k)),
-  'sex', 'parent', 'other_parent', 'birth_smart', 'death_smart', 'dead', 'gio_lunar', 'burial']));
+  'sex', 'parent', 'other_parent', 'birth_smart', 'death_smart', 'dead', 'gio_lunar', 'burial', ...(member ? ['contacts'] : [])]));
 // The values the form starts with: the record (or the merged suggestion, or the prefill of a new person).
 function fpInitVals(st) {
   const { d } = st; const v = {};
@@ -2094,6 +2160,7 @@ function fpInitVals(st) {
   if (st.keys.has('death_smart')) v.death_smart = smartText(d.death_date, d.died);
   if (st.keys.has('dead')) v.dead = isDead(d) ? 'on' : '';
   if (st.keys.has('contact_public')) v.contact_public = d.contact_public === 'yes' ? 'yes' : '';
+  if (st.keys.has('contacts')) v.contacts = JSON.stringify(contactList(d)); // the list, as JSON text (a draft holds text too)
   return v;
 }
 const fpDeath = (st) => `<div class="fp-2col">${fpW('death_smart', false, `<label class="fld">Ngày mất<input name="death_smart" value="${fpE(st.v.death_smart)}" inputmode="numeric" autocomplete="off" placeholder="5/3/1963 · 3/1963 · 1963"></label>`)}<div class="fp-au fld-w" data-au="death_lunar"></div></div>`
@@ -2142,7 +2209,7 @@ function fpBody(st, id) {
   }
   if (id === 'noi') return fpIn('place', 'Nơi sống', v) + fpIn('job', 'Nghề', v) + fpIn('religion', 'Tôn giáo', v);
   if (id === 'lien') {
-    return fpIn('phone', 'Điện thoại', v) + fpIn('email', 'Email', v) + fpIn('zalo', 'Zalo', v) + fpIn('facebook', 'Facebook', v) + fpIn('address', 'Địa chỉ', v, true)
+    return ctEditorHtml(st)
       + fpW('contact_public', true, `<label class="fld">Hiện liên hệ công khai?<select name="contact_public"><option value="" ${v.contact_public !== 'yes' ? 'selected' : ''}>Không</option><option value="yes" ${v.contact_public === 'yes' ? 'selected' : ''}>Có</option></select></label>`);
   }
   // ghi
@@ -2171,6 +2238,7 @@ function fpSections(st) {
 }
 // The drawn inputs into the state (the closed panels keep theirs). Every change goes through here before it is read.
 function fpSync(form, st) {
+  if (st.keys.has('contacts') && form.querySelector('[data-ct-list]')) st.v.contacts = JSON.stringify(ctReadDom(form));
   for (const el of form.querySelectorAll('input[name],select[name]')) {
     const n = el.name; if (!st.keys.has(n) || el.type === 'file') continue;
     if (el.type === 'checkbox') st.v[n] = el.checked ? 'on' : '';
@@ -2227,6 +2295,12 @@ function fpResolve(form, st) {
   if (only) { st.eff = eff; return { vals, errs, dead, eff }; }
   put('sex', sv('sex'));
   if (has('contact_public')) put('contact_public', sv('contact_public'));
+  if (has('contacts')) {
+    const rows = ctItems(st);
+    const bad = rows.map((c, i) => [c, i]).find(([c]) => String(c.value || '').trim() && contactError(c));
+    if (bad) err('contacts', `Dòng ${bad[1] + 1}: ${contactError(bad[0])}`);
+    put('contacts', cleanList(rows));
+  }
   put('gio_lunar', dead ? sv('gio_lunar') : '');
   put('burial', dead ? sv('burial') : '');
   const parentId = sv('parent');
@@ -2337,7 +2411,7 @@ function fpPickSearch(form, st, q) {
   const v = q.value.trim(); if (!v) { list.hidden = true; return; }
   const ex = fpPickExcluded(st);
   const hits = searchPeople(M.ps.filter((x) => !ex.has(x.id) && st.famPeople(x)), v, { limit: 6 });
-  list.innerHTML = hits.map((x) => `<button type="button" class="aco" role="option" data-pk="${fpE(x.id)}"><b>${fpE(x.data.name)}</b><span>${fpE(fpPickDesc(x))}</span></button>`).join('')
+  list.innerHTML = hits.map((x) => personItem({ name: x.data.name }, { variant: 'compact', attrs: `role="option" data-pk="${fpE(x.id)}"`, sub: fpE(fpPickDesc(x)) })).join('')
     || '<span class="sub pad">Không thấy tên nào.</span>';
   list.hidden = false; q.setAttribute('aria-expanded', 'true');
 }
@@ -2386,7 +2460,7 @@ function fpLive(form, st) {
   return r;
 }
 // One-line summary in each accordion header; "Chưa có" in grey when the section is empty.
-const FP_SEC_OF = { name: 'ten', name_han: 'ten', alias: 'ten', title_name: 'ten', parent: 'gd', other_parent: 'gd', spouse: 'gd', married: 'gd', gen: 'gd', thu: 'gd',
+const FP_SEC_OF = { contacts: 'lien', name: 'ten', name_han: 'ten', alias: 'ten', title_name: 'ten', parent: 'gd', other_parent: 'gd', spouse: 'gd', married: 'gd', gen: 'gd', thu: 'gd',
   birth_smart: 'sinh', birth_lunar: 'sinh', birth_place: 'sinh', death_smart: 'mat', death_lunar: 'mat', gio_lunar: 'mat', burial: 'mat' };
 function fpSummaries(form, st, r) {
   const v = r.vals; const par = v.parent ? M.byId.get(v.parent) : null;
@@ -2400,7 +2474,7 @@ function fpSummaries(form, st, r) {
     noi: [v.place, v.job].filter(Boolean).join(' · '),
     ghi: cnt(['photo', 'note', 'verify', 'source']) ? `${cnt(['photo', 'note', 'verify', 'source'])} mục` : '',
     su: evSumText(st),
-    lien: cnt(['phone', 'email', 'zalo', 'facebook', 'address']) ? `${cnt(['phone', 'email', 'zalo', 'facebook', 'address'])} mục` : '',
+    lien: ctItems(st).filter((c) => String(c.value || '').trim()).length ? `${ctItems(st).filter((c) => String(c.value || '').trim()).length} mục` : '',
   };
   for (const [k, txt] of Object.entries(sums)) {
     const el = form.querySelector(`[data-acc-sum="${k}"]`); if (!el) continue;
@@ -2439,7 +2513,7 @@ function fpDraftSave(form, st, now = false) {
     for (const k of Object.keys(cur)) if (cur[k] !== (st.raw0[k] ?? '')) changed[k] = cur[k];
     const over = {}; for (const k of FP_AUK) if (st.A[k]) over[k] = st.A[k];
     if (!Object.keys(changed).length && !Object.keys(over).length && !(st.evq || []).length) { await S.draftDelete(st.draftKey); fpStatus(''); return; }
-    const base = {}; for (const n of Object.keys(changed)) for (const k of FP_MAP[n] || [n]) base[k] = st.serverD[k] ?? '';
+    const base = {}; for (const n of Object.keys(changed)) for (const k of FP_MAP[n] || [n]) base[k] = baseVal(st.serverD, k);
     await S.draftSave(st.draftKey, { mode: st.mode, personId: st.p ? st.p.id : 'new', patchId: st.patch ? st.patch.id : null, changed, base, over, ev: st.evq || [] });
     formDraftSaved = true; fpStatus(`Đã lưu nháp ${fmtTime(Date.now())}`);
   };
@@ -2466,6 +2540,7 @@ function fpRestore(form, st, dr) {
   for (const k of Object.keys(dr.over || {})) st.A[k] = dr.over[k];
   if (Array.isArray(dr.ev)) { st.evq = dr.ev; const sec = document.getElementById('acc-p-su'); if (sec && st.rendered.has('su')) evAfterChange(st); }
   fpPushDom(form, changed);
+  if (names.includes('contacts')) ctRedraw(form, st);
   const box = form.querySelector('.fp-pick'); if (box && names.includes('parent')) box.outerHTML = fpPickBox(st);
   fpOtherOpts(form, st, false);
   for (const k of FP_AUK) fpPaintAu(form, st, k, true);
@@ -2473,7 +2548,7 @@ function fpRestore(form, st, dr) {
   const cur = st.p ? (M.byId.get(st.p.id)?.data || {}) : {};
   for (const n of names) {
     const keys = FP_MAP[n] || [n];
-    if (!keys.some((k) => String(cur[k] ?? '') !== String(dr.base?.[k] ?? ''))) continue;
+    if (!keys.some((k) => baseVal(cur, k) !== String(dr.base?.[k] ?? ''))) continue;
     if (FP_SEC_OF[n]) fpOpen(form, st, FP_SEC_OF[n]); // the marked field must be on the page
     const el = form.querySelector(`[name="${n}"]`); const w = el?.closest('.fld-w') || el?.parentElement;
     if (w && !w.querySelector('.fld-conf')) w.insertAdjacentHTML('beforeend', '<p class="fld-conf">Đã có người sửa</p>');
@@ -2510,7 +2585,7 @@ function formPage(arg) {
   const only = st0?.only || null;
   const st = { p, patch, suggest, d, only, title: st0?.title, base: inferThuBase(M.ps.filter(famPeople)), fam, inAll, fams, famPeople,
     A: { gen: null, thu: null, birth_lunar: null, death_lunar: null }, eff: {}, contrib: suggest && !patch && !S.isMember(),
-    open: { ten: true, gd: !p && !patch },  // Tên open; Gia đình open when adding a person; others collapsed
+    open: { ten: true, gd: !p && !patch, ...(st0?.open ? { [st0.open]: true } : {}) },  // Tên open; Gia đình open when adding a person; others collapsed; st0.open: the section a link asks for
     serverD: patch ? serverD : d, mode: patch ? 'patch' : suggest ? 'suggest' : 'edit', autoDraft: !!st0?.autoDraft, draftHold: true,
     draftKey: draftKeyOf(fam, suggest, p, patch),
     keys: fpKeys(only, famMember), rendered: new Set(), evq: [], evEd: null }; // every field's state (st.v) is set below; closed panels draw from it; evq: pending events and stories
@@ -2542,7 +2617,10 @@ function formPage(arg) {
   if (gNote) gNote.addEventListener('click', (e) => { if (e.target.closest('[data-fp-login]')) loginDialog(); else if (e.target.closest('[data-fp-guest-x]')) gNote.hidden = true; });
   // a focused text field is centred: never under the bottom bar or the on-screen keyboard (toggles and radios do not move)
   form.addEventListener('focusin', (e) => { if (e.target.matches('input:not([type=checkbox]):not([type=radio]),textarea')) e.target.scrollIntoView({ block: 'center' }); });
-  const live = (e) => { if (e.target.classList?.contains('pk-q') || e.target.id === 'fpfam') return; formDirty = true; fpLive(form, st); fpDraftSave(form, st); };
+  const live = (e) => {
+    if (e.target.matches?.('[data-ct-type]')) { ctMutate(form, st, () => {}, ctIdxOf(e.target), 'val'); return; } // a new type: the row redraws with its input
+    if (e.target.classList?.contains('pk-q') || e.target.id === 'fpfam') return; formDirty = true; fpLive(form, st); fpDraftSave(form, st);
+  };
   form.addEventListener('input', live);
   form.addEventListener('change', live);
   form.addEventListener('change', (e) => { if (e.target.id === 'fpfam') fpSwitchFam(form, st, e.target.value); });
@@ -2551,6 +2629,14 @@ function formPage(arg) {
   form.addEventListener('mousedown', (e) => { const b = e.target.closest('[data-pk]'); if (b) { e.preventDefault(); fpPickSet(form, st, b.dataset.pk); } });
   form.addEventListener('click', (e) => {
     if (evFormClick(form, st, e)) return; // the events and stories section
+    if (e.target.closest('[data-ct-add]')) { ctMutate(form, st, (l) => l.push({ type: 'phone', value: '' }), ctItems(st).length, 'val'); return; }
+    const cdel = e.target.closest('[data-ct-del]'); if (cdel) { const i = Number(cdel.dataset.ctDel); ctMutate(form, st, (l) => l.splice(i, 1), -1); return; }
+    if (e.target.closest('[data-ct-import]')) {
+      openContactImport({ person: { id: st.p?.id || null, name: st.v.name || '' }, onPick: (items) => ctMutate(form, st, (l) => {
+        for (const it of items) if (!l.some((x) => x.type === it.type && String(x.value).trim() === it.value)) l.push(it);
+      }, -1) });
+      return;
+    }
     // a closed panel is drawn when it is opened (the document handler opens it after this one)
     const ab = e.target.closest('[data-acc-btn]'); if (ab && !st.rendered.has(ab.dataset.accBtn)) { fpRender(form, st, ab.dataset.accBtn); fpLive(form, st); }
     const exp = e.target.closest('[data-expand]');
@@ -2580,7 +2666,7 @@ function formPage(arg) {
     try {
       if (patch) { // my own pending suggestion: the changes against the person's record (PATCH replaces them)
         const next = {};
-        for (const [k, v] of Object.entries(vals)) if (String(serverD[k] ?? '') !== String(v ?? '')) next[k] = v;
+        for (const [k, v] of Object.entries(vals)) if (differs(k, serverD, v)) next[k] = v;
         if (!Object.keys(next).length) throw new Error('Chưa có thông tin nào thay đổi.');
         const note = (f.get('suggest_note') || '').trim();
         try { await S.updateSuggestion(patch.id, { changes: next, note }); }
@@ -2588,7 +2674,7 @@ function formPage(arg) {
         await S.draftDelete(st.draftKey); formDirty = false; toast('Đã lưu góp ý. Vẫn chờ quản trị duyệt.'); location.hash = hf('mine'); return;
       }
       const out = {};
-      for (const [k, v] of Object.entries(vals)) if (String(d[k] ?? '') !== String(v ?? '')) out[k] = v;
+      for (const [k, v] of Object.entries(vals)) if (differs(k, d, v)) out[k] = v;
       if (!Object.keys(out).length && (st.evq || []).length) { // only events or stories changed
         await evFlush(st, p.id); await S.draftDelete(st.draftKey); formDirty = false; toast(st.suggest ? 'Đã gửi góp ý. Bạn xem lại trong Góp ý của tôi.' : 'Đã lưu');
         location.hash = st.suggest ? hf('mine') : hf(`person/${p.id}`); return;
@@ -2616,7 +2702,8 @@ function formPage(arg) {
     } catch (x) { err.hidden = false; err.textContent = x.message; }
   };
 }
-function confirmDialog(t, body, ok, fn) { dialog(`<h2>${esc(t)}</h2><p class="sub">${esc(body)}</p><div class="row end"><button type="button" class="btn gh" data-cancel>Hủy</button><button class="btn dng">${ok}</button></div>`, fn); }
+// confirm: the shared confirm (ui.js); the dialog stays open until the action is done, a failure shows in it
+function confirmDialog(t, body, ok, fn) { confirmModal({ title: t, body, ok, danger: true, wait: true, onOk: async () => { await fn(); render(); } }); }
 function prompt2(t, v, fn) { dialog(`<h2>${esc(t)}</h2><label class="fld">Nội dung<input name="v" value="${esc(v)}"></label><div class="row end"><button type="button" class="btn gh" data-cancel>Hủy</button><button class="btn">Lưu</button></div>`, (f) => fn(f.get('v'))); }
 async function historyDialog(id) {
   const rows = await fetch('/api/history/' + id).then((r) => r.json()).catch(() => []);
@@ -2676,7 +2763,7 @@ function treeDesk(jump) {
   const L = chartLayout(M, root, isOpen);
   if (zoom == null) zoom = Math.max(0.5, Math.min(1, ((main.clientWidth || innerWidth) - 340 - 16 - 48) / (L.w + 8)));
   const p = M.byId.get(sel); const d = p.data;
-  main.innerHTML = `<h1 class="vh">Cây gia phả</h1><div class="tbar2"><select id="chi" aria-label="Chọn chi"><option value="">Cả họ</option>${branches.map((b) => `<option value="${b.id}" ${b.id === chi ? 'selected' : ''}>Chi ${esc(rank(b.data))} ${esc(chiName(b.data.name))}</option>`).join('')}</select>
+  main.innerHTML = `<h1 class="vh">Cây gia phả</h1>${BT.bannerHtml(S.curFamily())}<div class="lbar"><select id="chi" aria-label="Chọn chi"><option value="">Cả họ</option>${branches.map((b) => `<option value="${b.id}" ${b.id === chi ? 'selected' : ''}>Chi ${esc(rank(b.data))} ${esc(chiName(b.data.name))}</option>`).join('')}</select>
    <button class="btn ter sm" id="qs2">Tìm người</button><span class="grow"></span>
    <span class="seg"><button class="on" id="mchart">Sơ đồ</button><button id="mlist">Danh sách</button></span>
    <button class="btn gh sm" id="oall">Mở hết</button><button class="btn gh sm" id="call">Đóng hết</button></div>
@@ -2793,7 +2880,7 @@ function acShow() {
   const r = inp.getBoundingClientRect();
   const w = Math.min(Math.max(r.width, 320), innerWidth - 32); const l = Math.max(16, Math.min(r.left, innerWidth - 16 - w));
   Object.assign(ac.box.style, { left: l + 'px', top: r.bottom + 'px', width: w + 'px' });
-  ac.box.innerHTML = ac.hits.map((p, i) => `<div class="aco${i === ac.i ? ' on' : ''}" role="option" id="aco${i}" data-ac="${p.id}" aria-selected="${i === ac.i}"><b>${esc(rank(p.data) + ' ' + p.data.name)}</b><span>${esc(acDesc(p))}</span></div>`).join('');
+  ac.box.innerHTML = ac.hits.map((p, i) => personItem({ rank: rank(p.data), name: p.data.name }, { variant: 'compact', tag: 'div', on: i === ac.i, attrs: `role="option" id="aco${i}" data-ac="${p.id}" aria-selected="${i === ac.i}"`, sub: esc(acDesc(p)) })).join('');
   inp.setAttribute('aria-controls', 'acbox'); inp.setAttribute('aria-expanded', 'true');
   ac.box.hidden = false;
 }
@@ -2833,8 +2920,8 @@ let cayQ = ''; let cayT = null;
 function cayPage() {
   // a same-route re-render keeps the page (render() leaves it in place): repaint the list when the new data is in
   if ($('#flist') && $('#fq')) return paintCay(cayQ);
-  // the shared list toolbar (.lbar: search + icon buttons, no visible label); no filter button on this page
-  main.innerHTML = `<div class="lbar"><div class="srch"><input id="fq" type="search" placeholder="Tìm họ, chữ Hán, quê quán" aria-label="Tìm họ, chữ Hán, quê quán" autocomplete="off" value="${esc(cayQ)}"></div><a class="fbtn" href="#lap-gia-pha" aria-label="Lập gia phả mới" title="Lập gia phả mới">${cic('plus', 20)}</a></div>
+  // the shared list toolbar; no filter button on this page (filter: false), the add link is its one icon button
+  main.innerHTML = `${toolbar({ id: 'fq', ph: 'Tìm họ, chữ Hán, quê quán', val: cayQ, filter: false, add: `<a class="fbtn" href="#lap-gia-pha" aria-label="Lập gia phả mới" title="Lập gia phả mới">${cic('plus', 20)}</a>` })}
     <div id="flist" class="cay"><p class="sub">Đang tìm…</p></div>`;
   paintCay(cayQ);
 }
@@ -2888,7 +2975,7 @@ function confirmPrivate(onOk, onCancel) {
 // Shown: computed values with a "Tự động" tag and the reason. One "Sửa tay" switch reveals the overrides + "Về tự động".
 const clanDefault = (f) => [bareName(f.name), f.origin_place || f.place].filter(Boolean).join(' · ');
 const branchLabel = (p) => `Chi ${rank(p.data)} ${p.data.name}`;
-const autoTag = (auto) => `<span class="tag ${auto ? 'blue' : 'gray'} sm">${auto ? 'Tự động' : 'Sửa tay'}</span>`;
+const autoTag = (auto) => tag(auto ? 'Tự động' : 'Sửa tay', { tone: auto ? 'blue' : 'gray', sm: true });
 function clanOrderRows(list, arrows) {
   return list.map((p, i) => `<li class="clan-row" data-bid="${esc(p.id)}"><span class="clan-n">${i + 1}. ${esc(branchLabel(p))}</span>${arrows
     ? `<span class="clan-acts"><button type="button" class="btn gh sm" data-up aria-label="Đưa ${esc(p.data.name)} lên"${i ? '' : ' disabled'}>↑</button><button type="button" class="btn gh sm" data-dn aria-label="Đưa ${esc(p.data.name)} xuống"${i < list.length - 1 ? '' : ' disabled'}>↓</button></span>` : ''}</li>`).join('') || '<li class="sub">Dòng chưa chia nhánh.</li>';
@@ -2982,6 +3069,7 @@ function famSettings() {
     </div>
     ${admin ? emblemField(f) : ''}
     ${clanCard(f, admin)}
+    ${SN.originCardHtml(f, admin)}
     <div class="cd"><h3>Ai thấy</h3>
       ${VIS_OPTS.map(([v, l, d]) => `<label class="radio fvis"><input type="radio" name="vis" value="${v}" ${f.visibility === v ? 'checked' : ''}${disabled}> <span><b>${l}</b><span class="sub">${d}</span></span></label>`).join('')}
       ${admin ? '' : '<p class="sub">Chỉ Chủ họ và Quản trị đổi được.</p>'}
@@ -3007,6 +3095,11 @@ function famSettings() {
     };
     bindEmblem(f, async (m) => { toast(m); await S.fetchFamily(slug, { fresh: true }); render(); });
     bindClan(f, slug);
+    $('#origin-form').onsubmit = async (e) => {
+      e.preventDefault(); const fd = new FormData(e.target); const err = e.target.querySelector('.err');
+      try { await S.patchFamily(slug, { origin_surname: fd.get('origin_surname'), origin_surname_han: fd.get('origin_surname_han'), origin_year: fd.get('origin_year'), origin_reason: fd.get('origin_reason'), origin_visibility: fd.get('origin_visibility') }); toast('Đã lưu họ gốc'); render(); }
+      catch (x) { err.hidden = false; err.textContent = x.message; }
+    };
   }
   main.querySelectorAll('input[name=vis]').forEach((r) => {
     r.onchange = () => {
@@ -3029,6 +3122,16 @@ async function gedExport(slug) {
     const r = await fetch(`/api/gedcom?family=${encodeURIComponent(slug)}`, { cache: 'no-store' });
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Không tải được tệp.'); }
     const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = `${slug}.ged`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } catch (x) { toast(x.message); }
+}
+// One branch (the person, blood descendants, their spouses) as a .ged file; the server names it <ten>-nhanh.ged in ASCII.
+async function gedBranch(id, slug) {
+  try {
+    const r = await fetch(`/api/persons/${encodeURIComponent(id)}/gedcom?scope=branch&family=${encodeURIComponent(slug)}`, { cache: 'no-store' });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Không tải được tệp.'); }
+    const name = (/filename="([^"]+)"/.exec(r.headers.get('content-disposition') || '') || [])[1] || 'nhanh.ged';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = name; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   } catch (x) { toast(x.message); }
 }

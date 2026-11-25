@@ -272,12 +272,17 @@ export const withdrawSuggestion = (id) => reviewCall(`/api/suggestions/${id}/wit
 export const updateSuggestion = (id, { changes, note }) => reviewCall(`/api/suggestions/${id}`, 'PATCH', { receipt: receiptFor(id) || undefined, changes, note });
 
 // ---------- people: one map for every family, each row tagged with its family ----------
-export const get = (id) => people.get(id);
+// A branch tree (branch-trees.js) shows the home tree's people: the same ids. They are kept apart from `people` (one row
+// per id), so a branch pull never overwrites or retags a home row. Branch rows are not kept on the device.
+const branchRows = new Map(); // branch family -> Map(id -> row)
+const branchFams = new Set();
+export const get = (id, fam) => (fam && branchRows.has(fam) ? branchRows.get(fam).get(id) : undefined) || people.get(id);
 // Relations of a family as the server gave them to this viewer: { source: 'table' | 'legacy', parent_child, couple }.
 const relMap = new Map();
 export const relOf = (fam) => relMap.get(fam || DEFAULT_FAM) || { source: 'legacy', parent_child: [], couple: [] };
 // People of the family on screen; in "Tất cả", people of every family in scope (each row keeps its p.fam).
 export const list = () => {
+  if (branchFams.has(curFam)) return [...(branchRows.get(curFam)?.values() || [])].filter((p) => !p.deleted && p.data);
   const sc = isAll() ? new Set(scopeFams()) : null;
   return [...people.values()].filter((p) => !p.deleted && p.data && (sc ? sc.has(p.fam || DEFAULT_FAM) : (p.fam || DEFAULT_FAM) === curFam));
 };
@@ -287,12 +292,17 @@ let running = null;
 // device preferences. Local only; every step is bounded, and a failure leaves the page online-only.
 async function openLocal() {
   try { db?.close(); } catch {}
-  db = null; people = new Map(); relMap.clear(); pulled = new Set(); denied = new Set(); famMeta = new Map(); cursors = {};
+  db = null; people = new Map(); branchRows.clear(); branchFams.clear(); relMap.clear(); pulled = new Set(); denied = new Set(); famMeta = new Map(); cursors = {};
   try {
     db = await within(idb(), 3000, 'IndexedDB');
     await within(adoptLegacy(), 3000, 'device adopt').catch((e) => console.warn('device data not moved', e));
     for (const p of await within(all('persons'), 3000, 'IndexedDB read')) people.set(p.id, { ...p, fam: p.fam || DEFAULT_FAM });
     cursors = (await within(tx('meta', 'readonly', (s) => s.get('cursors')), 3000, 'IndexedDB read')) || {};
+    // branch trees (branch-trees.js): their last rows, so a branch opens offline too
+    for (const f of (await within(tx('meta', 'readonly', (s) => s.get('branchFams')), 3000, 'IndexedDB read')) || []) {
+      const rows = (await within(tx('meta', 'readonly', (s) => s.get('branch:' + f)), 3000, 'IndexedDB read')) || [];
+      branchRows.set(f, new Map(rows.map((r) => [r.id, r]))); branchFams.add(f);
+    }
     if (cursors[DEFAULT_FAM] === undefined) cursors[DEFAULT_FAM] = Number(await within(tx('meta', 'readonly', (s) => s.get('since')), 3000, 'IndexedDB read')) || 0; // older devices
     for (const f of Object.values((await within(tx('meta', 'readonly', (s) => s.get('fams')), 3000, 'IndexedDB read')) || {})) { famMeta.set(f.id, f); famMeta.set(f.slug, f); }
     status.pending = (await within(all('outbox'), 3000, 'IndexedDB read')).length;
@@ -306,7 +316,7 @@ function saveFams() {
   tx('meta', 'readwrite', (s) => s.put(o, 'fams')).catch(() => {});
 }
 // True when this device has people of the family (its cache, or a partial fetch).
-export const hasData = (fam = curFam) => { for (const p of people.values()) if (!p.deleted && p.data && (p.fam || DEFAULT_FAM) === fam) return true; return false; };
+export const hasData = (fam = curFam) => { if (branchFams.has(fam)) return (branchRows.get(fam)?.size || 0) > 0; for (const p of people.values()) if (!p.deleted && p.data && (p.fam || DEFAULT_FAM) === fam) return true; return false; };
 // Waiting for the family's first full pull, with no failure yet: the shell draws a loading skeleton.
 export const loading = (fam = curFam) => !pulled.has(fam) && !denied.has(fam) && status.state !== 'error' && status.state !== 'offline';
 // Cold start on a person page: that person first, then the people linked to them (parents, spouses, children).
@@ -421,6 +431,17 @@ async function pullFamily(fam) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const res = await r.json();
     if (res.rel) relMap.set(fam, { ...res.rel, parent_child: res.rel.parent_child.map((x) => ({ ...x, fam })), couple: res.rel.couple.map((x) => ({ ...x, fam })) });
+    if (res.branch) { // a branch: the server sends its whole scope each time (since is ignored); kept apart from `people`
+      branchFams.add(fam);
+      const sig = (m) => [...(m?.values() || [])].map((x) => x.id + ':' + x.v).sort().join(',');
+      const prev = branchRows.get(fam);
+      const next = new Map(res.items.map((it) => [it.id, { ...it, fam }]));
+      branchRows.set(fam, next);
+      if (db) await tx('meta', 'readwrite', (s) => { s.put([...next.values()], 'branch:' + fam); s.put([...branchFams], 'branchFams'); });
+      if (wasPulled && sig(prev) !== sig(next)) famVer.set(fam, famVersion(fam) + 1);
+      pulled.add(fam);
+      return;
+    }
     const pend = db ? new Set((await all('outbox')).map((o) => o.id)) : new Set();
     if (since === 0) { // full pull: people removed from the family on the server go too
       const keep = new Set(res.items.map((i) => i.id));
@@ -438,18 +459,22 @@ async function pullFamily(fam) {
   if (changed && wasPulled) famVer.set(fam, famVersion(fam) + 1);
 }
 async function dropFamily(fam) {
+  branchRows.delete(fam); branchFams.delete(fam);
+  if (db) await tx('meta', 'readwrite', (s) => { s.delete('branch:' + fam); s.put([...branchFams], 'branchFams'); });
   for (const [id, p] of [...people]) if (p.fam === fam) { people.delete(id); if (db) await tx('persons', 'readwrite', (s) => s.delete(id)); }
 }
 
 // Local edit: visible at once, queued for upload to the person's family.
 export async function edit(id, fields, fam) {
-  const p = people.get(id) || { id, v: 0, deleted: false, data: {}, fam: fam || curFam };
+  const f = fam || curFam; const onBranch = branchFams.has(f); // a branch edit is shown in the branch and sent to its home tree
+  const p = (onBranch ? branchRows.get(f)?.get(id) : people.get(id)) || { id, v: 0, deleted: false, data: {}, fam: f };
   const data = { ...p.data };
   for (const [k, v] of Object.entries(fields)) { if (k === '_deleted') continue; if (v === '' || v == null) delete data[k]; else data[k] = v; }
   const next = { ...p, data, deleted: fields._deleted ?? p.deleted };
-  people.set(id, next);
+  if (onBranch) branchRows.get(f)?.set(id, next); else people.set(id, next);
   const op = { op_id: crypto.randomUUID(), id, fields, ts: Date.now(), family: next.fam || DEFAULT_FAM };
-  if (db) { await tx('persons', 'readwrite', (s) => s.put(next)); await tx('outbox', 'readwrite', (s) => s.put(op)); }
+  if (db && !onBranch) await tx('persons', 'readwrite', (s) => s.put(next));
+  if (db) await tx('outbox', 'readwrite', (s) => s.put(op));
   status.pending++; emit();
   sync();
   return next;

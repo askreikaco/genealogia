@@ -130,21 +130,21 @@ test('phone: Dòng họ filter in the sheet, active tag removes it; person links
   const b = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
   try {
     const { ctx, page, errors } = await open(b, { roles: BOTH, width: 390, hash: '/tat-ca/list' });
-    await page.waitForFunction(() => document.querySelectorAll('.cards .card').length === 5);
-    const href = await page.getAttribute('.cards .card a', 'href');
+    await page.waitForFunction(() => document.querySelectorAll('.cards .pi-card').length === 5);
+    const href = await page.getAttribute('.cards .pi-card a', 'href');
     assert.match(href, /^#\/(duong|dong-a)\/person\//);
     await page.click('[data-fp]');
     await page.selectOption('#ffamp', 'dong-a');
     await page.waitForSelector('.ltags .tagx');
     assert.match(await page.textContent('.ltags .tagx'), /Dòng họ: Nguyễn/);
-    assert.equal(await page.locator('.cards .card').count(), 2);
+    assert.equal(await page.locator('.cards .pi-card').count(), 2);
     if (SHOTS) {
       await page.click('[data-fp]'); await page.selectOption('#ffamp', 'dong-a');
       await page.click('[data-fp]'); await page.screenshot({ path: path.join(SHOTS, 'list-filter-sheet-390.png') });
       await page.keyboard.press('Escape');
     }
     await page.click('.ltags .tagx');
-    await page.waitForFunction(() => document.querySelectorAll('.cards .card').length === 5);
+    await page.waitForFunction(() => document.querySelectorAll('.cards .pi-card').length === 5);
     assert.equal(await page.locator('.ltags .tagx').count(), 0);
     assert.deepStrictEqual(errors, []);
     await ctx.close();
@@ -203,10 +203,10 @@ test('a family the server refuses drops out of "Tất cả" once it is followed'
     await page.click('[data-fam-follow="kin"]');
     await page.waitForTimeout(400); // the follow pulls the family; the server refuses it
     await page.evaluate(() => { location.hash = '#/tat-ca/list'; });
-    await page.waitForFunction(() => document.querySelectorAll('.cards .card').length === 5);
+    await page.waitForFunction(() => document.querySelectorAll('.cards .pi-card').length === 5);
     await openSwitcher(page);
     assert.match(await page.textContent('dialog.csw .famr:first-child'), /Tất cả dòng họ \(2\)/);
-    assert.equal(await page.locator('.cards .card').count(), 5);
+    assert.equal(await page.locator('.cards .pi-card').count(), 5);
     assert.deepStrictEqual(errors, []);
     await ctx.close();
   } finally { await b.close(); }
@@ -233,7 +233,7 @@ test('single family: no chips, no Dòng họ filter, no "Tất cả" entry (unch
   const b = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
   try {
     const { ctx, page, errors } = await open(b, { roles: { duong: 'member' }, width: 390, hash: '/duong/list' });
-    await page.waitForSelector('.cards .card');
+    await page.waitForSelector('.cards .pi-card');
     assert.equal(await page.locator('.fchip').count(), 0);
     assert.equal(await page.locator('#ffamp').count(), 0);
     await openSwitcher(page);

@@ -14,6 +14,8 @@ const WIDTHS = [
   [360, 740, 'phone'], [390, 844, 'phone'], [430, 932, 'phone'],
   [768, 1024, 'tablet'], [820, 1180, 'tablet'], [1024, 768, 'tablet'], [1180, 820, 'tablet'],
   [1280, 800, 'desktop'], [1440, 900, 'desktop'], [1920, 1080, 'desktop'],
+  // landscape phones: 844 and 932 wide are tablet range (rail toggle); 667 is a phone (bottom tab bar)
+  [844, 390, 'landscape'], [932, 430, 'landscape'], [667, 375, 'landscape'],
 ];
 let srv; let base;
 test.before(async () => { if (skip) return; const w = await startWeb(); srv = w.srv; base = w.base; setBase(base); });

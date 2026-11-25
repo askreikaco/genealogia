@@ -7,7 +7,7 @@
 #   1. docker (postgres:16 container, random host port)
 #   2. local binaries: initdb/pg_ctl/psql on PATH, pg_config --bindir, /usr/lib/postgresql/*/bin
 #      run as the 'postgres' user when this shell is root (initdb refuses root).
-set -euo pipefail
+set -Eeuo pipefail   # -E: the ERR trap also fires inside functions
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BASE="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/giapha-ci-pg"
 STATE_FILE="$BASE/state.env"
@@ -99,7 +99,7 @@ start() {
     done
     echo "docker could not start Postgres twice" >&2; exit 1
   else
-    local port bin; port="$(free_port)"; bin="$(find_pg_bin)"
+    local port bin; port="$(free_port)"; bin="$(find_pg_bin || true)"   # a missing binary is reported below, not a silent exit
     [ -n "$bin" ] || { echo "no Postgres: no docker and no initdb/pg_ctl found (PATH, pg_config, /usr/lib/postgresql)" >&2; exit 1; }
     local run=""; local owner="$(id -un)"
     if [ "$(id -u)" = 0 ]; then

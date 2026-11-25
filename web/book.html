@@ -6,14 +6,15 @@
 <title>Sách gia phả họ Dương</title>
 <meta name="description" content="Sách gia phả họ Dương, bản in A4, tự cập nhật theo dữ liệu.">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<!-- Noto Serif is not in REIKA DS 0.2.0, so it stays on Google Fonts. IBM Plex comes from the vendored tokens.css. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&display=swap">
 <link rel="stylesheet" href="/tokens.css">
 <link rel="stylesheet" href="/fields.css">
 <link rel="stylesheet" href="/listui.css">
 <link rel="stylesheet" href="/book.css">
 </head>
 <body>
-<div class="tbar" id="tbar"></div>
+<div class="stk" id="tbar"></div>
 <div class="pages" id="pages"><p class="loading">Đang dựng sách…</p></div>
 <div class="prog" id="prog" role="status" hidden><span id="progtxt"></span><progress id="progbar" max="1" value="0"></progress></div>
 <script type="module" src="/js/book.js"></script>
