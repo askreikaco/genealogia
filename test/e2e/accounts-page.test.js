@@ -162,7 +162,7 @@ test('subpages: each row opens its page with a back button; every capability is 
     await page.locator('.calm-row', { hasText: EXTRA }).locator('[data-em]').click();
     assert.deepEqual(await page.$$eval('.menu [role=menuitem]', (els) => els.map((e) => e.textContent.trim())), ['Gửi lại đường dẫn xác minh', 'Gỡ email']);
     await page.click('.menu [role=menuitem]:has-text("Gỡ email")');
-    await page.click('dialog.dcf [data-dcf-ok]');
+    await page.click('dialog#dcf [data-rds-confirm]');
     await page.waitForSelector('text=Đã gỡ email.');
     await settled(page);
     await page.locator('.acc-root .calm', { hasText: EXTRA }).first().waitFor({ state: 'detached' });
@@ -175,7 +175,7 @@ test('subpages: each row opens its page with a back button; every capability is 
     await page.locator('[data-out-others]').waitFor({ state: 'visible' });
     assert.equal(await page.locator('[data-out-others]').count(), 1, 'other devices exist (one per ownerPage call)');
     await page.click('[data-out-others]');
-    await page.click('dialog.dcf [data-dcf-ok]');
+    await page.click('dialog#dcf [data-rds-confirm]');
     await page.waitForSelector('text=Đã đăng xuất các thiết bị khác.');
     await settled(page);
     await page.locator('[data-out-others]').waitFor({ state: 'detached' });
@@ -241,7 +241,7 @@ test('sign out from the account page returns to the signed-out state', { skip },
   try {
     await openSub(page, 'tai-khoan');
     await page.click('#logout');
-    await page.click('dialog.cfm [data-cfm-ok]');
+    await page.click('dialog#cfm [data-rds-confirm]');
     await page.waitForSelector('[data-acct="in"]', { timeout: 10000 });
     assert.doesNotMatch(await page.textContent('.acc-root'), /Cần đăng nhập\./);
     assert.deepEqual(errors, []);
@@ -263,7 +263,7 @@ test('add email after a fresh sign-in; a stale sign-in asks to confirm first', {
   try {
     await openSub(page, 'tai-khoan/dang-nhap');
     await page.click('[data-link="google"]');
-    await page.waitForSelector('dialog.cfm[open]');
-    assert.match(await page.textContent('dialog.cfm'), /Xác nhận đây là bạn/);
+    await page.waitForSelector('dialog#cfm[open]');
+    assert.match(await page.textContent('dialog#cfm'), /Xác nhận đây là bạn/);
   } finally { await ctx.close(); }
 });

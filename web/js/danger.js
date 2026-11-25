@@ -10,6 +10,7 @@
 //   restoreTrash(fam, id)                 POST /api/trash/:id/restore
 // The guard test (server/test/danger-guard.test.js) fails when a delete-like control in web/js is made without these.
 import { esc } from './model.js';
+import { openConfirm } from '../vendor/reika-ds/js/index.js';
 
 export const dangerLabel = (label) => label;
 
@@ -33,35 +34,15 @@ const norm = (s) => String(s || '').normalize('NFC').trim().toLowerCase().replac
 // reason: a label for a required reason (passed to onConfirm({ reason })).
 // onConfirm may be async; an error stays in the dialog. Escape and "Hủy" cancel; focus starts on the heading.
 export function confirmDanger({ title, lose = '', restore = '', confirm = 'Xóa vĩnh viễn', typeName = '', reason = '', onConfirm, onCancel }) {
-  document.querySelectorAll('dialog.dcf').forEach((x) => { x.close(); x.remove(); });
-  const d = document.createElement('dialog');
-  d.className = 'dlg dcf'; d.setAttribute('role', 'alertdialog');
-  d.setAttribute('aria-labelledby', 'dcf-h'); d.setAttribute('aria-describedby', 'dcf-b');
-  d.innerHTML = `<div class="dcf-body"><h2 id="dcf-h" class="dng-h" tabindex="-1">${esc(title)}</h2>`
-    + `<div id="dcf-b">${lose ? `<p class="sub">${esc(lose)}</p>` : ''}<p class="dcf-note">${esc(restore || 'Không thể hoàn tác.')}</p></div>`
-    + (reason ? `<label class="fld">${esc(reason)}<textarea data-dcf-reason rows="2" maxlength="500"></textarea></label>` : '')
-    + (typeName ? `<label class="fld">Gõ “${esc(typeName)}” để xác nhận<input data-dcf-type autocomplete="off" spellcheck="false" autocapitalize="off"></label>` : '')
-    + '<p class="err" data-dcf-err role="alert" hidden></p>'
-    + `<div class="row end dcf-acts"><button type="button" class="btn gh" data-dcf-no>Hủy</button>`
-    + `<button type="button" class="btn dng" data-dcf-ok${typeName || reason ? ' disabled' : ''}>${esc(confirm)}</button></div></div>`;
-  document.body.append(d);
-  const ok = d.querySelector('[data-dcf-ok]');
-  let done = false;
-  const typed = d.querySelector('[data-dcf-type]'); const why = d.querySelector('[data-dcf-reason]');
-  const check = () => { ok.disabled = (typed && norm(typed.value) !== norm(typeName)) || (why && why.value.trim().length < 3); };
-  typed?.addEventListener('input', check); why?.addEventListener('input', check);
-  d.addEventListener('close', () => { if (!done) onCancel?.(); d.remove(); });
-  d.querySelector('[data-dcf-no]').onclick = () => d.close();
-  ok.onclick = async () => {
-    if (ok.disabled) return;
-    ok.disabled = true;
-    try { await onConfirm?.({ reason: why ? why.value.trim() : '' }); done = true; d.close(); } catch (e) {
-      const er = d.querySelector('[data-dcf-err]'); er.hidden = false; er.textContent = e?.message || String(e); check();
-    }
-  };
-  d.showModal();
-  d.querySelector('#dcf-h').focus();
-  return d;
+  document.querySelectorAll('dialog#cfm[open], dialog#dcf[open]').forEach((x) => x.close());
+  openConfirm({
+    id: 'dcf', title, message: lose, note: restore || 'Không thể hoàn tác.', noteTone: restore ? 'info' : 'danger', danger: true, role: 'alertdialog',
+    initialFocus: 'heading', confirmLabel: confirm, cancelLabel: 'Hủy', onCancel,
+    typeToConfirm: typeName ? { value: typeName, label: 'Gõ “' + typeName + '” để xác nhận' } : undefined,
+    reason: reason ? { label: reason, min: 3, max: 500 } : undefined,
+    onConfirm: (r) => onConfirm?.({ reason: r.reason ?? '' }),
+  });
+  return document.getElementById('dcf');
 }
 
 // After a delete: the item is in Thùng rác; "Hoàn tác" restores it for 10 s.

@@ -73,7 +73,7 @@ test('consent, then revoke from Cài đặt', { skip }, async () => {
     const row = page.locator('.ai-row', { hasText: CLIENT });
     await row.waitFor();
     await row.getByRole('button', { name: 'Gỡ kết nối' }).click();
-    await page.locator('dialog.dcf [data-dcf-ok]').click();
+    await page.locator('dialog#dcf [data-rds-confirm]').click();
     await page.locator('.ai-row', { hasText: CLIENT }).waitFor({ state: 'detached' });
     const left = await (await fetch(base + '/api/ai/connections', { headers: { cookie } })).json();
     assert.ok(!left.items.some((x) => x.client_name === CLIENT), 'gone from the server too');

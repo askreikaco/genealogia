@@ -145,8 +145,8 @@ test('two-step sign-in: set up from Bảo mật, sign in with a code, sign in wi
     await page.goto(base + '/#tai-khoan/xac-minh');
     await page.waitForSelector('[data-totp-off]');
     await page.click('[data-totp-off]');
-    await page.waitForSelector('dialog.dcf[open]');
-    await page.click('dialog.dcf [data-dcf-ok]');
+    await page.waitForSelector('dialog#dcf[open]');
+    await page.click('dialog#dcf [data-rds-confirm]');
     await toast(page, 'Đã tắt xác minh 2 bước.');
     const off = await pool.query('select (select count(*) from totp_factors where account_id = $1)::int as f, (select count(*) from recovery_codes where account_id = $1)::int as r', [await accountIdOf()]);
     assert.deepEqual([off.rows[0].f, off.rows[0].r], [0, 0], 'secret and codes removed');

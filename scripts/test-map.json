@@ -39,7 +39,8 @@
       ],
       "e2e": [
         "test/e2e/danger-pages.test.js",
-        "test/e2e/trash-pages.test.js"
+        "test/e2e/trash-pages.test.js",
+        "test/e2e/confirm-ds.test.js"
       ]
     },
     "match": {

@@ -139,7 +139,7 @@ test('manager: managed devices (row menu, confirm, remote sign-out) and the prin
       // Sign out every listed device through the row menu and its confirm.
       while (await mgr.locator('dialog[open] [data-more]').count()) {
         await mgr.locator('dialog[open] [data-more]').first().click();
-        await mgr.click('dialog[open] [data-cfm-ok]');
+        await mgr.click('dialog[open] [data-rds-confirm]');
         await mgr.waitForTimeout(400);
       }
       await mgr.waitForSelector('dialog[open]:has-text("Chưa có thiết bị nào")');

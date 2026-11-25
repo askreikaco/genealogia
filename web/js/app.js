@@ -13,7 +13,8 @@ import { nextAnniversary } from './lunar.js';
 import { locate } from './geo.js';
 import { chartLayout, chartSvg } from './treechart.js';
 import { emblemField, bindEmblem } from './emblem.js';
-import { isWide, isDesk, layoutAtLeast, emptyState, cic, iconButton, toolbar, addBtn, ltags, fpanel, fsheet, sheet, closeSheets, setUntag, deviceNote, toast, fmtTime, fmtDate, fieldDiff, frow, accItem, accToggle, confirmModal, famChip, familyCrest, calmRow, calmAct, surnameTile, surnameTileOf, popMenu, closeMenu, sexMark, sexClass, SEX_LABEL, tag, section, card } from './ui.js';
+import { openConfirm } from '../vendor/reika-ds/js/index.js';
+import { isWide, isDesk, layoutAtLeast, emptyState, cic, iconButton, toolbar, addBtn, ltags, fpanel, fsheet, sheet, closeSheets, setUntag, deviceNote, toast, fmtTime, fmtDate, fieldDiff, frow, accItem, accToggle, confirmModal, CFM_CANCEL, closeConfirms, famChip, familyCrest, calmRow, calmAct, surnameTile, surnameTileOf, popMenu, closeMenu, sexMark, sexClass, SEX_LABEL, tag, section, card } from './ui.js';
 import { BUILD, BUILD_DATE, createUpdater, updateNotice, buildLabel } from './update.js';
 import { searchPeople } from './fuzzy.js';
 import { nameHit, listPrefill, gioPrefill, eventPrefill } from './prefill.js';
@@ -2752,7 +2753,11 @@ function formPage(arg) {
   };
 }
 // confirm: the shared confirm (ui.js); the dialog stays open until the action is done, a failure shows in it
-function confirmDialog(t, body, ok, fn) { confirmModal({ title: t, body, ok, danger: true, wait: true, onOk: async () => { await fn(); render(); } }); }
+// Destructive-style question with a pending OK: the dialog stays open while fn runs and closes when it resolves.
+function confirmDialog(t, body, ok, fn) {
+  closeConfirms();
+  openConfirm({ id: 'cfm', title: t, message: body, confirmLabel: ok, cancelLabel: CFM_CANCEL, danger: true, onConfirm: async () => { await fn(); render(); } });
+}
 function prompt2(t, v, fn) { dialog(`<h2>${esc(t)}</h2><label class="fld">Nội dung<input name="v" value="${esc(v)}"></label><div class="row end"><button type="button" class="btn gh" data-cancel>Hủy</button><button class="btn">Lưu</button></div>`, (f) => fn(f.get('v'))); }
 async function historyDialog(id) {
   const rows = await fetch('/api/history/' + id).then((r) => r.json()).catch(() => []);
