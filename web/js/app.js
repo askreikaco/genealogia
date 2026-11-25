@@ -41,6 +41,7 @@ import * as DP from './dupes.js';
 import * as CS from './consistency.js';
 import * as RP from './relpath.js';
 import { VI as CSV } from './consistency-vi.js';
+import { TEXT_SIZE_VI } from './text-size-vi.js';
 import { addSearch, addBasic } from './addflow.js';
 import * as VR from './variants.js';
 import { KIN_REGION_KEY, resolveRegion } from './kin/index.js';
@@ -1719,15 +1720,26 @@ function kinRegionView() {
     r.onchange = () => { try { localStorage.setItem(KIN_REGION_KEY, r.value); } catch { /* private window: not kept */ } toast('Đã lưu cách gọi'); render(); };
   });
 }
+// Cỡ chữ (per device): 'normal' or 'large' / 'xlarge' as html[data-text]; tokens.css maps it to --text-scale. index.html sets it before first paint.
+const TEXT_KEY = 'gp_text';
+const TEXT_SIZES = [['normal', TEXT_SIZE_VI.normal], ['large', TEXT_SIZE_VI.large], ['xlarge', TEXT_SIZE_VI.xlarge]];
+const textPref = () => { try { const v = localStorage.getItem(TEXT_KEY); return v === 'large' || v === 'xlarge' ? v : 'normal'; } catch { return 'normal'; } };
+function setText(v) {
+  try { localStorage.setItem(TEXT_KEY, v); } catch { /* private window: not kept, this page still scales */ }
+  if (v === 'normal') delete document.documentElement.dataset.text; else document.documentElement.dataset.text = v;
+}
 function settings() {
   const t = themePref();
+  const x = textPref();
   main.innerHTML = `<h1>Cài đặt</h1>${section('Giao diện', `${[['', 'Theo hệ thống'], ['light', 'Sáng'], ['dark', 'Tối']].map(([v, l]) => `<label class="radio"><input type="radio" name="thm" value="${v}" ${t === v ? 'checked' : ''}> ${l}</label>`).join('')}`, { variant: 'card' })}`;
+  main.insertAdjacentHTML('beforeend', `${section(TEXT_SIZE_VI.label, `${TEXT_SIZES.map(([v, l]) => `<label class="radio"><input type="radio" name="txt" value="${v}" ${x === v ? 'checked' : ''}> ${l}</label>`).join('')}`, { variant: 'card' })}`);
   main.insertAdjacentHTML('beforeend', `${section('Dòng họ', `
     ${followedRecs().map((f) => famRowHtml(f, `#/${f.slug}/cai-dat-dong-ho`)).join('')}
     <a class="famr add" href="#/${S.ALL_FAMS}/tree"><span class="famr-tx"><span class="famr-nm">＋ Tìm / lập dòng họ</span></span></a>`, { variant: 'card', cls: 'fam-sec' })}`);
   main.insertAdjacentHTML('beforeend', `${section('Cách gọi', calmRow({ href: hf('cach-goi'), title: 'Cách gọi', subtitle: kinRegionLabel(kinRegionPref()), dense: true }), { variant: 'card' })}`);
   main.insertAdjacentHTML('beforeend', `${section('Tài khoản', acctRow(), { variant: 'card' })}`);
   main.querySelectorAll('input[name=thm]').forEach((r) => { r.onchange = () => setTheme(r.value); });
+  main.querySelectorAll('input[name=txt]').forEach((r) => { r.onchange = () => setText(r.value); });
   refreshFams();
   aiSection();
 }

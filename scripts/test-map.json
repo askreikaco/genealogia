@@ -1,5 +1,18 @@
 {
   "modules": {
+    "text-size": {
+      "paths": [
+        "web/tokens.css",
+        "web/app.css",
+        "web/listui.css",
+        "web/index.html",
+        "web/js/app.js",
+        "web/js/text-size-vi.js"
+      ],
+      "e2e": [
+        "test/e2e/text-size.test.js"
+      ]
+    },
     "claim": {
       "paths": [
         "server/claim-*.js",

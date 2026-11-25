@@ -80,6 +80,7 @@ const SHELL = [
   '/js/dupes.js',
   '/js/consistency.js',
   '/js/consistency-vi.js',
+  '/js/text-size-vi.js',
   '/js/relpath.js',
   '/js/relpath-vi.js',
   '/js/relpath-path.js',
