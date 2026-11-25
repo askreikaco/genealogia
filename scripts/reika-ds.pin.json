@@ -1,9 +1,9 @@
 {
   "repo": "askreikaco/reika-ds",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "tarballs": {
-    "reika-ds-tokens-0.2.0.tgz": "de10bfb6b3c08e91e84d1dfcda86223b09292e0354bce337be441261ef4df958",
-    "reika-ds-styles-0.2.0.tgz": "c4d92dcc233f975a1881c8f0f88f0e9c3dde3bef6d2539cfcb0da832d9b71fa7",
-    "reika-ds-web-0.2.0.tgz": "af2c4e52e9f172af3bf475cf681a00075622fe623e0f8e8e7579d6450a9bd6e1"
+    "reika-ds-tokens-0.2.1.tgz": "001a580b9439a43a57cfc76f265dc23ad106aba768edfa34bd88ed367791f3b9",
+    "reika-ds-styles-0.2.1.tgz": "51ce090ebd3270ef4fdafa7747424bb69a9f811405d684b4cb2db65b74d13461",
+    "reika-ds-web-0.2.1.tgz": "8a1fbd216c168a12e46e9c7c0a0c1a7fe3ab5482a5953f8222904d8e7d03c59c"
   }
 }

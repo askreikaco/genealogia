@@ -20,12 +20,24 @@ test('iconButton("pencil") renders rds-ibtn with the DS svg (rds-icon) and its a
 
 test('iconButton with an unmapped key keeps the local svg inside an rds-ibtn button', async () => {
   const { iconButton } = await load();
-  const html = iconButton({ icon: 'gear', label: 'Cài đặt' });
+  const html = iconButton({ icon: 'noSuchKey', label: 'Cài đặt' });
   assert.match(html, /^<button type="button" class="rds-ibtn" aria-label="Cài đặt"/, 'rds-ibtn button');
   assert.match(html, /<svg class="cic"/, 'local svg kept for an unmapped key');
-  const star = iconButton({ icon: 'star', label: 'Theo dõi', attrs: 'data-follow="PA" aria-pressed="false"' });
+  const star = iconButton({ icon: 'noSuchKey', label: 'Theo dõi', attrs: 'data-follow="PA" aria-pressed="false"' });
   assert.match(star, /data-follow="PA" aria-pressed="false"/, 'caller attrs kept on the unmapped-key button');
   assert.doesNotMatch(html, /class="rds-icon"/, 'no DS svg for an unmapped key');
+});
+
+test('every CI icon key has a DS mapping and renders svg.rds-icon', async () => {
+  const { iconButton, CI } = await load();
+  const keys = Object.keys(CI);
+  assert.ok(keys.length >= 25, `CI keys: ${keys.length}`);
+  const unmapped = [];
+  for (const k of keys) {
+    const html = iconButton({ icon: k, label: k });
+    if (!/<svg class="rds-icon"/.test(html)) unmapped.push(k);
+  }
+  assert.deepStrictEqual(unmapped, [], 'CI keys without a DS icon (add them to DS_ICON in web/js/ui.js)');
 });
 
 test('iconButton decodes escaped attrs once (DS helper escapes them again)', async () => {

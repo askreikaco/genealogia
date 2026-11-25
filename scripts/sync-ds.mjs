@@ -28,6 +28,7 @@ const MEMBERS = {
   },
   [`reika-ds-styles-${PIN.version}.tgz`]: {
     'package/fonts/fonts.css': 'fonts/fonts.css',
+    'package/fonts/IBMPlexSans-Light.woff2': 'fonts/IBMPlexSans-Light.woff2',
     'package/fonts/IBMPlexSans-Regular.woff2': 'fonts/IBMPlexSans-Regular.woff2',
     'package/fonts/IBMPlexSans-Medium.woff2': 'fonts/IBMPlexSans-Medium.woff2',
     'package/fonts/IBMPlexSans-SemiBold.woff2': 'fonts/IBMPlexSans-SemiBold.woff2',

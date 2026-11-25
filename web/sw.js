@@ -10,6 +10,7 @@ const SHELL = [
   '/vendor/reika-ds/tokens.css',
   '/vendor/reika-ds/web.css',
   '/vendor/reika-ds/fonts/fonts.css',
+  '/vendor/reika-ds/fonts/IBMPlexSans-Light.woff2',
   '/vendor/reika-ds/fonts/IBMPlexSans-Regular.woff2',
   '/vendor/reika-ds/fonts/IBMPlexSans-Medium.woff2',
   '/vendor/reika-ds/fonts/IBMPlexSans-SemiBold.woff2',

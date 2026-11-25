@@ -61,6 +61,6 @@ test('sw.js precaches every runtime vendor file', () => {
   const sw = read('web/sw.js');
   const shell = new Set([...sw.matchAll(/'(\/vendor\/reika-ds\/[^']+)'/g)].map((m) => m[1]));
   const runtime = ['tokens.css', 'web.css', 'fonts/fonts.css', 'js/index.js', 'js/html.js', 'js/components.js', 'js/menu-controller.js',
-    'fonts/IBMPlexSans-Regular.woff2', 'fonts/IBMPlexSans-Medium.woff2', 'fonts/IBMPlexSans-SemiBold.woff2', 'fonts/IBMPlexMono-Regular.woff2'];
+    'fonts/IBMPlexSans-Light.woff2', 'fonts/IBMPlexSans-Regular.woff2', 'fonts/IBMPlexSans-Medium.woff2', 'fonts/IBMPlexSans-SemiBold.woff2', 'fonts/IBMPlexMono-Regular.woff2'];
   for (const f of runtime) assert.ok(shell.has('/vendor/reika-ds/' + f), `missing from sw.js SHELL: ${f}`);
 });

@@ -213,7 +213,8 @@ export const calmRow = ({ href = '', attrs = '', icon = '', tile = '', title, su
 };
 // The one icon-only button (conv §36): an icon from CI, with aria-label and title (the desktop label) from label. attrs: data-*.
 // Local CI key -> REIKA DS ICONS name (icon-map.md). Keys not here keep the local svg in an rds-ibtn button.
-const DS_ICON = { plus: 'add', filter: 'filter', close: 'close', search: 'search', share: 'share', pencil: 'edit', more: 'overflow-menu-horizontal', chevR: 'chevron-right' };
+const DS_ICON = { plus: 'add', filter: 'filter', close: 'close', search: 'search', share: 'share', pencil: 'edit', more: 'overflow-menu-horizontal', chevR: 'chevron-right',
+  star: 'star', starOn: 'star-filled', check: 'checkmark', sun: 'sun', moon: 'moon', gear: 'settings', switcher: 'switcher', tree: 'tree-view-alt', book: 'book', map: 'map', gio: 'calendar', chart: 'chart-bar', flag: 'flag', dl: 'download', chevL: 'chevron-left', user: 'user', sheet: 'document' };
 const unesc = (s) => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 // attrs: the caller's data-* string; the DS helper takes an object and escapes values again, so decode them first.
 const attrObj = (s) => Object.fromEntries([...String(s).matchAll(/([\w-]+)="([^"]*)"/g)].map((m) => [m[1], unesc(m[2])]));
