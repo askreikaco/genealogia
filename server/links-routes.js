@@ -38,7 +38,8 @@ function mount(app, d) {
            (a_family=$1 and a_person=$2 and b_family=$3) or (b_family=$1 and b_person=$2 and a_family=$3)
            or (a_family=$3 and a_person=$4 and b_family=$1) or (b_family=$3 and b_person=$4 and a_family=$1))`, [fA.id, pa.id, fB.id, pb.id]);
       if (dupe.rowCount) throw new HttpError(409, dupe.rows[0].status === 'pending' ? 'Đã có liên kết đang chờ duyệt.' : 'Người này đã liên kết với cây kia.');
-      const status = L.statusFor(wA.role, wB.role, wA.code);
+      // An editor code is admin in every tree (server.js whoFor): its rights count in the tree the request is made in only.
+      const status = L.statusFor(wA.role, wB.code ? 'editor' : wB.role);
       const by = actor(wA);
       const ins = await client.query(
         `insert into person_links (a_family, a_person, b_family, b_person, status, reason, proposed_by, accepted_by, decided_at)

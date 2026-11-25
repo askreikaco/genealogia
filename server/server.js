@@ -565,6 +565,9 @@ app.get('/api/history/:id', H(async (req, res) => {
   if (!fr.length) return res.json([]);
   const f = fr[0]; const w = await who(req, f.id);
   if (!canRead(f, w)) throw new HttpError(403, 'Dòng họ này là riêng tư.');
+  // a living person's history (every changed field, the name included) goes to members only (the same rule as events)
+  const { rows: pr } = await pool.query('select data from persons where id=$1', [req.params.id]);
+  if (pr[0] && !(await EV.rules()).canSeeEventsOf(pr[0].data, { member: canSeePrivate(w), familyReadable: true })) return res.json([]);
   const { rows } = await pool.query('select field, old_value, new_value, by_user, source, at from history where person_id=$1 order by at desc limit 200', [req.params.id]);
   const hidden = ['phone', 'email', 'address', 'facebook', 'zalo', 'social', 'birth_date', 'birth_lunar', 'death_date', 'quan_he_rieng', 'su_kien', 'cau_chuyen', 'nguon_khac'];
   res.json(canSeePrivate(w) ? rows : rows.filter((r) => !hidden.includes(r.field)));
@@ -1424,7 +1427,8 @@ mountClan(app, { pool, readSession, rolesByFamily, H, HttpError });
 // New places + the curator's queue of open-data suggestions (places-curate-routes.js); mounted first so that
 // /api/places/pending is not read as a place id.
 mountPlacesCurate(app, { pool, readSession, who, famOf, canRead, H, HttpError });
-mountPlaces(app, { pool, readSession, who, famOf, canRead, H, HttpError });
+mountPlaces(app, { pool, readSession, who, famOf, canRead, H, HttpError,
+  seeLife: async (data, member) => (await EV.rules()).canSeeEventsOf(data, { member, familyReadable: true }) });
 // Conflicting data (variants-routes.js): several sourced values per field; choosing one writes the field through applyOp.
 mountVariants(app, { pool, who, famOf, canRead, H, HttpError, ROLE_RANK, applyOp, actorName, validateValue,
   seeLife: async (data, member) => (await EV.rules()).canSeeEventsOf(data, { member, familyReadable: true }), onWrite: () => bookCache.clear() });

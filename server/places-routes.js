@@ -9,8 +9,9 @@ const R = require('./places-rules');
 const BRN = require('./branch-routes'); // a branch lists its scope (people of a place)
 
 function mount(app, d) {
-  const { pool, readSession, who, famOf, canRead, H, HttpError } = d;
+  const { pool, readSession, who, famOf, canRead, H, HttpError, seeLife } = d;
   const statusOk = (req) => (readSession(req) ? ['verified', 'pending'] : ['verified']);
+  const MEMBER_ROLES = ['owner', 'admin', 'editor', 'member']; // who may see a living person (the client's isMember)
 
   // Current full label: the place's name today plus its open-ended parents, nearest first.
   async function labels(ids) {
@@ -105,7 +106,9 @@ function mount(app, d) {
   };
 
   app.get('/api/persons/:id/places', H(async (req, res) => {
-    const { p } = await personFor(req);
+    const { p, w } = await personFor(req);
+    // a living person's places go to members only (the same rule as their events: seeLife)
+    if (!(await seeLife(p.data, MEMBER_ROLES.includes(w.role)))) return res.json({ items: [], hidden: true });
     res.json({ items: (await itemsOf(p.id)).filter((x) => R.PERSON_FIELDS.includes(x.field)) });
   }));
 
@@ -162,12 +165,16 @@ function mount(app, d) {
     const f = await famOf(req); const w = await who(req, f.id);
     if (!canRead(f, w)) throw new HttpError(403, 'Dòng họ này là riêng tư.');
     // a branch lists its people (scope of the home tree) who have the place
-    const view = await BRN.viewOf(pool, f, ['owner', 'admin', 'editor', 'member'].includes(w.role));
+    const member = MEMBER_ROLES.includes(w.role);
+    const view = await BRN.viewOf(pool, f, member);
     const { rows: all } = await pool.query(
-      `select pp.person_id, pp.field from person_places pp join persons p on p.id = pp.person_id
+      `select pp.person_id, pp.field, p.data from person_places pp join persons p on p.id = pp.person_id
         where pp.place_id=$1 and p.family_id=$2 and not p.deleted and pp.field = any($3) order by pp.person_id, pp.field`,
       [Number(req.params.id), view.famId, R.PERSON_FIELDS]);
-    const rows = view.ids ? all.filter((r) => view.ids.includes(r.person_id)) : all;
+    const scoped = view.ids ? all.filter((r) => view.ids.includes(r.person_id)) : all;
+    // a living person is listed for members only (the same rule as their events: seeLife)
+    const rows = [];
+    for (const r of scoped) if (await seeLife(r.data, member)) rows.push({ person_id: r.person_id, field: r.field });
     res.json({ items: rows });
   }));
 }

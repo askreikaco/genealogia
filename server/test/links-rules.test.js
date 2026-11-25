@@ -15,13 +15,14 @@ test('validateLink: both exist, not deleted, different trees, same sex when both
   assert.match(L.validateLink(P('N1aaaaaaa', 'a'), P('N2bbbbbbb', 'b', {}, true)), /cây kia/);
 });
 
-test('statusFor: accepted only when owner/admin of BOTH trees (or the editor code)', () => {
+test('statusFor: accepted only when owner/admin of BOTH trees (an editor code is not admin of the other tree)', () => {
   assert.equal(L.statusFor('owner', 'owner'), 'accepted');
   assert.equal(L.statusFor('admin', 'owner'), 'accepted');
   assert.equal(L.statusFor('owner', 'editor'), 'pending');
   assert.equal(L.statusFor('editor', 'admin'), 'pending');
   assert.equal(L.statusFor('owner', 'guest'), 'pending');
-  assert.equal(L.statusFor('admin', 'guest', true), 'accepted', 'editor-code session is admin everywhere');
+  assert.equal(L.statusFor('admin', 'editor'), 'pending', 'an editor code on the other tree is not its owner: waits');
+  assert.equal(L.statusFor('admin', 'guest'), 'pending');
 });
 
 test('canSeeOther: deceased to readers of that tree, living only to its members', () => {

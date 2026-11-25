@@ -16,9 +16,10 @@ function validateLink(a, b) {
   if (sa && sb && sa !== sb) return 'Giới tính hai người khác nhau.';
   return null;
 }
-// Accepted at once when the proposer is owner/admin of BOTH trees (or an editor-code session); otherwise it waits
-// for an owner/admin of the other tree.
-const statusFor = (roleHere, roleThere, code = false) => (code || (isTop(roleHere) && isTop(roleThere)) ? 'accepted' : 'pending');
+// Accepted at once when the proposer is owner/admin of BOTH trees; otherwise it waits for an owner/admin of the other
+// tree. An editor code has no tree of its own (whoFor gives it admin everywhere): the caller passes it as 'editor' for
+// the other tree (links-routes.js propose), so a code never accepts a link into a tree it does not manage.
+const statusFor = (roleHere, roleThere) => (isTop(roleHere) && isTop(roleThere) ? 'accepted' : 'pending');
 // The other side's record is shown only when the viewer may read it there: a deceased person to anyone who can read
 // that tree, a living person to members of that tree.
 const canSeeOther = (otherData, roleThere, treeReadable) => !!treeReadable && (isDead(otherData || {}) || ROLE_RANK[roleThere] >= ROLE_RANK.member);
