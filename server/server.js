@@ -15,6 +15,7 @@ const mail = require('./mail');
 const ACC = require('./accounts');
 const mountElder = require('./elder-routes').mount;
 const T = require('./mail-templates');
+const GD = require('./gio-digest');
 const TRASH = require('./trash');
 const DEC = require('./decisions');
 const NEWS = require('./news');
@@ -1447,6 +1448,7 @@ TRASH.mount(app, { pool, who, famOf, H, HttpError, ROLE_RANK, actorName, mail, T
 // Biểu quyết (decisions.js): gỡ / khôi phục người by family vote; the chooser's options and the page's routes.
 DEC.mount(app, { pool, who, famOf, H, HttpError, ROLE_RANK, actorName, mail, T, publicUrl: mail.publicUrl, onWrite: () => bookCache.clear() });
 NEWS.mount(app, { pool, who, famOf, H, HttpError, ROLE_RANK, actorName, mail, T, publicUrl: mail.publicUrl });
+GD.mount(app, { pool, H, HttpError, requireGoogle }); // giỗ reminder e-mail: toggle + signed unsubscribe (gio-digest.js, N1)
 // AI connections (MCP): OAuth for AI clients, consent in the app, the /mcp endpoint. The AI acts as the signed-in person
 // (ai-perm.js); admin actions only become requests (ai_requests) that an admin approves in Cài đặt.
 const aiDeps = { pool, whoFor, readSession, findFamily, canRead, actorName, applyOp, acctKey, sameSite, doInvite, doRoleChange, doRemove,
@@ -1578,6 +1580,9 @@ if (require.main === module) {
   // Thùng rác: hourly, runs due delete requests; archive / purge only with GP_TRASH_PURGE=1 (else logs a dry run)
   const trashTick = () => { NEWS.sweep().catch((e) => console.error('news sweep failed:', e.message)); DEC.sweep().catch((e) => console.error('decision sweep failed:', e.message)); return TRASH.sweep().catch((e) => console.error('trash sweep failed:', e.message)); };
   setTimeout(trashTick, 120e3); setInterval(trashTick, 3600e3);
+  // Giỗ reminder e-mail: hourly check, sends on Monday 07:00 (Vietnam time) once per week per opted-in account.
+  const digestTick = () => GD.runDigestIfDue(pool).then((st) => st && console.log('gio digest', JSON.stringify(st))).catch((e) => console.error('gio digest failed:', e.message));
+  setTimeout(digestTick, 150e3); setInterval(digestTick, 3600e3);
 }
 // Two-way Google Sheet sync (off unless SHEET_SYNC=on). Never overlaps: the job takes a pg advisory lock.
 if (require.main === module && process.env.SHEET_SYNC === 'on') {

@@ -397,6 +397,19 @@
         "test/e2e/tim-search*.test.js"
       ]
     },
+    "gio-digest": {
+      "paths": [
+        "server/gio-digest.js",
+        "server/digest-vi.js",
+        "server/scripts/gen-digest-vi.js",
+        "server/test/gio-digest*.test.js",
+        "web/js/digest-vi.js",
+        "server/migrations/039_gio_digest.sql"
+      ],
+      "e2e": [
+        "test/e2e/gio-digest*.test.js"
+      ]
+    },
     "succession": {
       "paths": [
         "server/succession*.js",

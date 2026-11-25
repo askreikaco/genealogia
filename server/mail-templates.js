@@ -194,4 +194,16 @@ function deleteBrake({ family, who, count, limit, url }) {
 function newsNotice({ family, title, paras = [], url }) {
   return { subject: `${title} · ${family}`, ...build(title, [...paras, `Dòng họ: ${family}.`], { label: 'Mở tin', url }) };
 }
-module.exports = { treeClaimOpened, treeClaimDecided, treeOwnerAdded, newsNotice, trashNotice, deleteBrake, esc, vnTime, trustedInvite, ownerReminder, handoverNotice, handoverOffer, handoverCode, confirmRequest, ownerChanged, claimStarted, claimWindow, claimObjected, contribution, joinDecision, accountVerifyEmail, accountChanged };
+// Giỗ reminder (N1, gio-digest.js): the next 14 days for the followed people. items: [{ name, day: 'YYYY-MM-DD', lunar: 'd/m' }].
+// copy: the Vietnamese strings (digest-vi.js); the unsubscribe link is signed (gio-digest.js).
+function gioDigest({ items, copy, unsubUrl }) {
+  const title = copy.email_subject;
+  const paras = [copy.email_intro, ...items.map((it) => {
+    const [y, m, d] = it.day.split('-');
+    return `${d}/${m}/${y}: ${it.name} (${copy.email_item_lunar.replace('{lunar}', it.lunar)})`;
+  })];
+  const button = { label: copy.email_unsub_button, url: unsubUrl };
+  // the plain link follows the unsubscribe sentence in the footer (the button above does the same job)
+  return { subject: title, ...build(title, paras, button, `${copy.email_unsub_text} ${unsubUrl}`) };
+}
+module.exports = { gioDigest, treeClaimOpened, treeClaimDecided, treeOwnerAdded, newsNotice, trashNotice, deleteBrake, esc, vnTime, trustedInvite, ownerReminder, handoverNotice, handoverOffer, handoverCode, confirmRequest, ownerChanged, claimStarted, claimWindow, claimObjected, contribution, joinDecision, accountVerifyEmail, accountChanged };

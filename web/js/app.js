@@ -11,6 +11,7 @@ import { factGroups, factCardHtml, bornHintShown } from './facts.js';
 import { branchesOf, branchInfo, founderOf } from './branches.js';
 import { bareName } from './famlabel.js';
 import { nextAnniversary } from './lunar.js';
+import DG from './digest-vi.js';
 import { locate } from './geo.js';
 import { chartLayout, chartSvg } from './treechart.js';
 import { emblemField, bindEmblem } from './emblem.js';
@@ -1088,7 +1089,8 @@ function soonBanner() {
   const now = new Date(); const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const soon = f.map((id) => M.byId.get(id)).filter(Boolean).map((p) => { const g = gioOf(p.data); const at = g && nextAnniversary(g.d, g.m, now); return at ? { p, g, n: Math.round((at - t0) / 864e5) } : null; })
     .filter((x) => x && x.n <= 7).sort((a, b) => a.n - b.n);
-  return soon.map(({ p, g, n }) => `<a class="ntc warn soon" href="${ph(p, `person/${p.id}`)}"><b>Sắp tới · ${n === 0 ? 'Hôm nay' : n === 1 ? 'Ngày mai' : 'Còn ' + n + ' ngày'}: giỗ ${esc(rank(p.data))} ${esc(p.data.name)}</b><span class="sub">${g.label} âm lịch</span></a>`).join('');
+  const rows = soon.map(({ p, g, n }) => `<a class="ntc warn soon" href="${ph(p, `person/${p.id}`)}"><b>Sắp tới · ${n === 0 ? 'Hôm nay' : n === 1 ? 'Ngày mai' : 'Còn ' + n + ' ngày'}: giỗ ${esc(rank(p.data))} ${esc(p.data.name)}</b><span class="sub">${g.label} âm lịch</span></a>`).join('');
+  return rows ? `<section class="soon-blk" aria-labelledby="soon-h"><h2 id="soon-h" class="soon-h">${DG.block_title}</h2>${rows}</section>` : '';
 }
 const setGioAll = (v) => { S.setPrefs({ filters: { ...S.getPrefs().filters, gio_all: v } }); render(); };
 document.addEventListener('change', (e) => { const t = e.target.closest('[data-gioall]'); if (t && !t.disabled) { e.target.closest('dialog')?.close(); setGioAll(t.dataset.gioall); } });
@@ -1722,6 +1724,25 @@ function kinRegionView() {
     r.onchange = () => { try { localStorage.setItem(KIN_REGION_KEY, r.value); } catch { /* private window: not kept */ } toast('Đã lưu cách gọi'); render(); };
   });
 }
+// Giỗ reminder e-mail (N1): the opt-in toggle, saved on the account (user_prefs). Needs a Google sign-in.
+async function digestToggle() {
+  const box = $('#dgt'); const note = $('#dgs'); if (!box) return;
+  try {
+    const r = await fetch('/api/me/digest', { cache: 'no-store' });
+    if (r.status === 401) { note.textContent = DG.toggle_need_login; return; }
+    if (!r.ok) throw new Error(String(r.status));
+    box.checked = !!(await r.json()).enabled; box.disabled = false;
+  } catch { note.textContent = DG.toggle_need_login; return; }
+  box.onchange = async () => {
+    box.disabled = true;
+    try {
+      const r = await fetch('/api/me/digest', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: box.checked }) });
+      if (!r.ok) throw new Error(String(r.status));
+      note.textContent = DG.toggle_saved;
+    } catch { box.checked = !box.checked; note.textContent = DG.toggle_need_login; }
+    box.disabled = false;
+  };
+}
 // Cỡ chữ (per device): 'normal' or 'large' / 'xlarge' as html[data-text]; tokens.css maps it to --text-scale. index.html sets it before first paint.
 const TEXT_KEY = 'gp_text';
 const TEXT_SIZES = [['normal', TEXT_SIZE_VI.normal], ['large', TEXT_SIZE_VI.large], ['xlarge', TEXT_SIZE_VI.xlarge]];
@@ -1739,7 +1760,9 @@ function settings() {
     ${followedRecs().map((f) => famRowHtml(f, `#/${f.slug}/cai-dat-dong-ho`)).join('')}
     <a class="famr add" href="#/${S.ALL_FAMS}/tree"><span class="famr-tx"><span class="famr-nm">＋ Tìm / lập dòng họ</span></span></a>`, { variant: 'card', cls: 'fam-sec' })}`);
   main.insertAdjacentHTML('beforeend', `${section('Cách gọi', calmRow({ href: hf('cach-goi'), title: 'Cách gọi', subtitle: kinRegionLabel(kinRegionPref()), dense: true }), { variant: 'card' })}`);
+  main.insertAdjacentHTML('beforeend', `${section('Nhắc giỗ', `<label class="radio"><input type="checkbox" id="dgt" disabled> ${DG.toggle_label}</label><p class="sub">${DG.toggle_hint}</p><p class="sub" id="dgs" aria-live="polite"></p>`, { variant: 'card' })}`);
   main.insertAdjacentHTML('beforeend', `${section('Tài khoản', acctRow(), { variant: 'card' })}`);
+  digestToggle();
   main.querySelectorAll('input[name=thm]').forEach((r) => { r.onchange = () => setTheme(r.value); });
   main.querySelectorAll('input[name=txt]').forEach((r) => { r.onchange = () => setText(r.value); });
   refreshFams();
