@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const T = require('../totp-rules');
 
 // RFC 6238 appendix B, SHA-1, secret "12345678901234567890" (ASCII). The 8-digit codes end in the 6 digits we compare.
-const KEY = Buffer.from('3132333435363738393031323334353637383930', 'hex');
+const KEY = Buffer.from('12345678901234567890', 'ascii'); // RFC 6238 public test key
 test('RFC 6238 test vectors (SHA-1, 8 digits, last six compared)', () => {
   const vectors = [[59, '287082'], [1111111109, '081804'], [1111111111, '050471'], [1234567890, '005924'], [2000000000, '279037'], [20000000000, '353130']];
   for (const [t, want] of vectors) assert.equal(T.hotp(KEY, Math.floor(t / 30)), want, `t=${t}`);

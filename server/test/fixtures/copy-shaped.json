@@ -1,0 +1,119 @@
+[
+  {
+    "id": "P001",
+    "data": {
+      "name": "Giả Văn An",
+      "sex": "m",
+      "gen": 3,
+      "born": "1930",
+      "living": "dead"
+    }
+  },
+  {
+    "id": "P002",
+    "data": {
+      "name": "Giả Ngọc Giao",
+      "sex": "f",
+      "spouse_of": "P001",
+      "spouse_n": 1,
+      "married": "1952"
+    }
+  },
+  {
+    "id": "P003",
+    "data": {
+      "name": "Giả Thanh Huệ",
+      "sex": "f",
+      "spouse_of": "P001",
+      "spouse_n": 2,
+      "married": "1985"
+    }
+  },
+  {
+    "id": "P004",
+    "data": {
+      "name": "Giả Quang Nghĩa",
+      "sex": "m",
+      "gen": 4,
+      "parent": "P001",
+      "other_parent": "P002",
+      "order": 1
+    }
+  },
+  {
+    "id": "P005",
+    "data": {
+      "name": "Giả Mỹ Nhàn",
+      "sex": "f",
+      "gen": 4,
+      "parent": "P001",
+      "other_parent": "P003",
+      "order": 2
+    }
+  },
+  {
+    "id": "P006",
+    "data": {
+      "name": "Giả Thanh Thắng",
+      "sex": "m",
+      "gen": 4,
+      "parent": "P001",
+      "other_parent": "P003",
+      "order": 3
+    }
+  },
+  {
+    "id": "P007",
+    "data": {
+      "name": "Giả Công Trí",
+      "sex": "m",
+      "gen": 5,
+      "parent": "P004",
+      "order": 1
+    }
+  },
+  {
+    "id": "P008",
+    "data": {
+      "name": "Giả Ngọc Vĩnh",
+      "sex": "m",
+      "spouse_of": "P005",
+      "spouse_n": 1,
+      "married": "1990"
+    }
+  },
+  {
+    "id": "P009",
+    "data": {
+      "name": "Giả Đào",
+      "sex": "f",
+      "parent": "P999"
+    }
+  },
+  {
+    "id": "P010",
+    "data": {
+      "name": "Giả Hòa",
+      "sex": "m",
+      "parent": "P007"
+    }
+  },
+  {
+    "id": "P001X",
+    "data": {
+      "name": "An",
+      "sex": "m",
+      "spouse_of": "P010"
+    }
+  },
+  {
+    "id": "P012",
+    "data": {
+      "name": "Giả Kim Giao",
+      "sex": "f",
+      "spouse_of": "P001X",
+      "spouse_n": 1,
+      "married": "2001"
+    }
+  }
+]
