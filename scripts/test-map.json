@@ -63,6 +63,17 @@
         "test/e2e/add-person-flow.test.js"
       ]
     },
+    "consistency": {
+      "paths": [
+        "server/consistency-*.js",
+        "server/test/consistency*.test.js",
+        "web/js/consistency*.js",
+        "server/migrations/038_consistency_ignores.sql"
+      ],
+      "e2e": [
+        "test/e2e/consistency*.test.js"
+      ]
+    },
     "dupes": {
       "paths": [
         "server/merge*.js",

@@ -76,6 +76,8 @@ const SHELL = [
   '/js/account.js',
   '/js/match.js',
   '/js/dupes.js',
+  '/js/consistency.js',
+  '/js/consistency-vi.js',
   '/js/variants.js',
   '/js/clan.js',
   '/js/countries.js',

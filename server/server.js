@@ -1414,6 +1414,8 @@ const linksApi = mountLinks(app, { pool, who, famOf, findFamily, canRead, H, Htt
 // "Có thể là cùng một người" suggestions (match-routes.js; computed by scripts/match-run.js): a suggested link goes
 // through the same proposal as a hand-made one.
 mountMatch(app, { pool, who, famOf, findFamily, canRead, H, HttpError, propose: linksApi.propose });
+// Consistency checker (C1): GET /api/trees/:tree/consistency and the ignore list (consistency-routes.js).
+require('./consistency-routes').mount(app, { pool, who, findFamily, canRead, H, HttpError, readRel, express });
 // "Tạo cây cho nhánh này": branch trees by reference (branch-routes.js). Its reads, writes and suggestions are routed below.
 BRN.mount(app, { pool, who, famOf, findFamily, canRead, H, HttpError, ROLE_RANK });
 // Clan view (clan-routes.js): every tree with one surname, grouped by accepted links; private trees only counted.

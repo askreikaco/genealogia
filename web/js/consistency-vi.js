@@ -1,0 +1,23 @@
+export const VI = {
+  "page_title": "Kiểm tra dữ liệu",
+  "more_link": "Kiểm tra dữ liệu",
+  "more_sub": "Tìm ngày tháng mâu thuẫn, trùng lặp",
+  "sev_error": "Lỗi",
+  "sev_warn": "Cần xem lại",
+  "ignore": "Bỏ qua",
+  "unignore": "Hiện lại",
+  "show_ignored": "Hiện mục đã bỏ qua",
+  "empty": "Không thấy dữ liệu mâu thuẫn.",
+  "rule_death_before_birth": "Ngày mất trước ngày sinh",
+  "rule_parent_too_young": "Cha/mẹ dưới 12 tuổi khi sinh con",
+  "rule_father_too_old": "Cha trên 70 tuổi khi sinh con",
+  "rule_mother_too_old": "Mẹ trên 55 tuổi khi sinh con",
+  "rule_born_after_mother_death": "Con sinh sau khi mẹ mất",
+  "rule_born_after_father_death": "Con sinh hơn 1 năm sau khi cha mất",
+  "rule_married_too_young": "Kết hôn trước 12 tuổi",
+  "rule_probably_deceased": "Trên 110 tuổi, có thể đã mất",
+  "rule_event_before_birth": "Sự kiện trước ngày sinh",
+  "rule_event_after_death": "Sự kiện sau ngày mất",
+  "rule_same_name_sibling": "Anh chị em trùng tên, cùng năm sinh (có thể trùng lặp)",
+  "rule_spouse_age_gap": "Vợ chồng chênh nhau trên 40 tuổi"
+};
