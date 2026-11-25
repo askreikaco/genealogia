@@ -7,13 +7,14 @@ import { kinPath, lineDesc, term as kinTerm, resolveRegion, KIN_REGION_KEY } fro
 import { calmRow, calmAct, popMenu, cic, surnameTile, surnameOf, ghostRow, moreFold, toolbar, ltags, fpanel, addBtn, setUntag, section, sheet as openDialog, KEEP } from './ui.js';
 import { relPrefill, nextOrder } from './prefill.js';
 import { personItem } from './person-item.js';
+import { VI as RPV } from './relpath-vi.js';
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger, undoToast, restoreTrash } from './danger.js';
 
 const cache = new WeakMap();
 // The partners of a person (ids, in order) as the viewer sees them.
 const partnersOf = (M, id) => (relsOf(M).ix.partnersOf.get(id) || []).map((x) => x.other);
 // Combined rows of every family on screen (ids are global person ids; each row keeps its family).
-function relsOf(M) {
+export function relsOf(M) {
   if (cache.has(M)) return cache.get(M);
   const fams = [...new Set(M.all.map((p) => p.fam || 'duong'))];
   const pc = []; const cp = []; let source = 'table';
@@ -24,8 +25,8 @@ function relsOf(M) {
 const fold = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/đ/g, 'd');
 const sexOf = (M) => (id) => M.byId.get(id)?.data.sex || '';
 // Kinship labels: sex and birth year of each person; region = the user's 'Cách gọi' choice (standard unless set to Miền Nam).
-const kinOpts = (M) => ({ sex: sexOf(M), year: (x) => Number(M.byId.get(x)?.data.born) || null });
-const kinRegion = () => {
+export const kinOpts = (M) => ({ sex: sexOf(M), year: (x) => Number(M.byId.get(x)?.data.born) || null });
+export const kinRegion = () => {
   let pref = 'chuan';
   try { pref = localStorage.getItem(KIN_REGION_KEY) || 'chuan'; } catch { /* private window: standard */ }
   return resolveRegion(pref);
@@ -101,6 +102,7 @@ export function relSection(M, p, ctx = {}) {
   setUntag(relUntag);
   const note = relsOf(M).source !== 'table' ? '<p class="sub">Quan hệ hiện theo dữ liệu cũ. Quản trị cần chạy chuyển dữ liệu quan hệ để sửa ở đây.</p>' : '';
   return section('Quan hệ', `${ctx.links || ''}${note}
+    ${ctx.relpathHref ? `<p><a class="btn ter sm" href="${esc(ctx.relpathHref(p.id))}">${RPV.button}</a></p>` : ''}
     <div id="reltb" class="stk">${relToolbar(M, p)}</div>${relSheet(M, p)}<div id="relbody">${relBody(M, p, ctx)}</div>`, { variant: 'card', label: 'Quan hệ', cls: 'relsec sec-card', level: 2 });
 }
 function relBody(M, p, ctx) {

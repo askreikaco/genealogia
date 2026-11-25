@@ -38,6 +38,7 @@ import { twoStepPage } from './twostep.js';
 import * as MT from './match.js';
 import * as DP from './dupes.js';
 import * as CS from './consistency.js';
+import * as RP from './relpath.js';
 import { VI as CSV } from './consistency-vi.js';
 import { addSearch, addBasic } from './addflow.js';
 import * as VR from './variants.js';
@@ -267,6 +268,7 @@ function navLevel(r = route()) {
   if (view === 'su-kien') return { root: false, parent: hf(`person/${arg}`), tab: 'list' };
   if (view === 'tin') return { root: false, parent: hf('lich'), tab: 'lich' };
   if (view === 'tin-sua') return { root: false, parent: hf('tin'), tab: 'lich' };
+  if (view === 'relpath') return { root: false, parent: arg ? hf(`person/${encodeURIComponent(arg)}`) : hf('list'), tab: 'list' };
   if (view === 'thung-rac') return { root: false, parent: hf('more'), tab: 'more' };
   if (view === 'bieu-quyet') return { root: false, parent: hf('more'), tab: 'more' };
   if (view === 'place') return { root: false, parent: hf('list'), tab: 'list' };
@@ -334,7 +336,7 @@ function render() {
   if (view === 'tim-dong-ho') { location.replace('#/' + S.ALL_FAMS + '/tree'); return; } // old find-page link: the all-families tree
   if (!famGate(view)) return;
   const loadingNow = !S.isAll() && DATA_VIEWS.includes(view) && !S.hasData(fam) && S.loading(fam);
-  const v = loadingNow ? skeleton : { consistency: (a) => CS.consistencyPage(main, { fam: S.curFamily(), hf }), tree, list: listView, person, lich: gio, verify, tin: (a) => (a ? NW.detailPage(main, { fam: S.curFamily(), hf, id: a, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() }) : NW.feedPage(main, { fam: S.curFamily(), hf, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() })), 'tin-sua': (a) => NW.editorPage(main, { fam: S.curFamily(), hf, id: a, kind: route().qs.get('kind') === 'gathering' ? 'gathering' : 'notice' }), map, stats, settings, export: exportView, more, book: bookLink, review, members, join, mine, 'gop-y': gopyOpen, 'cai-dat-dong-ho': famSettings, 'su-kien': eventPage, 'bieu-quyet': () => CN.decisionsPage(main, { fam: S.curFamily() }), 'thung-rac': () => TR.trashPage(main, { fam: S.curFamily(), isAdmin: S.isAdmin() }), 'nguoi-ke-nhiem': successionPage, 'vai-tro': rolesPage, 'doi-chi': statsGenPage, 'cach-goi': kinRegionView, 'tai-khoan': () => accountPage(main, { qs: route().qs, sub: route().arg, icon }), 'dang-nhap-2fa': () => twoStepPage(main), place: (a) => PL.placePage(main, a, { fam: S.curFamily(), personOf: (x) => M.byId.get(x), personHref: (x) => hf(`person/${x}`), nameOf: (pp) => `${rank(pp.data)} ${pp.data.name}`.trim() }), ho: (a) => CL.clanPage(main, a, { page: Number(route().qs.get('trang')) || 1, country: route().qs.get('qg') || '' }), sua: formPage, them: formPage, offer: (a) => SUC.offerView(a), trusted: (a) => SUC.trustedView(a), 'lap-gia-pha': () => SUC.createView(), 'nhan-quan-ly': () => CLM.reviewPage(main) }[view] || tree;
+  const v = loadingNow ? skeleton : { consistency: (a) => CS.consistencyPage(main, { fam: S.curFamily(), hf }), relpath: (a) => RP.relpathPage(main, { hf, M, a, b: route().qs.get('b') || '' }), tree, list: listView, person, lich: gio, verify, tin: (a) => (a ? NW.detailPage(main, { fam: S.curFamily(), hf, id: a, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() }) : NW.feedPage(main, { fam: S.curFamily(), hf, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() })), 'tin-sua': (a) => NW.editorPage(main, { fam: S.curFamily(), hf, id: a, kind: route().qs.get('kind') === 'gathering' ? 'gathering' : 'notice' }), map, stats, settings, export: exportView, more, book: bookLink, review, members, join, mine, 'gop-y': gopyOpen, 'cai-dat-dong-ho': famSettings, 'su-kien': eventPage, 'bieu-quyet': () => CN.decisionsPage(main, { fam: S.curFamily() }), 'thung-rac': () => TR.trashPage(main, { fam: S.curFamily(), isAdmin: S.isAdmin() }), 'nguoi-ke-nhiem': successionPage, 'vai-tro': rolesPage, 'doi-chi': statsGenPage, 'cach-goi': kinRegionView, 'tai-khoan': () => accountPage(main, { qs: route().qs, sub: route().arg, icon }), 'dang-nhap-2fa': () => twoStepPage(main), place: (a) => PL.placePage(main, a, { fam: S.curFamily(), personOf: (x) => M.byId.get(x), personHref: (x) => hf(`person/${x}`), nameOf: (pp) => `${rank(pp.data)} ${pp.data.name}`.trim() }), ho: (a) => CL.clanPage(main, a, { page: Number(route().qs.get('trang')) || 1, country: route().qs.get('qg') || '' }), sua: formPage, them: formPage, offer: (a) => SUC.offerView(a), trusted: (a) => SUC.trustedView(a), 'lap-gia-pha': () => SUC.createView(), 'nhan-quan-ly': () => CLM.reviewPage(main) }[view] || tree;
   // all-families tree (the family list): a same-route re-render (a sync) keeps the list on screen until the new one is painted
   const cayHere = S.isAll() && view === 'tree' && !!main.querySelector('#flist') && !!main.querySelector('#fq');
   if (kept) { if (view === 'map') { mapFilterOpts(); paintMap(); } } // the book iframe and the map stay as they are
@@ -876,7 +878,7 @@ function profBody(p, { groups, id, d }) {
   LIFE = { p }; // the Câu chuyện đời actions (add, edit, Đọc tiếp, Xem tất cả) read the person from LIFE
   const facts = factCardHtml(factGroups(groups));
   return `${d.verify ? `<div class="ntc warn"><b>Cần xác minh</b><span class="sub">${esc(d.verify)}</span></div>` : ''}${facts}${codeOf(M, id) ? `<p class="sub">Vị trí trong cây <span class="ppos" title="${esc(CODE_HELP)}">${esc(codeOf(M, id))}</span></p>` : ''}${contactCard(d, id, p.fam || S.curFamily())}${storiesOnInfo(p)}`
-    + `${(LK.ensure(p.fam || S.curFamily()), '')}${relSection(M, p, { editable: S.isEditor(), treeHref: hf(`tree/@${id}`), treeOf: (x) => hf(`tree/@${x}`), personHref: (x) => hf(`person/${x}`), links: LK.linesHtml(p.fam || S.curFamily(), id, { clan: CL.clanLinkHtml(S.familyName(p.fam || S.curFamily()), 'clan-in', S.familyMeta(p.fam || S.curFamily())?.country) }) + (BT.ensureBranches(p.fam || S.curFamily()), BT.rootLinkHtml(p.fam || S.curFamily(), id)) })}${pedigreeHtml(M, id, 4, { personHref: (x) => hf(`person/${x}`) })}`;
+    + `${(LK.ensure(p.fam || S.curFamily()), '')}${relSection(M, p, { editable: S.isEditor(), relpathHref: (x) => hf(`relpath/${encodeURIComponent(x)}`), treeHref: hf(`tree/@${id}`), treeOf: (x) => hf(`tree/@${x}`), personHref: (x) => hf(`person/${x}`), links: LK.linesHtml(p.fam || S.curFamily(), id, { clan: CL.clanLinkHtml(S.familyName(p.fam || S.curFamily()), 'clan-in', S.familyMeta(p.fam || S.curFamily())?.country) }) + (BT.ensureBranches(p.fam || S.curFamily()), BT.rootLinkHtml(p.fam || S.curFamily(), id)) })}${pedigreeHtml(M, id, 4, { personHref: (x) => hf(`person/${x}`) })}`;
 }
 // Delegated clicks for the profile tabs, the timeline and the event/story dialogs.
 document.addEventListener('click', (e) => {
@@ -3271,7 +3273,7 @@ function famGate(view) {
   return false;
 }
 // Views that read the family's people: until the device has some (or the first pull ends), they draw a loading skeleton.
-const DATA_VIEWS = ['tree', 'list', 'lich', 'tin', 'tin-sua', 'verify', 'map', 'stats', 'doi-chi', 'person', 'sua', 'su-kien', 'them', 'export', 'place'];
+const DATA_VIEWS = ['tree', 'list', 'lich', 'tin', 'tin-sua', 'verify', 'map', 'stats', 'doi-chi', 'person', 'sua', 'su-kien', 'them', 'export', 'place', 'relpath'];
 const skeleton = () => { main.innerHTML = '<div class="skel" role="status" aria-live="polite"><p class="sub">Đang tải dữ liệu…</p><span class="skel-l"></span><span class="skel-l w2"></span><span class="skel-l w3"></span></div>'; };
 // Delegated follow buttons (follow bar, find page).
 document.addEventListener('click', (e) => {
