@@ -40,13 +40,13 @@ import * as DP from './dupes.js';
 import { addSearch, addBasic } from './addflow.js';
 import * as VR from './variants.js';
 import { KIN_REGION_KEY, resolveRegion } from './kin/index.js';
-import { EVENT_TYPES, SOURCE_QUALITY, formatEventDate, sortEvents, birthIso, autoSummary, canSeeEventsOf, parseEventDate } from './events.js';
+import { EVENT_TYPES, SOURCE_QUALITY, formatEventDate, sortEvents, birthIso, autoSummary, canSeeEventsOf, parseEventDate, EVENT_PHOTO_MAX } from './events.js';
 import { deriveLifeEvents, historyRows, relAccess, legacyAccess, estimatedLifeRows } from './events-life.js';
 import { estimateFamilyCached, ageAtDeathOf } from './estimate-graph.js';
 import { HISTORY_ALL } from './events-history.js';
 import { index as relIndex } from './relgraph.js';
 import { evIcon, typeIcon, headline, tlLoad, tlSave, tlTags, tlApplyUntag, tlToolbar, tlSheetDialog, tlEntries, tlMatch, tlList, tlCount, lifeStoriesHtml, approxHtml,
-  evEditorHtml, readEvx, wireEvx, storyEditorHtml, readStx } from './events-ui.js';
+  evEditorHtml, readEvx, wireEvx, storyEditorHtml, readStx, photoRow, PHOTO_PREVIEW } from './events-ui.js';
 const fold = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/đ/g, 'd');
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -626,9 +626,19 @@ const evPickList = (fam) => personsOf(fam).map((x) => ({ id: x.id, name: x.data.
 async function evLoad(fam, pid, force = false) {
   const k = evKey(fam, pid); const cur = EVD.get(k);
   if (!force && cur && cur.loaded) return cur;
-  const r = await fetch(`/api/events?family=${encodeURIComponent(fam)}&person=${encodeURIComponent(pid)}`, { cache: 'no-store' });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'Không tải được sự kiện.');
+  let j;
+  try {
+    const r = await fetch(`/api/events?family=${encodeURIComponent(fam)}&person=${encodeURIComponent(pid)}`, { cache: 'no-store' });
+    j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'Không tải được sự kiện.');
+    S.evCacheSet(fam, pid, j); // kept on the device for offline reading
+  } catch (e) {
+    // no network: the last online read of this person, when there is one (writes not yet sent are drawn on top)
+    if (!(e instanceof TypeError)) throw e;
+    const c = await S.evCacheGet(fam, pid);
+    if (!c) throw e;
+    j = { ...c, cached: true };
+  }
   const v = { ...j, loaded: true, at: Date.now() }; EVD.set(k, v); return v;
 }
 const evInvalidate = (fam, pid) => EVD.delete(evKey(fam, pid));
@@ -639,6 +649,27 @@ async function evApi(method, url, body) {
   return j;
 }
 const evOpId = () => 'ev-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+// An event create or edit: sent now; when the network fails before the server answers, kept on the device (the outbox)
+// with the same op_id, so the retry is applied once. The timeline draws it as "Chưa gửi" until it is on the server.
+async function evWriteOrQueue(fam, personId, method, url, body, show) {
+  const op_id = evOpId(); const full = { ...body, op_id };
+  try { return await evApi(method, url, full); } catch (e) {
+    if (!(e instanceof TypeError) || !S.hasOutbox()) throw e;
+    await S.queueEv({ op_id, family: fam, person_id: personId, ts: Date.now(), ev: { method, url, body: full }, show });
+    return { ok: true, queued: true, op_id };
+  }
+}
+S.hooks.evSynced = (fam, pid) => { evInvalidate(fam, pid); evLoad(fam, pid, true).catch(() => {}).finally(() => { if (route().view === 'person') render(); }); };
+// Queued writes of this person as timeline rows: an add is a new card; an edit shows the new values; both say "Chưa gửi".
+function withPending(fam, pid, items) {
+  let out = items.slice();
+  for (const o of S.pendingEvs(fam, pid)) {
+    const s = o.show; if (!s || s.kind !== 'event') continue;
+    if (s.act === 'add') out.push({ ...s.item, id: 'pend-' + o.op_id, person_id: pid, pending: true });
+    else if (s.act === 'edit') { const i = out.findIndex((x) => x.id === s.id); if (i >= 0) out[i] = { ...out[i], ...s.item, pending: true }; }
+  }
+  return out;
+}
 // Loads a person's events once per visit (30 s); the page is drawn again when they arrive.
 function evEnsure(p) {
   const fam = famOfP(p); const k = evKey(fam, p.id); const cur = EVD.get(k);
@@ -675,7 +706,8 @@ function lifeModel(p) {
   // with an estimated life, family rows outside it (e.g. a grandchild born after the estimated death) are left out
   const yOf = (r) => Number(String(r.date_from || '').slice(0, 4)) || null;
   const inWin = (r) => !window || r.group === 'self' || !yOf(r) || (yOf(r) >= Number(String(window.from).slice(0, 4)) && yOf(r) <= Number(String(window.to).slice(0, 4)));
-  return { fam, ev, derived: [...derived.filter(inWin), ...estRows], hist, birth, est, nameOf: evNameOf(fam) };
+  const evm = ev ? { ...ev, items: withPending(fam, p.id, ev.items || []) } : ev;
+  return { fam, ev: evm, derived: [...derived.filter(inWin), ...estRows], hist, birth, est, nameOf: evNameOf(fam) };
 }
 
 let profTab = 'info'; let profFor = '';
@@ -688,10 +720,10 @@ function profTabsHtml() {
 function lifePanelHtml(p) {
   const { ev } = lifeModel(p);
   if (!ev || !ev.loaded) return '<div class="skel" role="status"><p class="sub">Đang tải dòng đời…</p><span class="skel-l"></span><span class="skel-l w2"></span></div>';
-  if (ev.error) return `<p class="sub">${esc(ev.error)}</p>`;
+  if (ev.error && !(ev.items || []).length) return `<p class="sub">${esc(ev.error)}</p>`;
   if (ev.hidden) return `<div class="cd"><p class="sub">Thông tin của người đang sống chỉ thành viên xem được.</p>${S.signedIn() ? '' : '<p><button type="button" class="btn sm" data-acct="in">Đăng nhập</button></p>'}</div>`;
   LIFE = { p };
-  return `<div class="tl-bar stk" id="tl-bar">${lifeBarHtml()}</div><div id="tl-body">${lifeBodyHtml(p)}</div>${tlSheetDialog(tlLoad())}`;
+  return (ev.cached ? '<p class="sub" role="status">Không có mạng: đang xem dữ liệu đã lưu trên máy này.</p>' : '') + `<div class="tl-bar stk" id="tl-bar">${lifeBarHtml()}</div><div id="tl-body">${lifeBodyHtml(p)}</div>${tlSheetDialog(tlLoad())}`;
 }
 function lifeBarHtml() { return tlToolbar(tlLoad(), isWide()); } // the sheet is outside this part: it stays open while its checkboxes repaint the bar
 function lifeBodyHtml(p) {
@@ -753,7 +785,7 @@ function eventPage(pid) {
   root.querySelector('[data-evx-save]').onclick = async (e) => {
     const r = readEvx(root); if (r.error) return fail(r.error);
     const b = e.currentTarget; b.disabled = true;
-    try { await evApiSave({ fam, p, kind: 'event', id, item: r.item, direct }); await done(direct ? 'Đã lưu' : 'Đã gửi góp ý. Quản trị sẽ duyệt.'); } catch (x) { b.disabled = false; fail(x.message); }
+    try { const j = await evApiSave({ fam, p, kind: 'event', id, item: r.item, direct }); await done(j.queued ? 'Chưa gửi: sẽ lưu lên máy chủ khi có mạng' : direct ? 'Đã lưu' : 'Đã gửi góp ý. Quản trị sẽ duyệt.'); } catch (x) { b.disabled = false; fail(x.message); }
   };
   main.querySelector('[data-evp-del]')?.addEventListener('click', () => confirmDanger({ title: 'Xóa sự kiện này?', lose: `Sự kiện “${headline(it)}” bị xóa khỏi dòng đời của ${p.data.name}.`, restore: 'Không thể hoàn tác. Lịch sử sửa vẫn ghi lại việc xóa.', confirm: 'Xóa vĩnh viễn', onConfirm: async () => { const j = await evApi('POST', `/api/events/${id}/delete?family=${encodeURIComponent(fam)}`, { op_id: evOpId() }); await done(''); undoToast('Đã xóa sự kiện · trong Thùng rác', async () => { await restoreTrash(fam, j.trash_id); evInvalidate(fam, p.id); await evLoad(fam, p.id, true).catch(() => {}); render(); }); } }));
 }
@@ -773,7 +805,7 @@ function evDialog({ kind, p, id = null, item = {}, title }) {
   const save = async (changes) => {
     try {
       const j = await evApiSave({ fam, p, kind, id, item: changes, direct });
-      close(); toast(direct ? 'Đã lưu' : 'Đã gửi góp ý. Quản trị sẽ duyệt.'); if (direct) evInvalidate(fam, p.id); if (direct) await evLoad(fam, p.id, true).catch(() => {}); render(); return j;
+      close(); toast(j.queued ? 'Chưa gửi: sẽ lưu lên máy chủ khi có mạng' : direct ? 'Đã lưu' : 'Đã gửi góp ý. Quản trị sẽ duyệt.'); if (direct) evInvalidate(fam, p.id); if (direct) await evLoad(fam, p.id, true).catch(() => {}); render(); return j;
     } catch (e) { fail(e.message); }
   };
   const evSave = d.querySelector('[data-evx-save]'); if (evSave) evSave.onclick = () => { const r = readEvx(d.querySelector('[data-evx]')); if (r.error) return fail(r.error); save(r.item); };
@@ -800,8 +832,9 @@ async function evApiSave({ fam, p, kind, id, item, direct, action }) {
   if (!direct && act === 'delete') { const j = await S.suggest({ family: fam, person_id: p.id, changes: { _ev: { action: 'delete', kind: kind === 'event' ? 'event' : 'story', id } } }); S.addReceipt(j.id, j.receipt); return j; }
   if (direct) {
     if (kind === 'event') {
-      if (act === 'add') return evApi('POST', '/api/events' + q, { op_id: evOpId(), person_id: p.id, event: item });
-      return evApi('PUT', `/api/events/${id}${q}`, { op_id: evOpId(), event: item });
+      const show = { kind, act, id, item };
+      if (act === 'add') return evWriteOrQueue(fam, p.id, 'POST', '/api/events' + q, { person_id: p.id, event: item }, show);
+      return evWriteOrQueue(fam, p.id, 'PUT', `/api/events/${id}${q}`, { event: item }, show);
     }
     if (act === 'add') return evApi('POST', '/api/stories' + q, { op_id: evOpId(), person_id: p.id, story: item });
     return evApi('PUT', `/api/stories/${id}${q}`, { op_id: evOpId(), story: item });
@@ -1949,11 +1982,23 @@ async function uploadPhoto(file) {
   const k = Math.min(1, 800 / Math.max(img.width, img.height));
   const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-  const r = await fetch('/api/photos', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data: c.toDataURL('image/jpeg', 0.82) }) });
+  const r = await fetch(`/api/photos?family=${encodeURIComponent(S.curFamily())}`, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data: c.toDataURL('image/jpeg', 0.82) }) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || 'Tải ảnh lỗi.');
+  PHOTO_PREVIEW.set(j.url, c.toDataURL('image/jpeg', 0.82)); // shown from the device until it is saved with its record
   return j.url;
 }
+// An event's photo: uploaded now (needs the network) and kept in the form until Lưu.
+document.addEventListener('change', async (e) => {
+  const inp = e.target.closest?.('[data-evx-photo]'); if (!inp || !inp.files[0]) return;
+  const root = inp.closest('[data-evx]'); const msg = root.querySelector('[data-evx-photomsg]'); const list = root.querySelector('[data-phs]');
+  if (list.querySelectorAll('[data-ph]').length >= EVENT_PHOTO_MAX) { msg.textContent = `Tối đa ${EVENT_PHOTO_MAX} ảnh.`; inp.value = ''; return; }
+  if (!navigator.onLine) { msg.textContent = 'Cần có mạng để tải ảnh.'; inp.value = ''; return; }
+  msg.textContent = 'Đang tải ảnh…';
+  try { const url = await uploadPhoto(inp.files[0]); list.insertAdjacentHTML('beforeend', photoRow(url, PHOTO_PREVIEW.get(url))); msg.textContent = 'Đã tải ảnh. Bấm Lưu để giữ.'; }
+  catch (err) { msg.textContent = err.message; }
+  inp.value = '';
+});
 document.addEventListener('change', async (e) => {
   const inp = e.target.closest?.('[data-photo]'); if (!inp || !inp.files[0]) return;
   const box = inp.closest('.fld'); const msg = $('[data-photomsg]', box);
@@ -1962,7 +2007,7 @@ document.addEventListener('change', async (e) => {
   try {
     const url = await uploadPhoto(inp.files[0]);
     $('input[name=photo]', box).value = url;
-    let im = $('.phup img', box); if (!im) { im = document.createElement('img'); im.alt = ''; $('.phup', box).prepend(im); } im.src = url;
+    let im = $('.phup img', box); if (!im) { im = document.createElement('img'); im.alt = ''; $('.phup', box).prepend(im); } im.src = PHOTO_PREVIEW.get(url) || url;
     msg.textContent = 'Đã tải ảnh. Bấm Lưu để giữ.';
   } catch (err) { msg.textContent = err.message; }
 });

@@ -306,6 +306,7 @@ async function openLocal() {
     if (cursors[DEFAULT_FAM] === undefined) cursors[DEFAULT_FAM] = Number(await within(tx('meta', 'readonly', (s) => s.get('since')), 3000, 'IndexedDB read')) || 0; // older devices
     for (const f of Object.values((await within(tx('meta', 'readonly', (s) => s.get('fams')), 3000, 'IndexedDB read')) || {})) { famMeta.set(f.id, f); famMeta.set(f.slug, f); }
     status.pending = (await within(all('outbox'), 3000, 'IndexedDB read')).length;
+    await within(refreshEvMirror(), 3000, 'IndexedDB read');
   } catch (e) { console.warn('IndexedDB unavailable, online only', e); db = null; }
   await within(loadDevice(), 3000, 'device data').catch((e) => console.warn('device data unavailable', e));
 }
@@ -390,8 +391,10 @@ async function run() {
   try {
     // push first: our edits, oldest first, in batches; one request per family
     if (db) for (;;) {
-      const ops = (await all('outbox')).sort((a, b) => a.ts - b.ts).slice(0, 200);
-      if (!ops.length) break;
+      const queued = (await all('outbox')).sort((a, b) => a.ts - b.ts);
+      if (!queued.length) break;
+      if (queued[0].ev) { await pushEv(queued[0]); continue; } // life-event writes: one at a time, in order
+      const ops = []; for (const o of queued) { if (o.ev || ops.length >= 200) break; ops.push(o); } // a run of person ops
       const byFam = new Map();
       for (const o of ops) { const f = o.family || DEFAULT_FAM; if (!byFam.has(f)) byFam.set(f, []); byFam.get(f).push(o); }
       for (const [fam, batch] of byFam) {
@@ -417,6 +420,7 @@ async function run() {
     status.error = e.message;
   }
   status.pending = db ? (await all('outbox')).length : 0;
+  await refreshEvMirror();
   emit();
 }
 // Per family: a counter that moves when a pull brings changes after the family was first pulled (the book asks for a reload).
@@ -686,4 +690,31 @@ async function doFlush() {
   return out;
 }
 // App hook: told how many queued items were sent (for a toast).
-export const hooks = { queueFlushed: null };
+export const hooks = { queueFlushed: null, evSynced: null };
+
+// Life events written offline: outbox ops with `ev` ({method, url, body} sent as is; body.op_id makes a retry safe)
+// and `show` ({kind, act, id, item}: what the timeline draws until the server has it). Mirrored in memory for drawing.
+let evMirror = [];
+async function refreshEvMirror() { evMirror = db ? (await all('outbox')).filter((o) => o.ev).sort((a, b) => a.ts - b.ts) : []; }
+export const pendingEvs = (fam, personId) => evMirror.filter((o) => (o.family || DEFAULT_FAM) === fam && o.person_id === personId);
+export const hasOutbox = () => !!db;
+// A person's life events as last read online (per family and person): the timeline draws from it when offline.
+export const evCacheSet = (fam, pid, v) => soft(devPut(`evc:${fam}|${pid}`, { items: v.items || [], stories: v.stories || [], hidden: !!v.hidden, role: v.role, at: Date.now() }), 'events cache save');
+export const evCacheGet = (fam, pid) => soft(devGet(`evc:${fam}|${pid}`), 'events cache read');
+// Keeps one life-event write on the device until the server takes it (the caller has seen a network failure).
+export async function queueEv(op) {
+  if (!db) throw new Error('Không lưu được trên máy này.');
+  await tx('outbox', 'readwrite', (s) => s.put({ ...op, ts: op.ts || Date.now() }));
+  status.pending++; await refreshEvMirror(); emit();
+  sync();
+}
+// One queued life-event write: sent as is. Refusals drop it (with a message); network failures keep it for later.
+async function pushEv(o) {
+  const r = await fetch(o.ev.url, { method: o.ev.method, headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify(o.ev.body) });
+  if (r.status === 401) { me = { ...me, role: 'guest', editor: null }; throw new Error('Phiên đăng nhập hết hạn. Đăng nhập lại để gửi các sự kiện đã lưu trên máy.'); }
+  if (r.status >= 500 || r.status === 429) throw new Error('HTTP ' + r.status);
+  if (!r.ok) { const j = await r.json().catch(() => ({})); rejectedMsg = `Một sự kiện đã lưu trên máy bị máy chủ từ chối (${j.error || r.status}).`; }
+  await tx('outbox', 'readwrite', (s) => s.delete(o.op_id));
+  await refreshEvMirror(); emit();
+  hooks.evSynced?.(o.family || DEFAULT_FAM, o.person_id);
+}

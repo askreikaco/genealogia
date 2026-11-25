@@ -1452,12 +1452,42 @@ app.post('/api/photos', need('editor'), express.json({ limit: '1mb' }), async (r
     res.json({ url: `/api/photos/${id}` });
   } catch (e) { next(e); }
 });
+// A photo is served only to a viewer who may see a record that shows it: an event or story (the person's events rule:
+// a living person's go to members), or a person's photo (the family is readable). A photo no record shows is served to
+// nobody (uploads are shown by the editor from a local preview until they are saved). Unauthorized: 404, so the
+// existence of a photo is not revealed. A photo that a guest may see is cacheable for everyone; any other is private.
+async function photoAccess(req, id) {
+  const url = '/api/photos/' + id;
+  const R = await EV.rules();
+  const refs = [];
+  const evs = await pool.query('select e.family_id, p.data from events e join persons p on p.id=e.person_id and p.family_id=e.family_id where e.photos ? $1 and p.deleted=false', [url]);
+  for (const r of evs.rows) refs.push({ kind: 'event', famId: r.family_id, data: r.data });
+  const sts = await pool.query('select s.family_id, p.data from stories s join persons p on p.id=s.person_id and p.family_id=s.family_id where s.photos ? $1 and p.deleted=false', [url]);
+  for (const r of sts.rows) refs.push({ kind: 'story', famId: r.family_id, data: r.data });
+  const pes = await pool.query('select family_id, data from persons where data->>\'photo\' = $1 and deleted=false', [url]);
+  for (const r of pes.rows) refs.push({ kind: 'person', famId: r.family_id, data: r.data });
+  let allowed = false; let open = false;
+  const fams = new Map();
+  for (const r of refs) {
+    if (!fams.has(r.famId)) fams.set(r.famId, (await pool.query('select id, visibility from families where id=$1', [r.famId])).rows[0] || null);
+    const fam = fams.get(r.famId); if (!fam) continue;
+    const ok = (w) => {
+      const readable = canRead(fam, w);
+      return r.kind === 'person' ? readable : readable && R.canSeeEventsOf(r.data, { member: canSeePrivate(w), familyReadable: true });
+    };
+    if (ok({ role: 'guest' })) { allowed = true; open = true; }
+    else if (!allowed && ok(await who(req, fam.id))) allowed = true;
+  }
+  return { allowed, open };
+}
 app.get('/api/photos/:id', async (req, res, next) => {
   try {
     if (!/^[0-9a-f]{24}$/.test(req.params.id)) return res.status(404).end();
     const { rows } = await pool.query('select mime, bytes from photos where id=$1', [req.params.id]);
     if (!rows.length) return res.status(404).end();
-    res.set('Content-Type', rows[0].mime).set('Cache-Control', 'public, max-age=31536000, immutable').send(rows[0].bytes);
+    const access = await photoAccess(req, req.params.id);
+    if (!access.allowed) return res.status(404).end();
+    res.set('Content-Type', rows[0].mime).set('Cache-Control', access.open ? 'public, max-age=31536000, immutable' : 'private, no-cache').send(rows[0].bytes);
   } catch (e) { next(e); }
 });
 

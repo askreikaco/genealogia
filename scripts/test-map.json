@@ -244,7 +244,8 @@
         "server/facts-events.js",
         "server/scripts/facts-to-events.js",
         "server/test/facts-events.test.js",
-        "server/migrations/022_facts_events.sql"
+        "server/migrations/022_facts_events.sql",
+        "server/migrations/037_event_photos.sql"
       ],
       "e2e": [
         "test/e2e/events*.test.js"

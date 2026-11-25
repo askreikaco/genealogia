@@ -190,7 +190,14 @@ export function validateEvent(e) {
     }
   }
   if (e.is_preferred !== undefined && typeof e.is_preferred !== 'boolean') return 'is_preferred phải là đúng/sai.';
+  if (e.photos !== undefined && !validPhotos(e.photos)) return 'Ảnh phải là link http(s) hoặc ảnh đã tải lên, tối đa 10 ảnh.';
   return null;
+}
+// Event photos: http(s) links or uploaded photos (/api/photos/<24 hex>), at most 10. Shared with the server.
+export const EVENT_PHOTO_MAX = 10;
+export function validPhotos(list) {
+  return Array.isArray(list) && list.length <= EVENT_PHOTO_MAX
+    && list.every((u) => typeof u === 'string' && u.length <= 2000 && (/^https?:\/\//i.test(u) || /^\/api\/photos\/[0-9a-f]{24}$/.test(u)));
 }
 export function validateStory(s) {
   if (!s || typeof s !== 'object') return 'Thiếu nội dung câu chuyện.';

@@ -71,7 +71,7 @@ export function tlMatch(row, f, nameOf = () => '') {
   if (f.types.length && !f.types.includes(row.e.type)) return false;
   if (f.stages.length && (!row.stage || !f.stages.includes(row.stage))) return false;
   if (f.source && !(row.e.sources || []).length) return false;
-  if (f.photo) return false; // events carry no photos (part 2); photos are on the stories
+  if (f.photo && !(row.e.photos || []).length) return false; // derived rows carry no photos
   const q = fold(f.q).trim();
   if (q) {
     const hay = fold([headline(row.e), row.e.description, row.e.place, row.e.place_new, ...(row.e.people || []).map(nameOf)].join(' '));
@@ -174,16 +174,18 @@ function cardHtml(row, { ageLabel, canEdit, nameOf, editLbl, personHref = null, 
   const peopleHtml = (e.people || []).filter((pid) => nameOf(pid)).map((pid) => (personHref ? `<a class="tl-pp" href="${esc(personHref(pid))}">${esc(nameOf(pid))}</a>` : esc(nameOf(pid)))).join(' · ');
   const meta = e.place_new ? `Nay: ${e.place_new}` : '';
   const title = d && e.person_id && e.person_id !== selfId ? linkName(headline(e), e.person_id, nameOf(e.person_id), personHref) : esc(headline(e));
-  const edit = canEdit && !d ? `<button type="button" class="ib tl-edit" data-ev-edit="${esc(row.id)}" aria-label="${esc(editLbl)}" title="${esc(editLbl)}">${cic('pencil', 16)}</button>` : '';
+  const edit = canEdit && !d && !e.pending ? `<button type="button" class="ib tl-edit" data-ev-edit="${esc(row.id)}" aria-label="${esc(editLbl)}" title="${esc(editLbl)}">${cic('pencil', 16)}</button>` : '';
   // reign bands and every other history row share one quiet style (grey strip), below personal and family cards
   if (e.band || e.group === 'hist') return `<li class="band${e.group === 'hist' && !e.band ? ' hist' : ''}"><div class="dt"><b>${yrCell}</b>${e.band ? '' : age}</div><div class="rail"></div>`
     + (e.source ? `<a class="tl-band" href="${esc(e.source)}" target="_blank" rel="noopener" aria-label="${esc(e.label)} (mở nguồn trong thẻ mới)">${HIST_TAG}${esc(e.label)}</a>` : `<p class="tl-band">${HIST_TAG}${esc(e.label)}</p>`) + '</li>';
+  const pend = e.pending ? ` ${tag('Chưa gửi', { tone: 'gray', sm: true })}` : '';
   return `<li class="${d ? (e.group === 'hist' ? 'rel hist' : 'rel') : ''}"><div class="dt"><b>${yrCell}</b>${age}</div>`
     + `<div class="rail"><span class="dot"></span></div>`
-    + `<div class="card">${kind}<h3>${title}</h3>`
+    + `<div class="card">${kind}${pend}<h3>${title}</h3>`
     + (e.description && !d ? `<p>${esc(firstLine(e.description))}${e.description.includes('\n') || e.description.length > 90 ? '…' : ''}</p>` : '')
     + whenLine + (meta || peopleHtml ? `<span class="pl">${[meta ? esc(meta) : '', peopleHtml].filter(Boolean).join(' · ')}</span>` : '')
     + (e.grouped && e.names && e.names.length ? `<details class="tl-why"><summary>Xem tên ›</summary><p class="sub tl-why-body">${esc(e.names.join(', '))}</p></details>` : '')
+    + (!d && (e.photos || []).length ? `<div class="ev-ph">${e.photos.map((u) => `<img src="${esc(u)}" alt="" loading="lazy">`).join('')}</div>` : '')
     + `<div class="ft">${cnt}${src}${edit}</div></div></li>`;
 }
 const yearOfLabel = (row) => (row.days === null ? '' : String(yearOfDays(row.days)));
@@ -231,6 +233,7 @@ export function evEditorHtml(item = {}, { people = [], persons = [], id = '', pa
   if (item.date_kind && !v.date_text) v.date_text = formatEventDate(item);
   const chips = people.map((pid) => personChip(pid, persons)).join('');
   const srcs = (item.sources || []).map((s) => sourceRow(s)).join('');
+  const photos = (item.photos || []).map((u) => photoRow(u)).join('');
   return `<div class="evx" data-evx data-id="${esc(id)}">
     <label class="fld">Loại sự kiện<select data-f="type">${EVENT_TYPE_KEYS.map((k) => `<option value="${k}" ${k === v.type ? 'selected' : ''}>${esc(typeLabel(k))}</option>`).join('')}</select></label>
     <label class="fld">Thời gian<input data-f="date_text" value="${esc(v.date_text)}" autocomplete="off" placeholder="vd 1981, 3/1981, 1980–1981"></label>
@@ -242,6 +245,8 @@ export function evEditorHtml(item = {}, { people = [], persons = [], id = '', pa
     <div class="evx-people"><span class="sub">Người liên quan</span><div class="chips" data-chips>${chips}</div>
       <input class="pk-q" type="search" placeholder="Tìm người…" autocomplete="off" aria-label="Tìm người liên quan" data-pk-q>
       <div class="pk-res" data-pk-res></div></div>
+    <div class="evx-ph"><span class="sub">Ảnh (tối đa 10)</span><div class="evx-phs" data-phs>${photos}</div>
+      <label class="btn ter sm">+ Thêm ảnh<input type="file" accept="image/*" hidden data-evx-photo></label><span class="sub" data-evx-photomsg aria-live="polite"></span></div>
     <div class="evx-src"><span class="sub">Nguồn</span><div data-srcs>${srcs}</div><button type="button" class="btn ter sm src-add" data-src-add>+ Thêm nguồn</button></div>
     <p class="err" data-evx-err role="alert" hidden></p>
     <div class="row end evx-acts${page ? ' fp-bar' : ''}"><button type="button" class="btn gh" data-evx-cancel>Hủy</button><button type="button" class="btn" data-evx-save>Lưu sự kiện</button></div>
@@ -253,6 +258,12 @@ const sourceRow = (s = {}) => `<div class="srow" data-src><div class="srow-h"><s
   + `<label class="fld">Tên nguồn<input data-sf="title" value="${esc(s.title || '')}" placeholder="vd Gia phả viết tay 1950" maxlength="300" aria-label="Tên nguồn" autocomplete="off"></label>`
   + `<label class="fld">Link (tuỳ chọn)<input data-sf="url" value="${esc(s.url || '')}" placeholder="https://…" maxlength="2000" aria-label="Link nguồn" autocomplete="off"></label>`
   + `<label class="fld">Chất lượng<select data-sf="quality" aria-label="Chất lượng nguồn"><option value="">Chưa rõ</option>${Object.entries(SOURCE_QUALITY).map(([k, l]) => `<option value="${k}" ${s.quality === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label></div>`;
+
+// One photo of an event: a thumbnail and a remove button (the link is kept on the element).
+// Uploaded photos not saved yet are shown from the device (the server serves a photo only with its record).
+export const PHOTO_PREVIEW = new Map();
+const photoRow = (u, preview = '') => `<div class="evx-ph1" data-ph="${esc(u)}"><img src="${esc(preview || PHOTO_PREVIEW.get(u) || u)}" alt="" loading="lazy"><button type="button" class="linkbtn" data-ph-del aria-label="Ảnh này: gỡ khỏi sự kiện">×</button></div>`;
+export { photoRow };
 
 // Reads the editor's values: { item, error }. Dates are parsed here (the server checks them again).
 export function readEvx(root) {
@@ -266,7 +277,7 @@ export function readEvx(root) {
   })).filter((s) => s.title || s.url);
   const item = { type: g('type'), date_text: g('date_text'), date_kind: dp.kind || null, date_from: dp.from || null, date_to: dp.to || null,
     lunar: g('lunar'), place: g('place'), place_new: g('place_new'), description: root.querySelector('[data-f="description"]').value.trim(),
-    people, sources, is_preferred: true };
+    people, sources, photos: [...root.querySelectorAll('[data-ph]')].map((el) => el.dataset.ph), is_preferred: true };
   return { item };
 }
 
@@ -290,6 +301,7 @@ export function wireEvx(root, persons) {
       const titles = root.querySelectorAll('[data-srcs] [data-sf="title"]'); titles[titles.length - 1]?.focus(); return;
     }
     const del = e.target.closest('[data-src-del]'); if (del) { del.closest('[data-src]').remove(); }
+    const pdel = e.target.closest('[data-ph-del]'); if (pdel) { pdel.closest('[data-ph]').remove(); }
   });
 }
 
