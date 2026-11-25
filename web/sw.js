@@ -68,6 +68,7 @@ const SHELL = [
   '/js/treechart.js',
   '/js/ui.js',
   '/js/person-item.js',
+  '/js/hidden.js',
   '/js/links.js',
   '/js/branch-trees.js',
   '/js/contacts-import.js',

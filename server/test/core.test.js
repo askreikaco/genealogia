@@ -4,9 +4,9 @@ const assert = require('node:assert');
 const { publicView, validateOp, mergeOp, validateValue } = require('../core');
 
 test('contacts of living people are hidden unless public', () => {
-  const d = { name: 'A', phone: '090', email: 'a@x' };
+  const d = { name: 'A', phone: '90', email: 'a@x' };
   assert.equal(publicView(d).phone, undefined);
-  assert.equal(publicView({ ...d, contact_public: 'yes' }).phone, '090');
+  assert.equal(publicView({ ...d, contact_public: 'yes' }).phone, undefined, 'living: a placeholder for visitors, even with contacts public');
   assert.equal(publicView({ ...d, contact_public: 'yes', died: '2001' }).phone, undefined);
 });
 
@@ -28,9 +28,10 @@ test('newest write wins per field', () => {
   assert.equal(d.deleted, true);
 });
 
-test('public sees only the birth year', () => {
-  assert.equal(publicView({ name: 'A', born: '1990', birth_date: '02/03/1990' }).birth_date, undefined);
-  assert.equal(publicView({ name: 'A', born: '1990', birth_date: '02/03/1990' }).born, '1990');
+test('public sees only the birth year (dead); a living person is a placeholder', () => {
+  const living = publicView({ name: 'A', born: '1990', birth_date: '02/03/1990' });
+  assert.equal(living.hidden_living, true); assert.equal(living.name, '');
+  assert.equal(living.born, undefined); assert.equal(living.birth_date, undefined);
   assert.equal(publicView({ name: 'B', died: '2000', birth_date: '02/03/1920' }).birth_date, undefined);
 });
 
@@ -41,14 +42,8 @@ test('death_date is private like birth_date; birth_place is public', () => {
   assert.equal(validateValue('birth_place', 'Huế'), null);
 });
 
-test('has_contact: only a flag, only when asked, only for living people with hidden contacts', () => {
-  const d = { name: 'A', phone: '090', email: 'a@x' };
-  assert.equal(publicView(d).has_contact, undefined, 'not unless asked');
-  const v = publicView(d, { flag: true });
-  assert.equal(v.has_contact, true); assert.equal(v.phone, undefined); assert.equal(v.email, undefined);
-  assert.equal(publicView({ name: 'B' }, { flag: true }).has_contact, undefined, 'nothing to hide');
+test('has_contact: a living person is a placeholder with no flag; dead people never get one', () => {
+  const d = { name: 'A', phone: '90', email: 'a@x' };
+  assert.equal(publicView(d, { flag: true }).has_contact, undefined, 'living: placeholder, no flag');
   assert.equal(publicView({ ...d, died: '2001' }, { flag: true }).has_contact, undefined, 'dead: no flag');
-  const pub = publicView({ ...d, contact_public: 'yes' }, { flag: true });
-  assert.equal(pub.has_contact, undefined); assert.equal(pub.phone, '090');
-  assert.equal(publicView({ name: 'C', has_contact: true }, { flag: true }).has_contact, undefined, 'a stored flag is never trusted');
 });

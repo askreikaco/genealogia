@@ -38,14 +38,14 @@ test.before(async () => {
     await pool.query("insert into families (id, slug, name, han, visibility) values ($1,$1,$2,'試','public') on conflict do nothing", [id, name]);
   }
   const ins = (id, fam, data) => pool.query('insert into persons (id, family_id, data, updated_by) values ($1,$2,$3,$4)', [id, fam, data, 'e2e']);
-  await ins('RG1', FG, { name: 'Thử Văn Muộn', sex: 'm', gen: 1, born: '1900', ext: { order: 1, group: 'Q1' } });
-  await ins('RG2', FG, { name: 'Thử Văn Sớm', sex: 'm', gen: 1, born: '1850', ext: { order: 1, group: 'Q1' } });
-  await ins('RG3', FG, { name: 'Thử Văn Không Năm', sex: 'f', gen: 1, ext: { order: 2, group: 'Q2' } });
-  await ins('RG4', FG, { name: 'Thử Văn Hai Mươi', sex: 'm', gen: 1, born: '1500', ext: { order: 2, group: 'Q2' } });
-  await ins('RG5', FG, { name: 'Thử Văn Cổ', sex: 'm', gen: 1, born: '1700' });
-  await ins('RP1', FP, { name: 'Thử Bá Chín', sex: 'm', gen: 1, born: '1900' });
-  await ins('RP2', FP, { name: 'Thử Bá Không', sex: 'f', gen: 1 });
-  await ins('RP3', FP, { name: 'Thử Bá Bảy', sex: 'm', gen: 1, born: '1700' });
+  await ins('RG1', FG, { living: 'dead', name: 'Thử Văn Muộn', sex: 'm', gen: 1, born: '1900', ext: { order: 1, group: 'Q1' } });
+  await ins('RG2', FG, { living: 'dead', name: 'Thử Văn Sớm', sex: 'm', gen: 1, born: '1850', ext: { order: 1, group: 'Q1' } });
+  await ins('RG3', FG, { living: 'dead', name: 'Thử Văn Không Năm', sex: 'f', gen: 1, ext: { order: 2, group: 'Q2' } });
+  await ins('RG4', FG, { living: 'dead', name: 'Thử Văn Hai Mươi', sex: 'm', gen: 1, born: '1500', ext: { order: 2, group: 'Q2' } });
+  await ins('RG5', FG, { living: 'dead', name: 'Thử Văn Cổ', sex: 'm', gen: 1, born: '1700' });
+  await ins('RP1', FP, { living: 'dead', name: 'Thử Bá Chín', sex: 'm', gen: 1, born: '1900' });
+  await ins('RP2', FP, { living: 'dead', name: 'Thử Bá Không', sex: 'f', gen: 1 });
+  await ins('RP3', FP, { living: 'dead', name: 'Thử Bá Bảy', sex: 'm', gen: 1, born: '1700' });
   srv = app.listen(0, '127.0.0.1');
   await new Promise((r) => srv.on('listening', r));
   base = `http://127.0.0.1:${srv.address().port}`;

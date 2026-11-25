@@ -81,7 +81,7 @@ test('họ gốc visibility: all | members | editors', () => {
 });
 
 test('publicView: the reason and source of a change are not shown to visitors; members see them', () => {
-  const d = { name: 'Lý Thử Gốc', names: [{ type: 'changed', surname: 'Nguyễn', from: '1232', reason: 'lý do nhạy cảm', source: 'nguồn', confidence: 'tradition' }] };
+  const d = { name: 'Lý Thử Gốc', died: '1260', names: [{ type: 'changed', surname: 'Nguyễn', from: '1232', reason: 'lý do nhạy cảm', source: 'nguồn', confidence: 'tradition' }] };
   const pub = publicView(d).names[0];
   assert.deepStrictEqual(pub, { type: 'changed', surname: 'Nguyễn', from: '1232', confidence: 'tradition' });
   assert.strictEqual(d.names[0].reason, 'lý do nhạy cảm', 'the stored data keeps it');

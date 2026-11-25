@@ -36,7 +36,7 @@ test.before(async () => {
   for (const f of fs.readdirSync(path.join(__dirname, '..', 'migrations')).filter((x) => x.endsWith('.sql')).sort()) await pool.query(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
   personId = 'N' + crypto.randomUUID().slice(0, 13);
   await pool.query("insert into persons (id, data, updated_by) values ($1, $2, 'test')",
-    [personId, { name: 'Người Thử ' + TAG, gen: 7, sex: 'm', born: '1990', birth_date: '01/02/1990', place: 'Hà Nội' }]);
+    [personId, { name: 'Người Thử ' + TAG, gen: 7, sex: 'm', born: '1990', died: '2010', birth_date: '01/02/1990', place: 'Hà Nội' }]);
   await pool.query("insert into members (email, name, role, status) values ($1, 'Chủ Thử', 'owner', 'active')", [EMAIL.owner]);
   await pool.query("insert into members (email, name, role, status) values ($1, 'Biên Tập', 'editor', 'active')", [EMAIL.editor]);
   await pool.query("insert into members (email, name, role, status) values ($1, 'Thành Viên', 'member', 'active')", [EMAIL.member]);

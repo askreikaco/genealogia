@@ -118,6 +118,7 @@ test('list save: a valid list goes through /api/ops as one field; a bad item is 
   assert.ok(g.json && g.json.items, g.status + ' ' + g.text.slice(0, 200));
   const asGuest = g.json.items.find((x) => x.id === PID.cha).data;
   assert.equal(asGuest.contacts, undefined, 'a guest gets no contact values');
-  assert.equal(asGuest.has_contact, true, 'a guest gets the teaser flag only');
+  assert.equal(asGuest.hidden_living, true, 'a living person is a placeholder for a guest (no teaser)');
+  assert.equal(asGuest.has_contact, undefined);
   assert.equal(JSON.stringify(g.json).includes('0977 000 111'), false);
 });

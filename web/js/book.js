@@ -79,7 +79,7 @@ let printing = false;
 
 // ---- data ----
 // Hide living: a living person is printed as a name-less placeholder (structure and page layout stay the same).
-const P = (id) => { const d = persons.get(id) || null; return d && PREF.hideLiving && !isDead(d) ? { sex: d.sex, gen: d.gen, name: T('living2'), living: 'living' } : d; };
+const P = (id) => { const d = persons.get(id) || null; if (d && d.hidden_living) return { sex: d.sex, gen: d.gen, name: T('living2'), living: 'living' }; return d && PREF.hideLiving && !isDead(d) ? { sex: d.sex, gen: d.gen, name: T('living2'), living: 'living' } : d; };
 // Persons not yet known are requested in batches; ids already in flight are awaited, not asked again.
 async function loadPersons(ids) {
   const need = [...new Set(ids)].filter((id) => !persons.has(id) && !pending.has(id));

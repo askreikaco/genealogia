@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
 const { Pool } = require('pg');
-const { FIELDS, publicView, withContacts, validateOp, validateValue, mergeOp, DELETE } = require('./core');
+const { FIELDS, publicView, withContacts, validateOp, validateValue, mergeOp, DELETE, isDead } = require('./core');
 const SR = require('./surname-rules');
 const REL = require('./relations');
 const BRN = require('./branch-routes'); // branch trees by reference (reads, ops and suggestions of a branch)
@@ -1489,7 +1489,7 @@ async function photoAccess(req, id) {
     const fam = fams.get(r.famId); if (!fam) continue;
     const ok = (w) => {
       const readable = canRead(fam, w);
-      return r.kind === 'person' ? readable : readable && R.canSeeEventsOf(r.data, { member: canSeePrivate(w), familyReadable: true });
+      return r.kind === 'person' ? readable && (isDead(r.data) || canSeePrivate(w)) : readable && R.canSeeEventsOf(r.data, { member: canSeePrivate(w), familyReadable: true });
     };
     if (ok({ role: 'guest' })) { allowed = true; open = true; }
     else if (!allowed && ok(await who(req, fam.id))) allowed = true;

@@ -30,6 +30,13 @@ function isDead(d) {
 // opts.flag: when a living person's contacts are hidden, say so with has_contact: true (a boolean, never a value),
 // so the profile can show the Liên hệ card with a sign-in prompt. Only the persons API asks for it.
 function publicView(d, opts = {}) {
+  // A living person (not isDead) is a placeholder for non-members: the tree shape stays (sex, generation and the links,
+  // which come from the relation rows), but no name, years, photo, places, events, stories or contacts.
+  if (!isDead(d)) { // name '' (not null): the book and labels read it as text; the client shows the label from hidden_living
+    const out = { name: '', hidden_living: true, sex: d.sex || '', gen: d.gen ?? null };
+    for (const k of ['parent', 'other_parent', 'spouse_of', 'spouse_n']) if (d[k] !== undefined) out[k] = d[k]; // the links stay (tree shape)
+    return out;
+  }
   const out = withContacts(d);
   delete out.has_contact;
   const showContact = d.contact_public === 'yes' && !isDead(d);

@@ -39,7 +39,7 @@ test('name_han: stored like any text field, an empty value clears it; the public
   assert.strictEqual(m.data.name_han, '楊文乙');
   const c = mergeOp(m, { op_id: 'b', id: 'P001', ts: 2, fields: { name_han: '' } }, 10);
   assert.strictEqual(c.data.name_han, undefined);
-  assert.strictEqual(publicView({ name: 'A', name_han: '阮文' }).name_han, '阮文');
+  assert.strictEqual(publicView({ name: 'A', died: '1950', name_han: '阮文' }).name_han, '阮文');
 });
 
 const fixture = () => ({

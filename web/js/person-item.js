@@ -8,8 +8,9 @@
 // sep = divider above (the last option of a list), tag 'div' for a list whose options are not buttons).
 import { calmRow, surnameTile, sexMark, sexClass } from './ui.js';
 import { esc } from './model.js';
+import { nameOf } from './hidden.js';
 
-const titleOf = (p, sep = ' ') => (p.rank ? `${p.rank}${sep}${p.name}` : p.name);
+const titleOf = (p, sep = ' ') => (p.rank ? `${p.rank}${sep}${nameOf(p)}` : nameOf(p));
 
 export function personItem(p, opts = {}) {
   if (opts.variant === 'card') return personCard(p, opts);

@@ -131,8 +131,9 @@ test('the editor attaches a photo to an event; it shows on Dòng đời with the
 
   const guest = await newPage(390, false);
   try {
-    await lifeTab(guest.page, LIVING);
-    assert.match(await guest.page.textContent('#main'), /chỉ thành viên xem được/);
+    await guest.page.goto(`${base}/#/${SLUG}/person/${LIVING}`);
+    await guest.page.waitForSelector("#main h1", { timeout: 20000 });
+    assert.equal(await guest.page.locator("nav.ptabs").count(), 0, "a living person: no tabs for a guest");
     assert.equal(await guest.page.locator('.ev-ph img').count(), 0, 'no photo for a guest');
     assert.deepEqual(guest.errs, []);
   } finally { await guest.ctx.close(); }

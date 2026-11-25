@@ -29,7 +29,7 @@ test.before(async () => {
   pool = p;
   for (const f of fs.readdirSync(path.join(__dirname, '..', 'migrations')).filter((x) => x.endsWith('.sql')).sort()) await pool.query(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
   personId = 'N' + crypto.randomUUID().slice(0, 13);
-  await pool.query("insert into persons (id, data, updated_by) values ($1, $2, 'test')", [personId, { name: 'Người Thử', gen: 4, sex: 'm' }]);
+  await pool.query("insert into persons (id, data, updated_by) values ($1, $2, 'test')", [personId, { name: 'Người Thử', gen: 4, sex: 'm', died: '1960' }]);
   const srv = app.listen(0, '127.0.0.1');
   await new Promise((r) => srv.on('listening', r));
   base = `http://127.0.0.1:${srv.address().port}`;

@@ -1,4 +1,5 @@
 import * as S from './store.js';
+import { nameOf } from './hidden.js';
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger, undoToast, restoreTrash } from './danger.js';
 import * as TR from './trash-ui.js';
 import * as CN from './council.js';
@@ -455,7 +456,7 @@ function tree(arg) {
     const d = p.data;
     const sub = [depth ? '' : 'Đời ' + (d.gen || '?'), yearsHtml(d), d.gio_lunar || d.death_lunar ? 'Giỗ ' + esc(d.gio_lunar || d.death_lunar) + ' ÂL' : ''].filter(Boolean).join(' · ');
     const toggle = ks.length ? `<button class="tg ${isOpen ? 'op' : ''}" data-tg="${p.id}" aria-expanded="${isOpen}" aria-label="${isOpen ? 'Đóng' : 'Mở'} nhánh">${isOpen ? '−' : '+' + ks.length}</button>` : '';
-    out.push(personItem({ rank: rank(d), name: d.name, sex: d.sex }, { variant: 'tree', depth, href: hf(`person/${p.id}`), hit: !!hits?.has(p.id), badge: d.name_han ? ` <span class="nhan" lang="zh-Hant">${esc(d.name_han)}</span>` : '', sub, action: toggle }));
+    out.push(personItem({ rank: d.hidden_living ? '' : rank(d), name: nameOf(d), sex: d.sex }, { variant: 'tree', depth, href: hf(`person/${p.id}`), hit: !!hits?.has(p.id), badge: d.name_han ? ` <span class="nhan" lang="zh-Hant">${esc(d.name_han)}</span>` : '', sub, action: toggle }));
     for (const s of (M.inlaws(p.id).length ? M.inlaws(p.id).map((q) => ({ n: q.data.spouse_n, name: q.data.name, note: years(q.data), id: q.id })) : spousesOf(d))) out.push(`<${s.id ? 'a href="' + hf('person/' + s.id) + '"' : 'div'} class="tsp${s.id && s.id === inlawJump ? ' hit' : ''} ${d.sex === 'f' ? 'm' : 'f'}" style="--d:${depth}"><span class="tsl">${d.sex === 'f' ? 'Chồng' : 'Vợ'}${spousesOf(d).length > 1 ? ' ' + s.n : ''}</span><b>${esc(s.name)}</b>${s.note ? `<span class="sub">${esc(s.note)}</span>` : ''}</${s.id ? 'a' : 'div'}>` + (plain ? spouseTree(s, depth) : ''));
     if (plain) out.push(lowerCards(p, depth));
     if (isOpen && ks.length) out.push(`<div class="tgen" style="--d:${depth + 1}">Đời ${(d.gen || 0) + 1} · ${ks.length} người con</div>`);
@@ -523,9 +524,9 @@ function listView(arg) {
    <label>Đời<select id="fgen"><option value="">Mọi đời</option>${gens.map((g) => `<option ${String(g) === F.gen ? 'selected' : ''}>${g}</option>`).join('')}</select></label>
    <div class="row wrap">${tag('Còn sống', { kind: 'chip', on: F.living, attrs: 'id="fliv"' })}${tag('Cần xác minh', { kind: 'chip', on: F.flag, attrs: 'id="fflag"' })}</div>`)}
    ${isWide() ? `<div class="kpis lk">${[['Tổng số', M.all.length, 'ia'], ['Nam / Nữ', M.all.filter((p) => p.data.sex !== 'f').length + ' / ' + M.all.filter((p) => p.data.sex === 'f').length, 'c2'], ['Có ngày giỗ', M.all.filter((p) => gioOf(p.data)).length, 'c3'], ['Cần xác minh', M.all.filter((p) => p.data.verify).length, 'warn']].map(([l, v, c]) => `<div class="kpi" style="border-top-color:var(--${c})"><span class="sub">${l}</span><b>${v}</b></div>`).join('')}</div>` : ''}
-   ${!isWide() ? `<div class="cards">${rows.slice(0, 400).map((p) => { const d = p.data; return personItem({ rank: rank(d), name: d.name, sex: d.sex }, { variant: 'card', href: ph(p, `person/${p.id}`), flag: !!d.verify, badge: famChipIf(p), sub: `${sidHits.length && d.sid ? esc(formatSid(d.sid)) + ' · ' : cq && codeOf(M, p.id) ? esc(codeOf(M, p.id)) + ' · ' : ''}${gd ? `Giỗ ${esc(gioOf(d).label)} ÂL` : `Đời ${genOf(M, p) || '?'}${years(d) ? ' · ' + yearsHtml(d) : ''}${d.place ? ' · ' + esc(d.place) : ''}`}`, foot: d.verify ? `${tag(`${esc(d.verify)}`, { tone: 'yellow', sm: true })}` : '', action: iconButton({ icon: 'more', label: 'Thao tác', attrs: `data-menu="${p.id}" aria-haspopup="menu"` }) }); }).join('')}</div>` : `<div class="scroll"><table class="tb"><thead><tr><th></th><th>Đời</th><th>Họ tên</th><th>Cha/Mẹ</th><th>Sinh</th><th>Mất</th><th>Giỗ ÂL</th><th>Nơi sống</th><th>Cần xác minh</th><th>Thao tác</th></tr></thead><tbody>
+   ${!isWide() ? `<div class="cards">${rows.slice(0, 400).map((p) => { const d = p.data; return personItem({ rank: d.hidden_living ? '' : rank(d), name: nameOf(d), sex: d.sex }, { variant: 'card', href: ph(p, `person/${p.id}`), flag: !!d.verify, badge: famChipIf(p), sub: `${sidHits.length && d.sid ? esc(formatSid(d.sid)) + ' · ' : cq && codeOf(M, p.id) ? esc(codeOf(M, p.id)) + ' · ' : ''}${gd ? `Giỗ ${esc(gioOf(d).label)} ÂL` : `${d.hidden_living && !genOf(M, p) ? '' : `Đời ${genOf(M, p) || '?'}`}${years(d) ? ' · ' + yearsHtml(d) : ''}${d.place ? ' · ' + esc(d.place) : ''}`}`, foot: d.verify ? `${tag(`${esc(d.verify)}`, { tone: 'yellow', sm: true })}` : '', action: iconButton({ icon: 'more', label: 'Thao tác', attrs: `data-menu="${p.id}" aria-haspopup="menu"` }) }); }).join('')}</div>` : `<div class="scroll"><table class="tb"><thead><tr><th></th><th>Đời</th><th>Họ tên</th><th>Cha/Mẹ</th><th>Sinh</th><th>Mất</th><th>Giỗ ÂL</th><th>Nơi sống</th><th>Cần xác minh</th><th>Thao tác</th></tr></thead><tbody>
    ${rows.map((p) => { const d = p.data; const par = M.byId.get(d.parent); return `<tr class="${d.verify ? 'flag' : ''}"><td>${sexMark(d.sex)}</td><td class="num">${genOf(M, p) || ''}</td>
-   <td><a href="${ph(p, `person/${p.id}`)}"><b>${esc(rank(d))} ${esc(d.name)}</b></a>${famChipIf(p)}</td><td>${esc(par?.data.name || '')}</td><td class="num">${esc(d.born || '')}</td><td class="num">${esc(d.died || '')}</td><td class="num">${esc(d.gio_lunar || d.death_lunar || '')}</td><td>${esc(d.place || '')}</td><td>${esc(d.verify || '')}</td>
+   <td><a href="${ph(p, `person/${p.id}`)}"><b>${d.hidden_living ? esc(nameOf(d)) : `${esc(rank(d))} ${esc(d.name)}`}</b></a>${famChipIf(p)}</td><td>${esc(par?.data.name || '')}</td><td class="num">${esc(d.born || '')}</td><td class="num">${esc(d.died || '')}</td><td class="num">${esc(d.gio_lunar || d.death_lunar || '')}</td><td>${esc(d.place || '')}</td><td>${esc(d.verify || '')}</td>
    <td class="acts">${S.isEditor() ? `${iconButton({ icon: 'pencil', label: 'Sửa', attrs: `data-act="edit" data-id="${p.id}"` })}${iconButton({ icon: 'plus', label: 'Thêm con', attrs: `data-act="child" data-id="${p.id}"` })}` : ''}${iconButton({ icon: 'more', label: 'Thao tác', attrs: `data-menu="${p.id}" aria-haspopup="menu"` })}</td></tr>`; }).join('')}
    </tbody></table></div>`}`;
   $('#q').oninput = (e) => { clearTimeout(listView.t); listView.t = setTimeout(() => { history.replaceState(null, '', hf('list/' + encodeURIComponent(e.target.value))); render(); const i = $('#q'); i.focus({ preventScroll: true }); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
@@ -584,6 +585,7 @@ function act(k, id) {
 function person(id) {
   const p = M.byId.get(id); if (!p) { main.innerHTML = '<p>Không tìm thấy người này.</p>'; return; }
   if (profFor !== id) { profFor = id; profTab = 'info'; }
+  if (p.data.hidden_living) { main.innerHTML = `<section class="card"><h1 class="keep">${esc(nameOf(p.data))}</h1></section>`; return; } // a living person (visitor view): the label only, no data
   const d = p.data; const sp = d.spouse_of && M.byId.get(d.spouse_of); const ks = sp ? (M.kidsOf2(id).length || M.inlaws(sp.id).length > 1 ? M.kidsOf2(id) : M.kids(sp.id)) : M.kids(id); const br = branchOf(M, sp || p);
   const row = (k, v) => (v ? [k, v] : null); // one fact: [label, value html], or null when empty
   const loc = locate(d);
@@ -1135,7 +1137,7 @@ function verify() {
   ${ltags([st.fam && ['fam', 'Dòng họ: ' + S.familyLabel(st.fam)], st.k && ['k', K.find((x) => x[0] === st.k)[1]]].filter(Boolean))}
   <p class="sub lcount">${show.length}${show.length !== rows.length ? ' / ' + rows.length : ''} chỗ còn thiếu</p>
   ${fpanel(`<fieldset class="fset"><legend>Loại</legend>${[['', 'Tất cả'], ...K].map(([k, l]) => `<label class="radio"><input type="radio" name="vk" value="${k}" ${st.k === k ? 'checked' : ''}> ${l} (${rows.filter((p) => !k || kind(p.data.verify) === k).length})</label>`).join('')}</fieldset>`)}
-  ${card(`${show.map((p) => personItem({ rank: rank(p.data), name: p.data.name, sex: p.data.sex }, { href: ph(p, `person/${p.id}`), badge: famChipIf(p), sub: esc(p.data.verify) })).join('') || emptyState('Không có mục nào.')}`)}`;
+  ${card(`${show.map((p) => personItem({ rank: rank(p.data), name: nameOf(p.data), sex: p.data.sex }, { href: ph(p, `person/${p.id}`), badge: famChipIf(p), sub: esc(p.data.verify) })).join('') || emptyState('Không có mục nào.')}`)}`;
   $('#vq').oninput = (e) => { clearTimeout(verify.t); verify.t = setTimeout(() => { st.qRaw = e.target.value; st.q = fold(e.target.value).trim(); render(); const i = $('#vq'); i.focus({ preventScroll: true }); i.setSelectionRange(i.value.length, i.value.length); }, 200); };
   $('#vkq')?.addEventListener('change', (e) => setKind(e.target.value));
   $('#vfam')?.addEventListener('change', (e) => { st.fam = e.target.value; render(); });
@@ -1165,7 +1167,7 @@ const mapGroups = (people) => {
   return [...groups.values()];
 };
 const fcOf = (groups) => ({ type: 'FeatureCollection', features: groups.map((g, i) => ({ type: 'Feature', id: i, properties: { n: g.people.length, prec: g.precision, i, fi: groupFi(g) }, geometry: { type: 'Point', coordinates: [g.lon, g.lat] } })) });
-const mapRow = (p) => personItem({ rank: rank(p.data), name: p.data.name, sex: p.data.sex }, { href: ph(p, `person/${p.id}`), badge: famChipIf(p), sub: `Đời ${genOf(M, p) || '?'}${years(p.data) ? ' · ' + years(p.data) : ''}${p.data.place ? ' · ' + esc(p.data.place) : ''}` });
+const mapRow = (p) => personItem({ rank: p.data.hidden_living ? '' : rank(p.data), name: nameOf(p.data), sex: p.data.sex }, { href: ph(p, `person/${p.id}`), badge: famChipIf(p), sub: `${p.data.hidden_living && !genOf(M, p) ? '' : `Đời ${genOf(M, p) || '?'}`}${years(p.data) ? ' · ' + years(p.data) : ''}${p.data.place ? ' · ' + esc(p.data.place) : ''}` });
 // Filter bar (toolbar + fpanel + active tags). Rebuilt when a filter changes; the search box itself is kept.
 // Chi and Đời options from the people on the map's side (all of them, not only the filtered ones).
 function mapOpts() {
@@ -1214,7 +1216,7 @@ function mapHitList() { const q = fold(MF.qRaw).trim(); return q.length < 2 ? []
 function mapHits() {
   const box = $('#mqhits'); if (!box) return;
   const hits = mapHitList();
-  box.innerHTML = hits.length ? `${card(`${hits.map((p) => calmRow({ attrs: `data-pick="${p.id}"`, sex: p.data.sex, title: `${rank(p.data)} ${p.data.name}`, subtitle: locate(p.data) ? 'Đời ' + (p.data.gen || '?') + (p.data.place ? ' · ' + esc(p.data.place) : '') : 'Chưa có nơi sống', dense: true })).join('')}`, { cls: 'mhits' })}` : '';
+  box.innerHTML = hits.length ? `${card(`${hits.map((p) => calmRow({ attrs: `data-pick="${p.id}"`, sex: p.data.sex, title: p.data.hidden_living ? nameOf(p.data) : `${rank(p.data)} ${p.data.name}`, subtitle: locate(p.data) ? 'Đời ' + (p.data.gen || '?') + (p.data.place ? ' · ' + esc(p.data.place) : '') : 'Chưa có nơi sống', dense: true })).join('')}`, { cls: 'mhits' })}` : '';
 }
 function mapPick(id) {
   const p = M.byId.get(id); if (!p) return;
@@ -1231,7 +1233,7 @@ function mapPopup(g) {
   MAPX.popup?.remove();
   const more = g.people.length > 12 ? `<span class="sub">và ${g.people.length - 12} người nữa, xem danh sách bên dưới</span>` : '';
   MAPX.popup = new maplibregl.Popup({ maxWidth: '260px', offset: 12 }).setLngLat([g.lon, g.lat])
-    .setHTML(`<b>${esc(g.key)}</b><ul class="mpop">${g.people.slice(0, 12).map((p) => `<li><a href="${ph(p, `person/${p.id}`)}">${esc(rank(p.data))} ${esc(p.data.name)}</a></li>`).join('')}</ul>${more}`).addTo(MAPX.m);
+    .setHTML(`<b>${esc(g.key)}</b><ul class="mpop">${g.people.slice(0, 12).map((p) => `<li><a href="${ph(p, `person/${p.id}`)}">${p.data.hidden_living ? esc(nameOf(p.data)) : `${esc(rank(p.data))} ${esc(p.data.name)}`}</a></li>`).join('')}</ul>${more}`).addTo(MAPX.m);
 }
 function mapList() { renderMapList(mapG, mapPeople()); }
 function renderMapList(groups, people) {
@@ -1653,7 +1655,7 @@ function join() {
     const ho = form.ho.value.trim(); const ten = form.ten.value.trim();
     const hits = ho && ten ? searchPeople(M.all, `${ho} ${ten}`, { limit: 5 }) : [];
     const hint = !(ho && ten) ? '<span class="sub pad">Nhập họ và tên để xem gợi ý.</span>' : !hits.length ? '<span class="sub pad">Chưa thấy tên nào giống. Chọn dòng dưới nếu bạn chưa có trong gia phả.</span>' : '';
-    $('#jsug').innerHTML = hint + hits.map((p) => personItem({ rank: rank(p.data), name: p.data.name }, { variant: 'compact', on: pick === p.id, attrs: `role="option" aria-selected="${pick === p.id}" data-jpick="${p.id}"`, sub: esc(joinDesc(p)) })).join('')
+    $('#jsug').innerHTML = hint + hits.map((p) => personItem({ rank: p.data.hidden_living ? '' : rank(p.data), name: nameOf(p.data) }, { variant: 'compact', on: pick === p.id, attrs: `role="option" aria-selected="${pick === p.id}" data-jpick="${p.id}"`, sub: esc(joinDesc(p)) })).join('')
       + personItem({ name: 'Tôi chưa có trong gia phả' }, { variant: 'compact', sep: true, on: pick === 'none', attrs: `role="option" aria-selected="${pick === 'none'}" data-jpick="none"`, sub: esc('Quản trị sẽ xem và thêm bạn vào cây') });
     $('#jrelw').hidden = !(pick && pick !== 'none');
   };
@@ -2946,7 +2948,7 @@ function acShow() {
   const r = inp.getBoundingClientRect();
   const w = Math.min(Math.max(r.width, 320), innerWidth - 32); const l = Math.max(16, Math.min(r.left, innerWidth - 16 - w));
   Object.assign(ac.box.style, { left: l + 'px', top: r.bottom + 'px', width: w + 'px' });
-  ac.box.innerHTML = ac.hits.map((p, i) => personItem({ rank: rank(p.data), name: p.data.name }, { variant: 'compact', tag: 'div', on: i === ac.i, attrs: `role="option" id="aco${i}" data-ac="${p.id}" aria-selected="${i === ac.i}"`, sub: esc(acDesc(p)) })).join('');
+  ac.box.innerHTML = ac.hits.map((p, i) => personItem({ rank: p.data.hidden_living ? '' : rank(p.data), name: nameOf(p.data) }, { variant: 'compact', tag: 'div', on: i === ac.i, attrs: `role="option" id="aco${i}" data-ac="${p.id}" aria-selected="${i === ac.i}"`, sub: esc(acDesc(p)) })).join('');
   inp.setAttribute('aria-controls', 'acbox'); inp.setAttribute('aria-expanded', 'true');
   ac.box.hidden = false;
 }

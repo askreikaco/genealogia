@@ -403,6 +403,7 @@ export function planBook(M, opts = '') {
     .sort((a, b) => a.q.data.name.split(' ').pop().localeCompare(b.q.data.name.split(' ').pop(), 'vi') || a.q.data.name.localeCompare(b.q.data.name, 'vi'));
   let cur = ''; const it = [];
   for (const { q, target } of idx) {
+    if (q.data.hidden_living) continue; // a living person (non-member view) has no name to index
     const L = q.data.name.split(' ').pop()[0].toUpperCase();
     if (L !== cur) { cur = L; it.push({ t: 'il', L, h: 21 }); }
     // a spouse's row shows the partner's entry number, linked to the partner's entry

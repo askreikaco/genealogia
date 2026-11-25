@@ -59,6 +59,15 @@ test.before(async () => {
   await pool.query("insert into members (email, name, family_id, role, status) values ($1,'Thành viên thử',$2,'member','active')", [MEMBER, FAM]);
 });
 
+test('owner of a family without the backfill marker: relation writes refused (409 rel-backfill)', { skip }, async () => {
+  const OWN = `owner.${TAG}@example.test`;
+  await pool.query("insert into members (email, name, role, status, family_id) values ($1,'o','owner','active',$2)", [OWN, FAM_LEGACY]);
+  const cookie = (await fetch(base + '/api/test/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: OWN, name: OWN }) })).headers.get('set-cookie').split(';')[0];
+  const r = await call('POST', '/api/relations', { family: FAM_LEGACY, op_id: ops(11), action: 'add', kind: 'couple', a_id: ID_L.P001, b_id: ID_L.P002, cp_kind: 'cuoi' }, cookie);
+  assert.equal(r.status, 409, JSON.stringify(r.json));
+  assert.match(r.json.error, /rel-backfill/);
+});
+
 test.after(async () => {
   if (skip) return;
   for (const fam of [FAM, FAM_LEGACY]) {

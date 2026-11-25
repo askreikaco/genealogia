@@ -90,10 +90,10 @@ const shot = async (page, name) => { if (SHOT) { fs.mkdirSync(SHOT, { recursive:
 test('a guest sees no events of a living person, and a suggestion for one is refused', { skip }, async () => {
   const { ctx, page, errs } = await newPage(390, 'light', false);
   try {
-    await profile(page, LIVING);
-    await lifeTab(page);
-    assert.match(await page.textContent('#tl-body, .tl-bar, main'), /chỉ thành viên xem được/);
-    assert.equal(await page.locator('.tl2 li').count(), 0, 'no timeline rows for a guest');
+    await page.goto(`${base}/#/${SLUG}/person/${LIVING}`);
+    await page.waitForSelector("#main h1", { timeout: 20000 });
+    assert.equal(await page.locator("nav.ptabs").count(), 0, "a living person: no tabs for a guest");
+    assert.equal(await page.locator(".tl2 li").count(), 0, "no timeline rows for a guest");
     const refused = await page.evaluate(async ([fam, id]) => (await fetch('/api/suggest', { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ family: fam, person_id: id, changes: { _ev: { action: 'add', kind: 'event', item: { type: 'hoc', date_kind: 'exact', date_from: '1990', sources: [] } } } }) })).status, [SLUG, LIVING]);
     assert.equal(refused, 403);

@@ -37,7 +37,7 @@ test.before(async () => {
     [FA, `Họ Nguyễn ${TAG}`, FB, `Họ Lý ${TAG}`]);
   await pool.query(`update families set origin_surname='Lý', origin_surname_han='李', origin_year='1232', origin_reason='Theo gia phả nhánh', origin_visibility='members' where id=$1`, [FA]);
   const ins = (id, data, fam) => pool.query('insert into persons (id, data, updated_by, family_id) values ($1,$2,$3,$4)', [id, data, 'test', fam]);
-  await ins(P_ROOT, { name: 'Nguyễn Thử Gốc', sex: 'm', born: '1200', names: [
+  await ins(P_ROOT, { name: 'Nguyễn Thử Gốc', sex: 'm', born: '1200', died: '1260', names: [
     { type: 'birth', surname: 'Lý', from: '1200', to: '1232', confidence: 'tradition' },
     { type: 'changed', surname: 'Nguyễn', given: 'Thử', from: '1232', reason: 'Đổi họ theo lệnh vua', source: 'gia phả nhánh', confidence: 'tradition' }] }, FA);
   await ins(P_NEW, { name: 'Nguyễn Thử Con', sex: 'm', born: '1240', parent: P_ROOT }, FA);

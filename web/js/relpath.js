@@ -2,6 +2,7 @@
 // The walk is the kin engine's own (engine.js shortest), so the steps and the kin terms agree with the Quan he section.
 // Client-side only: the viewer's loaded tree (M) and relation rows (relsOf). Every visible string comes from relpath-vi.js (VI).
 import { esc } from './model.js';
+import { nameOf } from './hidden.js';
 import { section, card, emptyState, toolbar } from './ui.js';
 import { personItem } from './person-item.js';
 import { searchPeople } from './fuzzy.js';
@@ -19,7 +20,7 @@ export function relpathPage(main, { hf, M, a = '', b = '' }) {
   const { ix } = relsOf(M);
   const region = kinRegion(); const kin = kinOpts(M);
   const visible = (id) => M.byId.has(id);
-  const nameOf = (id) => M.byId.get(id)?.data.name || '';
+  const nameById = (id) => nameOf(M.byId.get(id)?.data);
   const sexOf = (id) => M.byId.get(id)?.data.sex || '';
   const term = (x, y) => kinTerm(kinPath(ix, x, y, kin), { locale: 'vi', region });
   const go = (x, y) => { location.hash = hf(`relpath/${enc(x)}${y ? `?b=${enc(y)}` : ''}`); };
@@ -31,7 +32,7 @@ export function relpathPage(main, { hf, M, a = '', b = '' }) {
       const sub = i === r.apexIndex ? VI.common_ancestor : '';
       const who = r.hidden[i]
         ? personItem({ name: '', sex: '' }, { tile: false, sub, trailing: 'none' }) // hidden person: the row without the name
-        : personItem({ name: nameOf(id), sex: sexOf(id) }, { href: hf(`person/${enc(id)}`), sub });
+        : personItem({ name: nameById(id), sex: sexOf(id) }, { href: hf(`person/${enc(id)}`), sub });
       const between = i < r.steps.length
         ? `<li class="sub">${esc(term(id, r.nodes[i + 1]))}${r.viaMarriage[i] ? ` \u00b7 ${esc(VI.via_marriage)}` : ''}</li>` : '';
       return `<li>${who}</li>${between}`;
@@ -43,8 +44,8 @@ export function relpathPage(main, { hf, M, a = '', b = '' }) {
     const r = relPath(ix, a, b, { visible });
     if (!r) return emptyState(VI.no_path);
     if (r.same) return emptyState(VI.same_person);
-    const sum = card(`<p>${esc(callLine(nameOf(a), nameOf(b), term(a, b)))}</p>`
-      + `<p>${esc(callLine(nameOf(b), nameOf(a), term(b, a)))}</p>`
+    const sum = card(`<p>${esc(callLine(nameById(a), nameById(b), term(a, b)))}</p>`
+      + `<p>${esc(callLine(nameById(b), nameById(a), term(b, a)))}</p>`
       + `<p class="sub">${r.steps.length} ${esc(VI.steps)}</p>`);
     return `${section(VI.page_title, `<ul class="ped">${chain(r)}</ul>${sum}`, { variant: 'card', label: VI.page_title, level: 2 })}`;
   }

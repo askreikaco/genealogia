@@ -27,7 +27,7 @@ const OWNER = 'owner-desc-e2e@test.local';
 // P810 is a married-in spouse of C1 whose child P811 is not a descendant of A.
 const P = (id, name, sex, gen, extra = {}) => ({ id, data: { name, sex, gen, ...extra } });
 const FIX = [
-  P('P801', 'Dương Văn Gốc', 'm', 1),
+  P('P801', 'Dương Văn Gốc', 'm', 1, { died: '1950' }),
   P('P802', 'Dương Văn Hai', 'm', 2, { parent: 'P801', order: 1 }),
   P('P803', 'Dương Thị Ba', 'f', 2, { parent: 'P801', order: 2 }),
   P('P804', 'Dương Văn Bốn', 'm', 3, { parent: 'P802', order: 2 }),

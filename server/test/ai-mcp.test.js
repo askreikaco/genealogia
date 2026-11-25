@@ -158,14 +158,16 @@ test('PKCE and codes: wrong verifier, reuse and an unregistered redirect are ref
   assert.equal(ok.status, 400, 'the code is one-time: a failed exchange already used it');
 });
 
-test('reading: privacy follows the web (guest sees the birth year only; members see full details)', { skip }, async () => {
+test('reading: privacy follows the web (guest sees a placeholder for a living person; members see full details)', { skip }, async () => {
   const guest = await asGuestNow(['read'], 'khach');
   const g = await mcp(guest.access);
   const got = await tool(g, 'get_person', { person_id: P1 });
   assert.equal(got.isError, false);
-  assert.equal(got.data.person.born, '1980', 'birth year is public');
-  assert.equal(got.data.person.birth_date, undefined, 'full birth date is for members');
-  assert.equal(got.data.person.phone, undefined, 'phone of a living person is private');
+  assert.equal(got.data.person.hidden_living, true, 'a living person is a placeholder for a guest');
+  assert.equal(got.data.person.name, '', 'no name');
+  assert.equal(got.data.person.born, undefined, 'no years for a living person');
+  assert.equal(got.data.person.birth_date, undefined, 'no dates');
+  assert.equal(got.data.person.phone, undefined, 'no contacts');
   const member = await connect(sess.member, ['read'], FAM);
   const m = await mcp(member.access);
   const full = await tool(m, 'get_person', { person_id: P1 });

@@ -3,6 +3,7 @@
 'use strict';
 const L = require('./links-rules');
 const CR = require('./claim-rules');
+const { isDead } = require('./core');
 
 const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
 const yearOf = (v) => { const m = /(\d{4})/.exec(String(v || '')); return m ? m[1] : ''; };
@@ -156,7 +157,9 @@ function mount(app, d) {
     const q = fold(req.query.q).slice(0, 60);
     if (q.length < 2) return res.json({ items: [] });
     const { rows } = await pool.query("select id, data from persons where family_id=$1 and not deleted", [f.id]);
-    const items = rows.filter((r) => fold(r.data.name).includes(q) || fold(r.data.alias).includes(q)).slice(0, 20)
+    // a living person is not listed to a non-member at all: a name match would reveal that they exist (no placeholder here)
+    const member = ['owner', 'admin', 'editor', 'member'].includes(w.role);
+    const items = rows.filter((r) => (member || isDead(r.data)) && (fold(r.data.name).includes(q) || fold(r.data.alias).includes(q))).slice(0, 20)
       .map((r) => ({ id: r.id, name: r.data.name || '', sex: r.data.sex || '', years: [yearOf(r.data.born || r.data.birth_date), yearOf(r.data.died)].filter(Boolean).join('–'), gen: r.data.gen || null }));
     res.json({ items });
   }));
