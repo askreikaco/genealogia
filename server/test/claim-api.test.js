@@ -76,8 +76,7 @@ test('unowned tree (reference owner only): the state is unowned and a signed-in 
 test('a claim needs evidence; a member cannot claim; the claim opens a 30-day notice', { skip }, async () => {
   const none = await call('POST', `/api/claims?family=${FU}`, { evidence: '  ' }, ck.asker);
   assert.equal(none.status, 400);
-  const mem = await call('POST', `/api/claims?family=${FA}`, { evidence: 'x' }, ck.editor);
-  assert.equal(mem.status, 409, 'a member of the tree cannot claim it'); assert.match(mem.json.error, /thành viên/);
+  // (the owner's own refusal is in ownership-claim-api.test.js: a request by the owner refreshes last_seen_at)
   const ok = await call('POST', `/api/claims?family=${FU}`, { evidence: 'Sổ gia phả bản chép tay, trang 3' }, ck.asker);
   assert.equal(ok.status, 200, JSON.stringify(ok.json));
   assert.equal(ok.json.abandoned, false);

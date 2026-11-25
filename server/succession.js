@@ -279,6 +279,10 @@ async function transfer(db, reqId, { email, offerId = null, claimant = false }, 
 // ---- member claim (no contacts, admins or editors to hand over to) ----
 async function startClaim(db, fam, email, now) {
   if (await openHandover(db, fam.id)) throw new Refuse(409, 'Dòng họ đang có một việc chuyển quyền.');
+  // One claim at a time across both paths: an open notice claim (claim-routes.js) blocks the member claim.
+  if ((await db.query("select 1 from tree_claims where family_id=$1 and status='notice' and notice_until > $2", [fam.id, ts(now)])).rowCount) {
+    throw new Refuse(409, 'Dòng họ đang có đơn nhận quản lý chờ góp ý.');
+  }
   const owner = await ownerOf(db, fam.id);
   const chain = await chainFor(db, fam.id, owner?.email);
   const last = await lastHandover(db, fam.id);

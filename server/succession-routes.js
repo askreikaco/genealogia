@@ -5,6 +5,7 @@
 const crypto = require('crypto');
 const S = require('./succession');
 const R = require('./succession-rules');
+const CR = require('./claim-rules');
 const { SYSTEM_MEMBER_SQL } = require('./system-accounts');
 const { Refuse } = R;
 
@@ -13,7 +14,7 @@ const STR = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const isHttpUrl = (u) => { try { const x = new URL(u); return x.protocol === 'https:' || x.protocol === 'http:'; } catch { return false; } };
 
 module.exports = function mountSuccession(app, ctx) {
-  const { pool, who, readSession, findFamily, canRead, ROLE_RANK } = ctx;
+  const { pool, who, readSession, findFamily, canRead, ROLE_RANK, claims } = ctx;
   // Route wrapper: a Refuse answers its status and message; anything else goes to the error handler.
   const SH = (fn) => async (req, res, next) => {
     try { await fn(req, res); } catch (e) {
@@ -50,6 +51,10 @@ module.exports = function mountSuccession(app, ctx) {
     const acceptedContacts = contacts.filter((c) => c.status === 'accepted').length;
     const myEmail = w.email;
     const alreadyBacked = !!open && Array.isArray(open.backers) && open.backers.some((b) => b.email === myEmail);
+    // The one entry: which path applies now (owned -> succession, unowned/abandoned -> claim; claim-rules.routeClaim).
+    const tree = await claims.stateOf(pool, fam.id, now);
+    const openClaim = (await pool.query("select 1 from tree_claims where family_id=$1 and status='notice' and notice_until > now()", [fam.id])).rowCount > 0;
+    const route = CR.routeClaim({ state: tree.state, signedIn: !!myEmail, isOwner, hasOpen: false, openHandover: !!open, openClaim });
     const reclaim = isOwner || !myEmail ? null : await (async () => {
       const st = await S.reclaimState(pool, fam, myEmail, now);
       return st.ok ? { until: new Date(st.until).toISOString() } : null;
@@ -71,7 +76,10 @@ module.exports = function mountSuccession(app, ctx) {
       can_confirm: !!open && open.kind === 'deceased' && open.stage === 'reported' && !!myEmail && await S.canConfirm(pool, fam.id, myEmail),
       can_back: !!open && open.kind === 'claim' && open.stage === 'backing' && member && !!myEmail && !alreadyBacked && open.claimant_email !== myEmail,
       can_object: !!open && open.kind === 'claim' && open.stage === 'objection' && member && !!myEmail && open.claimant_email !== myEmail,
-      can_claim: member && !open && !!myEmail && R.claimAllowed({ openHandover: null, chainCount: chain.length, lastBlocked: last?.status === 'blocked' }),
+      can_claim: member && !!myEmail && !route.block && (route.path === 'claim' || (route.path === 'succession' && !open && R.claimAllowed({ openHandover: null, chainCount: chain.length, lastBlocked: last?.status === 'blocked' }))),
+      family_state: tree.state,
+      claim_path: route.path,
+      claim_notice_days: route.path === 'claim' ? CR.NOTICE_MS / CR.DAY : undefined,
       can_cancel: isOwner && !!open,
       reclaim,
       owner_banner: isOwner && acceptedContacts === 0 && otherAdmins === 0,
@@ -149,11 +157,25 @@ module.exports = function mountSuccession(app, ctx) {
     const n = await S.cancelOpen(pool, fam.id, w.email, Date.now());
     res.json({ ok: true, cancelled: n });
   }));
+  // THE entry for "Xin nhận quyền Chủ họ". The family state picks the path: owned -> succession member claim (no
+  // evidence); unowned or abandoned -> the claim path (evidence required, 30-day notice, app-admin approval).
   app.post('/api/families/:ref/claim', SH(async (req, res) => {
     const fam = await famByRef(req); const w = await who(req, fam.id);
+    const now = Date.now();
+    const tree = await claims.stateOf(pool, fam.id, now);
+    const route = CR.routeClaim({ state: tree.state, signedIn: !!w.email, isOwner: w.role === 'owner', hasOpen: false,
+      openHandover: !!(await S.openHandover(pool, fam.id)),
+      openClaim: (await pool.query("select 1 from tree_claims where family_id=$1 and status='notice' and notice_until > now()", [fam.id])).rowCount > 0 });
+    if (route.block) throw new Refuse(409, route.block);
+    const path = route.path;
+    if (path === 'claim') {
+      if (!w.email || w.code) throw new Refuse(401, 'Cần đăng nhập bằng Google để nhận quyền.');
+      const out = await claims.openTreeClaim(fam, w, w.email, { evidence: String(req.body?.evidence || '').slice(0, CR.MAX_EVIDENCE + 1), name: w.name || '' });
+      return res.json({ ...out, path });
+    }
     if (!w.email || ROLE_RANK[w.role] < ROLE_RANK.member) throw new Refuse(403, 'Chỉ thành viên của dòng họ mới xin nhận quyền.');
-    const id = await S.startClaim(pool, fam, w.email, Date.now());
-    res.json({ ok: true, id });
+    const id = await S.startClaim(pool, fam, w.email, now);
+    res.json({ ok: true, id, path: 'succession' });
   }));
   app.post('/api/handover/:id/back', SH(async (req, res) => {
     const email = needGoogle(req);

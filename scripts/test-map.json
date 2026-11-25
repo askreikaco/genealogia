@@ -4,13 +4,15 @@
       "paths": [
         "server/claim-*.js",
         "server/test/claim*.test.js",
+        "server/test/ownership-claim*.test.js",
         "web/js/claim.js",
         "server/migrations/*_tree_claims.sql",
         "server/mail-templates.js"
       ],
       "e2e": [
         "test/e2e/claim-pages.test.js",
-        "test/e2e/nav-claim.test.js"
+        "test/e2e/nav-claim.test.js",
+        "test/e2e/ownership-claim.test.js"
       ]
     },
     "decisions": {

@@ -301,11 +301,11 @@ test('the reclaim window closes after 90 days (injected clock)', { skip }, async
 
 // ---- member claim ----
 test('no contacts, admins or editors: a member claims; members back it; the claimant becomes the owner', { skip }, async () => {
-  const fam = await newFamily('claim');
+  const fam = await newFamily('claim', { months: 6 });
   await member(fam, E('cl-owner'), 'owner', { approvedYearsAgo: 2 });
   for (const w of ['c-m1', 'c-m2', 'c-m3', 'c-m4']) await member(fam, E(w), 'member');
   for (const w of ['c-m1', 'c-m2', 'c-m3', 'c-m4']) cookies[w] = await sessionFor(E(w), w);
-  await setLastSeen(fam, addMonths(T0, -13));
+  await setLastSeen(fam, addMonths(T0, -7));
   await S.runEngine(pool, T0, { only: [fam.id] });
   await S.runEngine(pool, T0 + 14 * DAY + 60e3, { only: [fam.id] });
   assert.strictEqual((await reqRow(fam)).status, 'blocked', 'nobody to hand over to');
@@ -336,11 +336,11 @@ test('no contacts, admins or editors: a member claims; members back it; the clai
 });
 
 test('during the objection window a member objects and the claim stops; the owner refusing by signing in also stops it', { skip }, async () => {
-  const fam = await newFamily('objt');
+  const fam = await newFamily('objt', { months: 6 });
   await member(fam, E('ob-owner'), 'owner', { approvedYearsAgo: 2 });
   for (const w of ['ob-m1', 'ob-m2', 'ob-m3', 'ob-m4']) { await member(fam, E(w), 'member'); cookies[w] = await sessionFor(E(w), w); }
   cookies.obOwner = await sessionFor(E('ob-owner'), 'Chủ ob');
-  await setLastSeen(fam, addMonths(T0, -13));
+  await setLastSeen(fam, addMonths(T0, -7));
   await S.runEngine(pool, T0, { only: [fam.id] });
   await S.runEngine(pool, T0 + 14 * DAY + 60e3, { only: [fam.id] });
   assert.strictEqual((await reqRow(fam)).status, 'blocked');
@@ -358,10 +358,10 @@ test('during the objection window a member objects and the claim stops; the owne
   await S.runEngine(pool, Date.now() + 40 * DAY, { only: [fam.id] });
   assert.strictEqual((await ownerRow(fam)).email, E('ob-owner'), 'an objected claim never transfers');
   // a second claim, the owner signs in during the window: refused
-  const fam2 = await newFamily('objt2');
+  const fam2 = await newFamily('objt2', { months: 6 });
   await member(fam2, E('o2-owner'), 'owner', { approvedYearsAgo: 2 });
   for (const w of ['o2-m1', 'o2-m2', 'o2-m3', 'o2-m4']) { await member(fam2, E(w), 'member'); cookies[w] = await sessionFor(E(w), w); }
-  await setLastSeen(fam2, addMonths(T0, -13));
+  await setLastSeen(fam2, addMonths(T0, -7));
   await S.runEngine(pool, T0, { only: [fam2.id] });
   await S.runEngine(pool, T0 + 14 * DAY + 60e3, { only: [fam2.id] });
   const r2 = (await call('POST', `/api/families/${fam2.id}/claim`, {}, cookies['o2-m1'])).json.id;
@@ -375,8 +375,9 @@ test('during the objection window a member objects and the claim stops; the owne
 });
 
 test('the owner signing in refuses a claim', { skip }, async () => {
-  const fam = await newFamily('refuse');
+  const fam = await newFamily('refuse', { months: 6 });
   await member(fam, E('rf-owner'), 'owner', { approvedYearsAgo: 2 });
+  await setLastSeen(fam, addMonths(T0, -7)); // owned (inactive under a year): the succession path
   await member(fam, E('rf-m1'), 'member');
   cookies.rfOwner = await sessionFor(E('rf-owner'), 'Chủ rf');
   cookies.rfM1 = await sessionFor(E('rf-m1'), 'Thành viên rf');
@@ -388,8 +389,9 @@ test('the owner signing in refuses a claim', { skip }, async () => {
 });
 
 test('a claim window of 30 days ends blocked when nobody backs it', { skip }, async () => {
-  const fam = await newFamily('expire');
+  const fam = await newFamily('expire', { months: 6 });
   await member(fam, E('ex-owner'), 'owner', { approvedYearsAgo: 2 });
+  await setLastSeen(fam, addMonths(T0, -7)); // owned (inactive under a year): the succession path
   await member(fam, E('ex-m1'), 'member');
   await member(fam, E('ex-m2'), 'member');
   cookies.exM1 = await sessionFor(E('ex-m1'), 'ex1');

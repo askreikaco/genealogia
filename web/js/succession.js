@@ -5,6 +5,7 @@
 import { esc } from './model.js';
 import { toast, surnameTileOf, famShort } from './ui.js';
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger } from './danger.js';
+import { openClaimSheet } from './claim.js';
 
 const deps = { render: () => {}, S: null, dialog: null, confirm: null, googleUrl: () => '/api/auth/google', hashNext: () => '', visOpts: [] };
 const mainEl = () => document.querySelector('#main');
@@ -69,7 +70,8 @@ function actionRows(st) {
   if (st.can_cancel) out.push(`<button type="button" class="btn sm" data-succ="cancel">Tôi vẫn giữ quyền, hủy việc chuyển</button>`);
   if (st.can_object) out.push(`<button type="button" class="btn ter sm dng-t" data-succ="object" data-id="${h.id}">Phản đối việc nhận quyền</button>`);
   if (st.can_back) out.push(`<button type="button" class="btn sm" data-succ="back" data-id="${h.id}">Ủng hộ người xin nhận quyền</button>`);
-  if (st.can_claim) out.push(`<button type="button" class="btn ter sm" data-succ="claim">Xin nhận quyền Chủ họ</button>`);
+  // One entry, two paths (server: claim-rules.routeClaim). The one-liner says which one applies here.
+  if (st.can_claim) out.push(`${st.claim_path === 'claim' ? '<p class="sub">Dòng họ không còn Chủ họ đang hoạt động: nộp bằng chứng, công khai góp ý 30 ngày, rồi quản trị ứng dụng duyệt.</p>' : ''}<button type="button" class="btn ter sm" data-succ="claim">Xin nhận quyền Chủ họ</button>`);
   if (st.reclaim) out.push(`<button type="button" class="btn ter sm" data-succ="reclaim">Lấy lại quyền Chủ họ (đến ${esc(DAYS_VN(st.reclaim.until))})</button>`);
   return out.length ? `<div class="succ-acts">${out.join('')}</div>` : '';
 }
@@ -116,7 +118,11 @@ async function act(fam, kind, id) {
   if (kind === 'remove') return confirmDanger({ title: 'Bỏ người này khỏi danh sách tin cậy?', lose: 'Người này không còn được hỏi khi có việc chuyển quyền.', restore: 'Có thể mời lại sau.', confirm: 'Bỏ khỏi danh sách', onConfirm: () => go(`trusted/${Number(id)}/remove`, 'Đã bỏ') });
   if (kind === 'cancel') return go('handover/cancel', 'Đã hủy việc chuyển quyền');
   if (kind === 'object') return api('POST', `/api/handover/${Number(id)}/object`).then(() => { drop(fam); toast('Đã ghi nhận phản đối. Việc nhận quyền dừng lại.'); });
-  if (kind === 'claim') return deps.confirm('Xin nhận quyền Chủ họ?', 'Chỉ làm được khi dòng họ không còn ai để trao quyền. Các thành viên khác sẽ được hỏi ủng hộ. Trong 30 ngày, Chủ họ có thể đăng nhập để từ chối.', 'Xin nhận quyền', () => go('claim', 'Đã gửi yêu cầu nhận quyền'));
+  if (kind === 'claim') {
+    const st = await succState(fam, { fresh: true });
+    if (st.claim_path === 'claim') return openClaimSheet(fam); // unowned or abandoned: evidence + notice + approval
+    return deps.confirm('Xin nhận quyền Chủ họ?', 'Chỉ làm được khi dòng họ không còn ai để trao quyền. Các thành viên khác sẽ được hỏi ủng hộ. Trong 30 ngày, Chủ họ có thể đăng nhập để từ chối.', 'Xin nhận quyền', () => go('claim', 'Đã gửi yêu cầu nhận quyền'));
+  }
   if (kind === 'back') return api('POST', `/api/handover/${Number(id)}/back`).then((r) => { drop(fam); toast(r.owner ? 'Đủ người ủng hộ. Quyền Chủ họ đã chuyển.' : `Đã ủng hộ (${r.backers})`); });
   if (kind === 'confirm') return deps.confirm('Xác nhận Chủ họ đã mất?', 'Dòng họ sẽ bắt đầu thời hạn 14 ngày. Trong thời hạn đó, Chủ họ có thể đăng nhập để hủy.', 'Xác nhận', () => api('POST', `/api/handover/${Number(id)}/confirm`).then(() => { drop(fam); toast('Đã xác nhận'); }));
   if (kind === 'reclaim') return deps.confirm('Lấy lại quyền Chủ họ?', 'Chủ họ hiện tại sẽ thành Quản trị.', 'Lấy lại', () => api('POST', `/api/families/${enc(fam)}/reclaim`).then(async () => { drop(fam); await deps.S.refreshMe(); toast('Bạn đã là Chủ họ'); }));

@@ -30,13 +30,30 @@ function treeState(owners, nowMs) {
 }
 const claimable = (state) => state === 'unowned' || state === 'abandoned';
 
-// Why a signed-in person cannot open a claim now, or null. ctx: { state, signedIn, isMember, hasOpen }.
-function claimBlock({ state, signedIn, isMember, hasOpen }) {
+// Why a signed-in person cannot open a claim now, or null. ctx: { state, signedIn, isOwner, hasOpen }.
+// Members may claim an unowned or abandoned tree (they are the natural successors); an active owner may not.
+function claimBlock({ state, signedIn, isOwner, hasOpen }) {
   if (!signedIn) return 'Cần đăng nhập bằng Google để nhận quản lý.';
-  if (isMember) return 'Bạn đã là thành viên của cây này.';
+  if (isOwner) return 'Bạn đã là Chủ họ của cây này.';
   if (!claimable(state)) return 'Cây này đã có Chủ họ đang quản lý.';
   if (hasOpen) return 'Bạn đã có đơn đang chờ góp ý cho cây này.';
   return null;
+}
+
+// The ONE entry for "Xin nhận quyền Chủ họ": which path applies to this family now.
+//   owned (some owner active)                           -> 'succession' (members back it, 30-day window, owner may refuse)
+//   unowned / abandoned (all inactive 1 y or deceased)  -> 'claim' (evidence, 30-day notice, app-admin approval)
+// No double claims: one person holds one open claim per tree; an open handover blocks both paths. Claims are
+// non-exclusive (a board): a second person may claim a claimable tree while another claim waits.
+// ctx: { state, signedIn, isOwner, hasOpen (this person has an open claim), openHandover, openClaim }.
+function routeClaim({ state, signedIn, isOwner, hasOpen, openHandover, openClaim }) {
+  if (!signedIn) return { path: null, block: 'Cần đăng nhập bằng Google để nhận quyền.' };
+  if (hasOpen) return { path: null, block: 'Bạn đã có đơn đang chờ góp ý cho cây này.' };
+  if (isOwner) return { path: null, block: 'Bạn đã là Chủ họ của cây này.' };
+  if (openHandover) return { path: null, block: 'Dòng họ đang có một việc chuyển quyền.' };
+  if (claimable(state)) return { path: 'claim', block: null };
+  if (openClaim) return { path: null, block: 'Dòng họ đang có đơn nhận quản lý chờ góp ý.' };
+  return { path: 'succession', block: null };
 }
 
 // Evidence: text (kept short) or a file, at least one. file: { type, bytes } or null.
@@ -98,4 +115,4 @@ function ownerFacts({ person_data, deceased_email, email, last_seen_at, approved
 
 module.exports = { DAY, NOTICE_MS, INACTIVE_MS, MAX_FILE_BYTES, FILE_TYPES, MAX_EVIDENCE, norm, isSystemEmail, appAdmins,
   isAppAdmin, treeState, claimable, claimBlock, evidenceBlock, noticeUntil, publicNotice, approveBlock, rejectBlock,
-  withdrawBlock, approvalChange, canDecideLink, ownerFacts };
+  withdrawBlock, approvalChange, canDecideLink, ownerFacts, routeClaim };

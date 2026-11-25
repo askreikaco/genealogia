@@ -1407,10 +1407,10 @@ app.post('/api/families/:ref/leave', H(async (req, res) => {
   res.json({ ok: true });
 }));
 // Succession: trusted contacts, inactivity, death reports, claims, offers, reclaim, create a family (succession-routes.js).
-mountSuccession(app, { pool, who, readSession, findFamily, canRead, ROLE_RANK });
+const claimApi = require('./claim-routes').mount(app, { pool, who, famOf, canRead, H, HttpError, readSession, mail, T, publicUrl: mail.publicUrl }); // Nhận quản lý (claim-routes.js)
+mountSuccession(app, { pool, who, readSession, findFamily, canRead, ROLE_RANK, claims: claimApi });
 // "Same person" links between family trees (links-routes.js).
 const linksApi = mountLinks(app, { pool, who, famOf, findFamily, canRead, H, HttpError, readSession });
-require('./claim-routes').mount(app, { pool, who, famOf, canRead, H, HttpError, readSession, mail, T, publicUrl: mail.publicUrl }); // Nhận quản lý (claim-routes.js)
 // "Có thể là cùng một người" suggestions (match-routes.js; computed by scripts/match-run.js): a suggested link goes
 // through the same proposal as a hand-made one.
 mountMatch(app, { pool, who, famOf, findFamily, canRead, H, HttpError, propose: linksApi.propose });

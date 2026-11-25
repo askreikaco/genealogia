@@ -56,12 +56,13 @@ test('ownerFacts: deceased from the person record or the handover, baseline last
 });
 
 test('claim is non-exclusive: many can be open, one per person; members and signed-out people are refused', () => {
-  const base = { state: 'unowned', signedIn: true, isMember: false, hasOpen: false };
+  const base = { state: 'unowned', signedIn: true, isOwner: false, hasOpen: false };
   assert.equal(C.claimBlock(base), null);
   assert.equal(C.claimBlock({ ...base, state: 'abandoned' }), null, 'abandoned trees can be claimed too');
   assert.match(C.claimBlock({ ...base, hasOpen: true }), /đã có đơn/);
   assert.match(C.claimBlock({ ...base, state: 'owned' }), /đã có Chủ họ/);
-  assert.match(C.claimBlock({ ...base, isMember: true }), /thành viên/);
+  assert.equal(C.claimBlock({ ...base, isOwner: false }), null, 'a member of a claimable tree may claim it');
+  assert.match(C.claimBlock({ ...base, isOwner: true }), /Chủ họ của cây/);
   assert.match(C.claimBlock({ ...base, signedIn: false }), /đăng nhập/);
 });
 

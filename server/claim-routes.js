@@ -43,13 +43,48 @@ function mount(app, d) {
       .map((r) => ({ ...r, notice_until: Number(r.notice_until) }));
     const mine = emailOf(req) ? (await pool.query(`select id, (extract(epoch from notice_until) * 1000)::float8 as until from tree_claims
       where family_id = $1 and claimant_email = $2 and status = 'notice'`, [f.id, emailOf(req)])).rows[0] : null;
-    const block = CR.claimBlock({ state: st.state, signedIn: !!emailOf(req) && !w.code, isMember: w.status === 'active', hasOpen: !!mine });
+    const block = CR.claimBlock({ state: st.state, signedIn: !!emailOf(req) && !w.code, isOwner: w.role === 'owner', hasOpen: !!mine });
     const notice = CR.publicNotice(open, nowMs);
     res.json({ state: st.state, owners: st.owners, can_claim: !block, block, notice,
       my_claim: mine ? { id: Number(mine.id), notice_until: Number(mine.until) } : null, days: CR.NOTICE_MS / CR.DAY });
   }));
 
-  // Open a claim: evidence (text and/or one small file). An abandoned tree also e-mails its owners.
+  // Open a claim (one path for both entries: POST /api/claims and the routed POST /api/families/:ref/claim).
+  // Evidence: text and/or one small file. Refused while a handover or another open claim is on the family.
+  async function openTreeClaim(f, w, email, { evidence = '', file = null, name = '' } = {}) {
+    const bad = CR.evidenceBlock({ evidence, file });
+    if (bad) throw new HttpError(400, bad);
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      await client.query('select id from families where id = $1 for update', [f.id]);
+      const nowMs = Date.now();
+      const st = await stateOf(client, f.id, nowMs);
+      const hasOpen = (await client.query("select 1 from tree_claims where family_id = $1 and claimant_email = $2 and status = 'notice'", [f.id, email || ''])).rowCount > 0;
+      const openHandover = (await client.query("select 1 from handover_requests where family_id = $1 and status = 'open'", [f.id])).rowCount > 0;
+      const openClaim = (await client.query("select 1 from tree_claims where family_id = $1 and status = 'notice' and notice_until > now()", [f.id])).rowCount > 0;
+      const r = CR.routeClaim({ state: st.state, signedIn: !!email && !w.code, isOwner: w.role === 'owner', hasOpen, openHandover, openClaim });
+      if (r.block) throw new HttpError(409, r.block);
+      if (r.path !== 'claim') throw new HttpError(409, 'Dòng họ này có Chủ họ đang quản lý: việc nhận quyền đi theo quy trình chuyển quyền.');
+      const who = (name || w.name || email || '').slice(0, 120);
+      const ins = await client.query(`insert into tree_claims (family_id, claimant_email, claimant_name, evidence, abandoned, notice_until)
+        values ($1,$2,$3,$4,$5, now() + interval '30 days') returning id, (extract(epoch from notice_until) * 1000)::float8 as until`,
+        [f.id, email, who, String(evidence || '').trim(), st.state === 'abandoned']);
+      const id = Number(ins.rows[0].id); const until = Number(ins.rows[0].until);
+      if (file) await client.query('insert into tree_claim_files (claim_id, name, mime, size, data) values ($1,$2,$3,$4,$5)', [id, file.name, file.type, file.bytes, file.buf]);
+      await histRow(client, f.id, 'quan_ly', null, `mở đơn: ${who}${st.state === 'abandoned' ? ' (cây bỏ trống)' : ''}`, email);
+      await client.query('commit');
+      if (st.state === 'abandoned') {
+        const owners = await ownerEmails(pool, f.id);
+        const m = T.treeClaimOpened({ family: f.name, claimant: who, abandoned: true, until, url: `${publicUrl()}/#/${f.slug}/tree` });
+        for (const o of owners) {
+          await pool.query('insert into notices (email, family_id, kind, body) values ($1,$2,$3,$4)', [o, f.id, 'claim', m.subject]);
+          await mail.send(pool, { familyId: f.id, kind: 'tree_claim', to: o, subject: m.subject, html: m.html, text: m.text }).catch(() => {});
+        }
+      }
+      return { ok: true, id, notice_until: until, abandoned: st.state === 'abandoned' };
+    } catch (e) { await client.query('rollback').catch(() => {}); throw e; } finally { client.release(); }
+  }
   app.post('/api/claims', H(async (req, res) => {
     const f = await famOf(req); const w = await who(req, f.id);
     const email = emailOf(req);
@@ -60,35 +95,7 @@ function mount(app, d) {
       file = { name: String(b.file.name || 'tep').slice(0, 120), type: String(b.file.type || ''), bytes: buf.length, buf };
     }
     const evidence = String(b.evidence || '').slice(0, CR.MAX_EVIDENCE + 1);
-    const bad = CR.evidenceBlock({ evidence, file });
-    if (bad) throw new HttpError(400, bad);
-    const client = await pool.connect();
-    try {
-      await client.query('begin');
-      await client.query('select id from families where id = $1 for update', [f.id]);
-      const nowMs = Date.now();
-      const st = await stateOf(client, f.id, nowMs);
-      const hasOpen = (await client.query("select 1 from tree_claims where family_id = $1 and claimant_email = $2 and status = 'notice'", [f.id, email || ''])).rowCount > 0;
-      const block = CR.claimBlock({ state: st.state, signedIn: !!email && !w.code, isMember: w.status === 'active', hasOpen });
-      if (block) throw new HttpError(409, block);
-      const name = (w.name || readSession(req)?.name || email).slice(0, 120);
-      const ins = await client.query(`insert into tree_claims (family_id, claimant_email, claimant_name, evidence, abandoned, notice_until)
-        values ($1,$2,$3,$4,$5, now() + interval '30 days') returning id, (extract(epoch from notice_until) * 1000)::float8 as until`,
-        [f.id, email, name, String(evidence || '').trim(), st.state === 'abandoned']);
-      const id = Number(ins.rows[0].id); const until = Number(ins.rows[0].until);
-      if (file) await client.query('insert into tree_claim_files (claim_id, name, mime, size, data) values ($1,$2,$3,$4,$5)', [id, file.name, file.type, file.bytes, file.buf]);
-      await histRow(client, f.id, 'quan_ly', null, `mở đơn: ${name}${st.state === 'abandoned' ? ' (cây bỏ trống)' : ''}`, email);
-      await client.query('commit');
-      if (st.state === 'abandoned') {
-        const owners = await ownerEmails(pool, f.id);
-        const m = T.treeClaimOpened({ family: f.name, claimant: name, abandoned: true, until, url: `${publicUrl()}/#/${f.slug}/tree` });
-        for (const o of owners) {
-          await pool.query('insert into notices (email, family_id, kind, body) values ($1,$2,$3,$4)', [o, f.id, 'claim', m.subject]);
-          await mail.send(pool, { familyId: f.id, kind: 'tree_claim', to: o, subject: m.subject, html: m.html, text: m.text }).catch(() => {});
-        }
-      }
-      res.json({ ok: true, id, notice_until: until, abandoned: st.state === 'abandoned' });
-    } catch (e) { await client.query('rollback').catch(() => {}); throw e; } finally { client.release(); }
+    res.json(await openTreeClaim(f, w, email, { evidence, file, name: readSession(req)?.name || '' }));
   }));
 
   // The claimant withdraws an open claim.
@@ -196,7 +203,7 @@ function mount(app, d) {
     } catch (e) { await client.query('rollback').catch(() => {}); throw e; } finally { client.release(); }
   }));
 
-  return { stateOf, ownersOf, requireAdmin };
+  return { stateOf, ownersOf, requireAdmin, openTreeClaim };
 }
 
 module.exports = { mount };
