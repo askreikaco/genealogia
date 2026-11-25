@@ -4,6 +4,7 @@
 // profile simply shows no link line. Owner/admin of both trees -> accepted at once; otherwise pending for the other tree.
 import { esc } from './model.js';
 import { toast } from './ui.js';
+import { personItem } from './person-item.js';
 
 const cache = new Map(); // family -> { at, items, byPerson: Map(personId -> link[]) }
 const loading = new Map();
@@ -77,7 +78,7 @@ export function openSheet({ fam, personId, personName, families, done }) {
     if (q.length < 2) { res.innerHTML = ''; return; }
     try {
       const j = await getJson(`/api/links/search?family=${encodeURIComponent(f.fam.value)}&q=${encodeURIComponent(q)}`);
-      res.innerHTML = j.items.map((p) => `<button type="button" class="calm dense" role="option" data-pick="${esc(p.id)}"><span class="calm-t"><b class="calm-n">${esc(p.name)}</b><span class="calm-s">${esc([p.years, p.gen ? 'Đời ' + p.gen : ''].filter(Boolean).join(' · '))}</span></span></button>`).join('') || '<p class="sub">Không thấy ai khớp.</p>';
+      res.innerHTML = j.items.map((p) => personItem({ name: p.name }, { attrs: `role="option" data-pick="${esc(p.id)}"`, tile: false, dense: true, sub: esc([p.years, p.gen ? 'Đời ' + p.gen : ''].filter(Boolean).join(' · ')) })).join('') || '<p class="sub">Không thấy ai khớp.</p>';
     } catch (e) { res.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
   };
   f.q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(search, 250); });

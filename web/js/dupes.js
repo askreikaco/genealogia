@@ -3,7 +3,7 @@
 // the compare sheet: the two records side by side, one choice per field, a reason. The merge is then a family vote
 // (Biểu quyết): nothing moves until it passes; the merged-away person goes to the Thùng rác and can be restored there.
 import { esc } from './model.js';
-import { toast, cic } from './ui.js';
+import { toast, cic, tag } from './ui.js';
 
 const q = (fam) => `family=${encodeURIComponent(fam)}`;
 async function api(method, url, body) {
@@ -30,7 +30,7 @@ export async function reviewSection(main, before, fams) {
     <p class="sub">Hai hồ sơ có thể là cùng một người. Gộp cần biểu quyết của dòng họ; hồ sơ bị gộp vào Thùng rác và khôi phục được.</p>
     ${rows.map((s) => `<div class="rv dp-row" data-dp-row="${s.id}">
       <p>${who(s.a.name, s.a.years)} <span aria-hidden="true">⇄</span><span class="vh">và</span> ${who(s.b.name, s.b.years)}</p>
-      <p class="sub dp-why"><span class="tag gray sm">khớp ${Math.round(s.score * 100)}%</span> ${s.reasons.map(esc).join(' · ')}</p>
+      <p class="sub dp-why">${tag(`khớp ${Math.round(s.score * 100)}%`, { tone: 'gray', sm: true })} ${s.reasons.map(esc).join(' · ')}</p>
       ${s.pending ? '<p class="sub dp-why"><span class="tag sm">Đang biểu quyết</span> Đề nghị gộp hai hồ sơ này đang chờ dòng họ.</p>' : `<div class="row end"><button type="button" class="btn ter sm" data-dp="dismiss" data-id="${s.id}" data-fam="${esc(s.f)}">Không phải</button>
         <button type="button" class="btn sm" data-dp="compare" data-keep="${esc(s.a.id)}" data-drop="${esc(s.b.id)}" data-fam="${esc(s.f)}">So sánh và gộp</button></div>`}</div>`).join('')}</section>` : '';
   box.onclick = async (e) => {
@@ -45,7 +45,10 @@ export async function reviewSection(main, before, fams) {
   };
 }
 
-// The compare sheet. keep/drop: which record stays. Swapping the two redraws it from the server's preview.
+// The compare sheet. keep/drop: the two records as the list shows them; the server keeps the older profile whatever
+// the order, so the sheet is drawn from the preview's keep (the older one). Per field: a conflict (both set, different)
+// gets a choice (default: the older one's value); a field set on one side only is filled in and shown as text; equal
+// fields are counted in one line. Nothing to choose -> only the summary and the primary action.
 export async function openCompare(fam, keep, drop, onDone) {
   document.querySelectorAll('dialog.dp-cmp').forEach((x) => { x.close(); x.remove(); });
   const d = document.createElement('dialog'); d.className = 'fpanel dp-cmp'; d.setAttribute('aria-labelledby', 'dp-h');
@@ -53,30 +56,30 @@ export async function openCompare(fam, keep, drop, onDone) {
   document.body.appendChild(d);
   d.addEventListener('close', () => d.remove());
   d.showModal();
-  const load = async (k, dr) => {
-    const pv = await api('GET', `/api/merge/preview?${q(fam)}&keep=${encodeURIComponent(k)}&drop=${encodeURIComponent(dr)}`);
+  const label = Object.fromEntries(FIELDS);
+  const shown = (f) => label[f] && !REL.includes(f);
+  const load = async () => {
+    const pv = await api('GET', `/api/merge/preview?${q(fam)}&keep=${encodeURIComponent(keep)}&drop=${encodeURIComponent(drop)}`);
     const body = d.querySelector('#dpbody');
-    const fields = FIELDS.filter(([f]) => !REL.includes(f) && (pv.keep.data[f] != null || pv.drop.data[f] != null));
-    const rowsHtml = fields.map(([f, label]) => {
+    const conflicts = pv.fields.conflicts.filter(shown);
+    const filled = pv.fields.filled.filter((x) => shown(x.field));
+    const same = pv.fields.same.filter(shown);
+    const conflictHtml = conflicts.map((f) => {
       const a = show(f, pv.keep.data[f]); const b = show(f, pv.drop.data[f]);
-      const same = a === b;
       const def = pv.defaults[f] || 'keep';
-      const only = !same && !b; // the other record has no value: show ours, no radio
-      return `<div class="frow dp-field" data-f="${esc(f)}" data-only="${only ? 'keep' : ''}"><b class="dp-label">${esc(label)}</b>
-        ${same ? `<p class="sub">${esc(a || '—')} <span class="tag gray sm">giống nhau</span></p>` : only ? `<p class="sub">${esc(a)}</p>` : `<div class="dp-pick" role="radiogroup" aria-label="${esc(label)}">
+      return `<div class="frow dp-field" data-f="${esc(f)}"><b class="dp-label">${esc(label[f])}</b>
+        <div class="dp-pick" role="radiogroup" aria-label="${esc(label[f])}">
           <label class="radio dp-opt"><input type="radio" name="c-${esc(f)}" value="keep" ${def === 'keep' ? 'checked' : ''}> <span>Giữ: ${esc(a || '—')}</span></label>
-          <label class="radio dp-opt"><input type="radio" name="c-${esc(f)}" value="drop" ${def === 'drop' ? 'checked' : ''}> <span>Lấy từ hồ sơ kia: ${esc(b || '—')}</span></label></div>`}
-      </div>`;
+          <label class="radio dp-opt"><input type="radio" name="c-${esc(f)}" value="drop" ${def === 'drop' ? 'checked' : ''}> <span>Lấy từ hồ sơ kia: ${esc(b || '—')}</span></label></div></div>`;
     }).join('');
-    body.innerHTML = `<div class="dp-keep" role="radiogroup" aria-label="Hồ sơ giữ lại">
-        <p class="sub">Hồ sơ giữ lại:</p>
-        <label class="radio dp-opt"><input type="radio" name="keepwho" value="${esc(pv.keep.id)}" checked> <span>${who(pv.keep.name)}</span></label>
-        <label class="radio dp-opt"><input type="radio" name="keepwho" value="${esc(pv.drop.id)}"> <span>${who(pv.drop.name)}</span></label></div>
-      <div class="fdiff">${rowsHtml || '<p class="sub">Không có trường nào khác nhau.</p>'}</div>
+    const fillHtml = filled.length ? `<p class="sub dp-fill">Bổ sung: ${filled.map((x) => `${esc(label[x.field])} ${esc(show(x.field, pv[x.from].data[x.field]))}`).join(' · ')}</p>` : '';
+    const sameHtml = same.length ? `<p class="sub dp-same">${same.length} trường giống nhau.</p>` : '';
+    body.innerHTML = `<p class="sub">Hồ sơ giữ lại (cũ hơn): ${who(pv.keep.name)}. ${who(pv.drop.name)} sẽ được gộp vào đó.</p>
+      ${conflicts.length ? `<div class="fdiff"><p class="sub">Khác nhau, cần chọn:</p>${conflictHtml}</div>` : ''}
+      ${fillHtml}${sameHtml}
       <p class="sub">Hồ sơ còn lại sẽ vào Thùng rác, kèm quan hệ, sự kiện và câu chuyện được chuyển sang hồ sơ giữ lại. Việc này cần biểu quyết trong ${pv.days} ngày.</p>
       <label class="fld dp-reason">Lý do gộp<textarea id="dpwhy" rows="2" maxlength="500" placeholder="Ví dụ: cùng một người, đã đối chiếu giấy khai sinh"></textarea></label>
       <p class="dp-err sub" id="dperr" role="alert"></p>`;
-    body.querySelectorAll('input[name=keepwho]').forEach((r) => { r.onchange = () => { const other = r.value === pv.keep.id ? pv.drop.id : pv.keep.id; load(r.value, other); }; });
     const foot = d.querySelector('#dpfoot'); if (foot) foot.remove();
     const f2 = document.createElement('div'); f2.id = 'dpfoot'; f2.className = 'fp-foot';
     f2.innerHTML = pv.can_propose ? `<button type="button" class="btn" id="dpgo">Đề nghị gộp</button>` : '<p class="sub">Chưa có Chủ họ hoặc Quản trị để biểu quyết.</p>';
@@ -85,7 +88,7 @@ export async function openCompare(fam, keep, drop, onDone) {
     if (go) go.onclick = async () => {
       const reason = body.querySelector('#dpwhy').value.trim();
       const choices = {};
-      body.querySelectorAll('.dp-field').forEach((row) => { const c = row.querySelector('input:checked'); const v = c ? c.value : row.dataset.only; if (v) choices[row.dataset.f] = v; });
+      body.querySelectorAll('.dp-field').forEach((row) => { const c = row.querySelector('input:checked'); if (c) choices[row.dataset.f] = c.value; });
       if (reason.length < 3) { body.querySelector('#dperr').textContent = 'Cần ghi lý do gộp.'; return; }
       go.disabled = true;
       try {
@@ -95,5 +98,5 @@ export async function openCompare(fam, keep, drop, onDone) {
       } catch (x) { go.disabled = false; body.querySelector('#dperr').textContent = x.message; }
     };
   };
-  try { await load(keep, drop); } catch (x) { d.querySelector('#dpbody').innerHTML = `<p class="sub">${esc(x.message)}</p>`; }
+  try { await load(); } catch (x) { d.querySelector('#dpbody').innerHTML = `<p class="sub">${esc(x.message)}</p>`; }
 }

@@ -5,7 +5,8 @@ const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
 const { Pool } = require('pg');
-const { FIELDS, publicView, validateOp, validateValue, mergeOp, DELETE } = require('./core');
+const { FIELDS, publicView, withContacts, validateOp, validateValue, mergeOp, DELETE } = require('./core');
+const SR = require('./surname-rules');
 const REL = require('./relations');
 const { RelError, readRel, withRel, applyRelOp, isTable, LEGACY } = REL;
 const succession = require('./succession');
@@ -487,7 +488,7 @@ app.get('/api/persons', H(async (req, res) => {
       'select id, data, version, deleted, short_id from persons where family_id = $1 and version > $2 order by version limit 5000', [f.id, since]));
   }
   const rel = await readRel(pool, f.id, full);
-  const items = (await withRel(rel, rows, full)).map((r) => ({ id: r.id, v: Number(r.version), deleted: r.deleted, data: r.deleted ? null : withSid(full ? r.data : publicView(r.data, { flag: true }), r.short_id) }));
+  const items = (await withRel(rel, rows, full)).map((r) => ({ id: r.id, v: Number(r.version), deleted: r.deleted, data: r.deleted ? null : withSid(full ? withContacts(r.data) : publicView(r.data, { flag: true }), r.short_id) }));
   const next_since = items.length ? items[items.length - 1].v : since;
   res.set('Cache-Control', 'no-store');
   // rel: the family's relations as the viewer may see them; source 'legacy' = derived from the person fields (no backfill yet)
@@ -534,7 +535,7 @@ app.get('/api/book/outline', H(async (req, res) => {
     for (const r of stRows) { if (!stOf.has(r.person_id)) stOf.set(r.person_id, []); stOf.get(r.person_id).push(r); }
     const all = (await withRel(rel, rows, full)).filter((r) => !r.deleted && r.data).map((r) => {
       const seen = R.canSeeEventsOf(r.data, { member: full, familyReadable: true });
-      return { id: r.id, data: withSid(full ? r.data : publicView(r.data), r.short_id), st: seen ? (stOf.get(r.id) || []).map((s) => ({ kind: s.kind, title: s.title, body: s.body })) : [] };
+      return { id: r.id, data: withSid(full ? withContacts(r.data) : publicView(r.data), r.short_id), st: seen ? (stOf.get(r.id) || []).map((s) => ({ kind: s.kind, title: s.title, body: s.body })) : [] };
     });
     const bm = lib.bookModel(all, { founder_person_id: f.founder_person_id || null });
     plan = lib.planBook(bm, opts);
@@ -1213,11 +1214,20 @@ const fuzzy = async () => fuzzyMod || (fuzzyMod = await import(require('url').pa
 // One family as the API shows it. $1 = the signed-in email (or null): my_role is that account's active role here.
 const FAM_SELECT = `select f.id, f.slug, f.name, f.han, f.place, f.color, f.visibility, f.updated_at,
     f.short_name, f.founder_person_id, f.origin_place, f.branch_gen, f.branch_order, f.country,
+    f.origin_surname, f.origin_surname_han, f.origin_year, f.origin_reason, f.origin_visibility,
     (select count(*)::int from persons p where p.family_id = f.id and not p.deleted) as people,
     (select count(distinct p.data->>'gen')::int from persons p where p.family_id = f.id and not p.deleted and p.data ? 'gen') as generations,
     (select m.role from members m where m.family_id = f.id and m.email = $1 and m.status = 'active') as my_role
   from families f`;
-const famView = (r) => ({ ...r, my_role: r.my_role || null, is_member: !!r.my_role });
+const famView = (r) => originGate({ ...r, my_role: r.my_role || null, is_member: !!r.my_role }, r.my_role || null);
+// Họ gốc (origin_*) only for the viewers its visibility allows: all | members | editors (surname-rules.js). Hidden
+// fields are removed, never sent as null, so a hidden origin cannot be read from the response.
+const ORIGIN_KEYS = ['origin_surname', 'origin_surname_han', 'origin_year', 'origin_reason'];
+function originGate(r, role) {
+  if (SR.originVisibleTo(r.origin_visibility, role)) return r;
+  const out = { ...r }; for (const k of ORIGIN_KEYS) delete out[k];
+  return out;
+}
 
 // Search: public families whose name, place or Hán match every query token (fuzzy, see web/js/fuzzy.js),
 // plus every family the account belongs to (matched or not). Link and private families only when a member.
@@ -1231,7 +1241,9 @@ app.get('/api/families', H(async (req, res) => {
     if (r.my_role) return true; // members always see their families
     if (r.visibility !== 'public') return false; // link: by slug only; private: members only
     if (!qt.length) return true;
-    const hay = [...fz.tokens(r.name), ...fz.tokens(r.place), ...fz.tokens(r.han), ...fz.tokens(r.short_name), ...fz.tokens(r.origin_place)];
+    // the họ gốc is searchable only where its visibility lets this viewer see it
+    const origin = SR.originVisibleTo(r.origin_visibility, r.my_role) ? [r.origin_surname, r.origin_surname_han] : [];
+    const hay = [...fz.tokens(r.name), ...fz.tokens(r.place), ...fz.tokens(r.han), ...fz.tokens(r.short_name), ...fz.tokens(r.origin_place), ...origin.flatMap((x) => fz.tokens(x))];
     return qt.every((t) => hay.some((h) => fz.tokenScore(t, h) > 0));
   });
   const em = await emblemFlags();
@@ -1247,7 +1259,8 @@ app.get('/api/families/:ref', H(async (req, res) => {
   const { rows } = await pool.query(`${FAM_SELECT} where f.id = $2`, [w.email, f.id]);
   res.set('Cache-Control', 'no-store');
   const em = (await emblemFlags(f.id)).get(f.id) || { has_emblem: false, emblem_v: 0 };
-  res.json({ ...famView({ ...rows[0], ...em }), my_role: w.code ? 'admin' : (w.role === 'guest' ? null : w.role) });
+  const myRole = w.code ? 'admin' : (w.role === 'guest' ? null : w.role);
+  res.json({ ...famView({ ...rows[0], ...em, my_role: myRole }), my_role: myRole });
 }));
 // Owner or admin of that family: name, han, place, visibility, and the clan fields (short name, founder, quê gốc,
 // branch generation, manual branch order; migrations/018). Anyone else: 403 (401 when not signed in).
@@ -1267,6 +1280,16 @@ app.patch('/api/families/:ref', H(async (req, res) => {
   if (b.visibility !== undefined) { if (!FAM_VIS.includes(b.visibility)) throw new HttpError(400, 'Quyền xem không hợp lệ.'); set.visibility = b.visibility; }
   if (b.short_name !== undefined) set.short_name = str(b.short_name, 60) || null;
   if (b.origin_place !== undefined) set.origin_place = str(b.origin_place, 120) || null;
+  // Họ gốc (surname-rules.js): the family's original surname, its Hán, the year of the change, why, and who sees it.
+  if (b.origin_surname !== undefined) set.origin_surname = str(b.origin_surname, 40) || null;
+  if (b.origin_surname_han !== undefined) {
+    const h = str(b.origin_surname_han, 40);
+    if (h && !/^[\p{Script=Han}\s]+$/u.test(h)) throw new HttpError(400, 'Chữ Hán của họ gốc chỉ gồm chữ Hán và dấu cách.');
+    set.origin_surname_han = h || null;
+  }
+  if (b.origin_year !== undefined) set.origin_year = str(b.origin_year, 20) || null;
+  if (b.origin_reason !== undefined) set.origin_reason = str(b.origin_reason, 200) || null;
+  if (b.origin_visibility !== undefined) { if (!['all', 'members', 'editors'].includes(b.origin_visibility)) throw new HttpError(400, 'Quyền xem họ gốc không hợp lệ.'); set.origin_visibility = b.origin_visibility; }
   if (b.country !== undefined) { const c = String(b.country || '').trim().toUpperCase(); if (c && !/^[A-Z]{2}$/.test(c)) throw new HttpError(400, 'Quốc gia không hợp lệ.'); set.country = c || null; }
   if (b.branch_gen !== undefined) { if (b.branch_gen === null || b.branch_gen === '') set.branch_gen = null; else { const g = Number(b.branch_gen); if (!Number.isInteger(g) || g < 1 || g > 30) throw new HttpError(400, 'Đời của chi không hợp lệ (1–30).'); set.branch_gen = g; } }
   if (b.branch_order !== undefined) {

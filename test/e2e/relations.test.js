@@ -103,10 +103,10 @@ test('add spouse #3 (step 1-3, new person) shows in the profile in order; a seco
     await page.locator('#rel-q').fill('Đoàn Thị Thu');
     // "Tạo người mới" opens the person form, prefilled (wife: sex opposite); the relation sheet follows the save
     await page.locator('button[data-newp]').click();
-    await page.waitForSelector('input[name=name]');
-    assert.equal(await page.locator('input[name=sex][value="f"]').isChecked(), true, 'prefilled sex');
-    await page.locator('input[name=name]').fill('Đoàn Thị Thu');
-    await page.locator('.fp-bar button[type=submit]').click();
+    await page.waitForSelector('#add-f input[name=name]');
+    assert.equal(await page.locator('#add-f select[name=sex]').inputValue(), 'f', 'prefilled sex');
+    await page.locator('#add-f input[name=name]').fill('Đoàn Thị Thu');
+    await page.locator('#add-f button[type=submit]').click();
     await page.waitForSelector('.rel-sheet #ys', { timeout: 8000 });
     await page.locator('button[data-kind="cuoi"]').click();
     await page.locator('#ys').fill('1995'); await page.locator('#ord').fill('3');
@@ -122,10 +122,10 @@ test('add spouse #3 (step 1-3, new person) shows in the profile in order; a seco
     await addFlow(page, 'P003', 'child');
     await page.locator('#rel-q').fill('Vương Thị Quý');
     await page.locator('button[data-newp]').click();
-    await page.waitForSelector('input[name=name]');
-    await page.locator('input[name=name]').fill('Vương Thị Quý');
-    await page.locator('input[name=sex][value="m"]').check();
-    await page.locator('.fp-bar button[type=submit]').click();
+    await page.waitForSelector('#add-f input[name=name]');
+    await page.locator('#add-f input[name=name]').fill('Vương Thị Quý');
+    await page.locator('#add-f select[name=sex]').selectOption('m');
+    await page.locator('#add-f button[type=submit]').click();
     await page.waitForSelector('.rel-sheet #ord', { timeout: 8000 });
     await page.locator('button[data-kind="ruot"]').click();
     await page.locator('#ord').fill('1');

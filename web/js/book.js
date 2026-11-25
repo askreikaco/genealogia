@@ -3,8 +3,9 @@
 // when it is far away. Print loads every page first. No store sync: the book needs no IndexedDB and no full pull.
 import { rank, years } from './bookplan.js';
 import { figSvg } from './bookchart.js';
-import { lbar, ltags, fpanel, setUntag, cic, familyCrest } from './ui.js';
+import { toolbar, ltags, fpanel, setUntag, cic, familyCrest } from './ui.js';
 import { isDead } from './model.js';
+import { listOf } from './contacts-model.js';
 import { tx, childOf, kinRegionPref, setKinRegion, LANGS, REGIONS } from './booktext.js';
 import { formatSid } from './shortid.js';
 
@@ -117,7 +118,7 @@ function entryHtml(id, reg, kids, txt) {
   const d = P(id) || { name: '' };
   const died = [esc(d.died), d.death_lunar ? esc(d.death_lunar) + ' ' + T('lunar') : ''].filter(Boolean).join(' · ');
   const facts = F(T('born'), esc(d.born)) + F(T('died'), died) + F(T('anniv'), d.gio_lunar && d.gio_lunar !== d.death_lunar ? esc(d.gio_lunar) + ' ' + T('lunar') : '') + F(T('lives'), esc(d.place)) + F(T('alias'), esc(d.alias)) + F(T('job'), esc(d.job)) + F(T('religion'), esc(d.religion)) + F(T('burial'), esc(d.burial));
-  const contact = [d.phone, d.email, d.zalo && 'Zalo ' + d.zalo, d.facebook].filter(Boolean).map(esc).join(' · ');
+  const contact = listOf(d).filter((c) => ['phone', 'email', 'zalo', 'facebook'].includes(c.type)).map((c) => esc(c.type === 'zalo' ? 'Zalo ' + c.value : c.value)).join(' · ');
   const shown = kids.filter(([kid]) => P(kid));
   const kidsHtml = shown.length ? '<ol class="kids">' + shown.map(([kid, xr]) => { const c = P(kid); return `<li>${esc(rank(c))} <b>${esc(c.name)}</b>${years(c) ? ' (' + years(c) + ')' : ''}${xr != null ? ` <a class="xr" href="#${anc(kid)}">${xr}</a>` : ''}</li>`; }).join('') + '</ol>' : '';
   // story paragraphs: plain text, after the facts and the note (hidden for a hidden living person)
@@ -304,7 +305,7 @@ function renderBar() {
   if (!Q.spouses) tags.push(['spouses', T('noSpouses')]);
   if (Q.daughters === 'name') tags.push(['daughters', T('daughtersTag')]);
   if (Q.status !== 'all') tags.push(['status', STATUS().find(([v]) => v === Q.status)[1]]);
-  tbar.innerHTML = lbar('bq', T('search'), '', active).replace(/<\/div>$/, share + '</div>')
+  tbar.innerHTML = toolbar({ id: 'bq', ph: T('search'), active, extra: share })
     + '<div class="bhits" id="bhits" hidden></div>'
     + ltags(tags)
     + `<p class="sub lcount">${filtered ? `${plan.totals.scopePeople} / ${plan.totals.people}` : plan.totals.people} ${T('people')}</p>`

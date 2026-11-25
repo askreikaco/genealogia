@@ -48,8 +48,11 @@ test('bad input throws (a deploy must not stamp a guess)', () => {
 
 // Regression: the two squash messages that were wrongly bumped to a major (v1.80.0 -> v2.0.0, v2.0.0 -> v3.0.0).
 // Their bodies mention "BREAKING CHANGE" in a bullet, not as a footer; each must be a minor bump.
-test('real squash messages with "BREAKING CHANGE" in a bullet -> minor (v1.80.0 -> v1.81.0 -> v1.82.0)', () => {
-  const dir = path.join(__dirname, 'fixtures', 'semver');
+// the fixtures are real squash messages from the private repo: the public export drops them, so the test skips there
+const SEMVER_FIXTURES = path.join(__dirname, 'fixtures', 'semver');
+test('real squash messages with "BREAKING CHANGE" in a bullet -> minor (v1.80.0 -> v1.81.0 -> v1.82.0)',
+  { skip: !fs.existsSync(SEMVER_FIXTURES) && 'private-only fixtures (not in the public export)' }, () => {
+  const dir = SEMVER_FIXTURES;
   const cases = [
     ['0ef4609-release-train-2.txt', 'v1.80.0', '1.81.0'], // was v2.0.0 (#71)
     ['98b31db-release-train-3.txt', 'v1.81.0', '1.82.0'], // was v3.0.0 (#81)

@@ -1,10 +1,10 @@
 {
  "web/app.css": {
-  "media": 26,
-  "size": 187,
+  "media": 20,
+  "size": 182,
   "other": 32,
-  "space": 80,
-  "type": 48,
+  "space": 78,
+  "type": 46,
   "radius": 11,
   "colour": 28,
   "shadow": 8,

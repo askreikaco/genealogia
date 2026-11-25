@@ -1,4 +1,5 @@
 import { isDead } from './model.js';
+import { listOf } from './contacts-model.js';
 import { branchesOf, branchGen } from './branches.js';
 // Book plan: the page list of the printed family book, computed from the person list alone (no DOM, no network).
 // The server (GET /api/book/outline) and the browser (book.js) both import this module, so the page count and the
@@ -258,7 +259,7 @@ export function entryPieces(M, p) {
     const t = `${rank(c.data)} ${c.data.name}${years(c.data) ? ' (' + years(c.data) + ')' : ''}`;
     out.push(piece('kid', { id: c.id, xr: M.reg.has(c.id) && M.kids(c.id).length ? M.reg.get(c.id) : null }, wrapH(textPx(t.length + (M.reg.has(c.id) && M.kids(c.id).length ? 4 : 2), 9.82), W - 9, 9.82) + 2));
   });
-  const contact = [d.phone, d.email, d.zalo && 'Zalo ' + d.zalo, d.facebook].filter(Boolean).join(' · ');
+  const contact = listOf(d).filter((c) => ['phone', 'email', 'zalo', 'facebook'].includes(c.type)).map((c) => (c.type === 'zalo' ? 'Zalo ' + c.value : c.value)).join(' · ');
   let tail = 0;
   if (contact) tail += wrapH(textPx(contact.length, 9.02), W, 9.02) + 2;
   if (d.verify) tail += wrapH(textPx(('Cần xác minh: ' + d.verify).length, 8.02), W, 8.02) + 2;

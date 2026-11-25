@@ -58,11 +58,21 @@ const founderText = (t) => {
   const y = t.founder.born ? `sinh ${t.founder.born}` : t.founder.died ? `mất ${t.founder.died}` : '';
   return `thủy tổ ${t.founder.name}${y ? ' · ' + y : ''}`;
 };
+// Họ gốc (surname-rules.js): a tree that changed its surname shows the origin on its row, and a dashed connector
+// "đổi họ 1232" (the levels card). A carried tree (listed under the origin surname) says which surname it has now.
+const changeText = (c) => (c.carried ? `hiện là họ ${c.now}` : `gốc ${c.from}${c.han ? ' ' + c.han : ''}`) + (c.year ? ` · đổi họ ${c.year}` : '');
+const changeHtml = (t) => (t.change ? `<span class="clan-chg tl-dash"><span class="tlk-why">${esc(changeText(t.change))}</span></span>` : '');
 function treeRow(t, surname) {
   const sub = [founderText(t), t.origin, t.country ? countryName(t.country) : '', `${num(t.people)} người`].filter(Boolean).map(esc).join(' · ')
-    + (t.shared ? ` · <span class="clan-lk"><span aria-hidden="true">⇄</span> ${num(t.shared)} người chung</span>` : '');
+    + (t.shared ? ` · <span class="clan-lk"><span aria-hidden="true">⇄</span> ${num(t.shared)} người chung</span>` : '')
+    + (t.change ? ` · ${changeHtml(t)}` : '');
   return calmRow({ href: famHref(t.slug), tile: surnameTile(surname), title: t.label, subtitle: sub, attrs: `data-clan-tree="${esc(t.id)}"` });
 }
+// Editors only (the server sends hints to editors): historical mass changes that may relate to this surname. A hint is a
+// suggestion; it is never assigned to a tree.
+const hintsHtml = (hs) => (hs && hs.length ? `<section class="cd clan-hint" aria-label="Gợi ý lịch sử"><b class="clan-h">Gợi ý lịch sử · có thể liên quan</b>
+  <span class="sub">Chỉ để đối chiếu, không gán cho cây nào.</span>
+  ${hs.map((h) => `<p class="clan-hint-row"><b>${esc(h.title)}</b> <span class="sub">${esc(h.year)} · ${esc(h.confidence === 'tradition' ? 'theo truyền thống' : h.confidence)}</span><br><span class="sub">${esc(h.note)}</span><br><span class="sub">Nguồn: ${esc(h.source)}</span></p>`).join('')}</section>` : '');
 const groupHtml = (g, surname) => `<section class="cd clan-clu" aria-label="Cụm ${esc(g.label)}">
   <b class="clan-h">Cụm ${esc(g.trees[0].founder ? g.trees[0].founder.name : g.label)}${g.year ? ` (${g.year})` : ''}</b>
   <span class="sub">${g.trees.length} cây · ${num(g.people)} người</span>
@@ -102,5 +112,6 @@ export async function clanPage(main, slug, { page = 1, country = '' } = {}) {
     <div class="kpis s"><div class="kpi"><span class="sub">Cụm dòng họ</span><b>${num(j.kpis.groups)}</b></div><div class="kpi"><span class="sub">Cây</span><b>${num(j.kpis.trees)}</b></div><div class="kpi"><span class="sub">Người</span><b>${num(j.kpis.people)}</b></div></div>
     ${chips}
     <p class="sub clan-note">Các cây mang họ ${esc(s)}. Một cụm là các cây đã được hai bên xác nhận có người chung (⇄), xếp theo thủy tổ: năm sớm nhất trước. Cây riêng tư chỉ hiện số lượng.</p>
+    ${hintsHtml(j.hints)}
     <div class="clan-lay">${j.groups.map((g) => groupHtml(g, s)).join('')}${unlinked}</div>${pager}`;
 }

@@ -228,9 +228,9 @@ test('toolbar: the book bar has the list toolbar metrics (phone and desktop, lig
     await page.goto(`${base}/book?family=duong&inapp=1`, { waitUntil: 'load' });
     await page.waitForSelector('#tbar .lbar', { timeout: 20000 });
     try {
-      // the list's own markup and CSS (ui.js lbar() inside a tbar2, the shared listui.css): the reference
+      // the list's own markup and CSS (ui.js toolbar() inside the shared sticky wrapper .stk, listui.css): the reference
       const ref = await page.evaluate(() => {
-        const host = document.createElement('div'); host.className = 'tbar2'; host.style.cssText = 'position:fixed;left:0;top:0;width:' + (document.documentElement.clientWidth) + 'px';
+        const host = document.createElement('div'); host.className = 'stk'; host.style.cssText = 'position:fixed;left:0;top:0;width:' + (document.documentElement.clientWidth) + 'px';
         host.innerHTML = '<div class="lbar"><div class="srch"><input type="search" aria-label="x"></div><button type="button" class="fbtn" aria-label="x"><svg class="cic" width="20" height="20"></svg></button></div><p class="sub lcount">1 người</p>';
         document.body.append(host);
         const bar = host.querySelector('.lbar'); const srch = host.querySelector('.srch'); const fb = host.querySelector('.fbtn'); const cnt = host.querySelector('.lcount');

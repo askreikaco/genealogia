@@ -100,13 +100,13 @@ test('Tìm: a giỗ date lists the people whose giỗ is that lunar day; line 2 
     const { page, ctx } = await open(browser, { phone: true, hash: '/#/duong/list' });
     for (const q of ['3/8', '3-8', 'mồng 3 tháng 8', 'Mong 3 thang 8']) {
       await page.locator('#q').fill(q);
-      await page.waitForFunction((n) => document.querySelectorAll('.card').length === n, 2, { timeout: 3000 });
-      const names = await page.locator('.card b').allInnerTexts();
+      await page.waitForFunction((n) => document.querySelectorAll('.pi-card').length === n, 2, { timeout: 3000 });
+      const names = await page.locator('.pi-card b').allInnerTexts();
       assert.deepEqual(names.map((n) => n.replace(/^(Ông|Bà) \S+ /, '')).sort(), ['Dương Hoàng Chín', 'Dương Thị Hai'], q);
-      assert.deepEqual(await page.locator('.card .sub').allInnerTexts(), ['Giỗ 3/8 ÂL', 'Giỗ 3/8 ÂL'], q + ': line 2');
+      assert.deepEqual(await page.locator('.pi-card .sub').allInnerTexts(), ['Giỗ 3/8 ÂL', 'Giỗ 3/8 ÂL'], q + ': line 2');
     }
     await page.locator('#q').fill('3/9');
-    await page.waitForFunction(() => document.querySelectorAll('.card').length === 0, null, { timeout: 3000 });
+    await page.waitForFunction(() => document.querySelectorAll('.pi-card').length === 0, null, { timeout: 3000 });
     await ctx.close();
   } finally { await browser.close(); }
 });

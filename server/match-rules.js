@@ -14,6 +14,31 @@ const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').rep
 const APPROX = /kho[aả]ng|~|\bk\.|\bc\.|ước|uoc|chừng|chung|trước|truoc|sau\b/i;
 const yearOf = (v) => { const m = /(\d{4})/.exec(String(v || '')); return m ? Number(m[1]) : null; };
 const MIN = 0.8; // stored suggestions start here
+const SR = require('./surname-rules');
+
+// Aliases (surname-rules.js names[]): every name a person carried (birth, changed, aka) is a second context of the same
+// person, with its own surname and the years it was used (alias.win). Only names that differ from the primary name count.
+// A context is compared only when its years overlap the other person's life (scorePair), so a surname used before
+// 1232 never matches someone born after it. Context = toCtx() plus alias: { of, win: { from, to } }.
+// The primary name's first word is its surname; the rest (middle name and given name) carries over, with the given
+// name replaced when the mark gives one.
+function aliasCtxs(id, family, data = {}, extra = {}) {
+  const primary = fold(data.name); const toks = String(data.name || '').trim().split(/\s+/).filter(Boolean);
+  const seen = new Set([primary]); const out = [];
+  for (const e of SR.timelineOf(data)) {
+    if (!['birth', 'changed', 'aka'].includes(e.type) || !e.surname) continue;
+    const rest = toks.slice(1); const given = String(e.given || '').trim();
+    const tail = given ? [...rest.slice(0, -1), given] : rest;
+    if (!tail.length) continue;
+    const name = [e.surname.trim(), ...tail].join(' ');
+    if (seen.has(fold(name))) continue;
+    seen.add(fold(name));
+    const c = toCtx(id, family, { ...data, name }, extra);
+    c.alias = { of: e.surname.trim(), win: { from: SR.yearOf(e.from), to: SR.yearOf(e.to) } };
+    out.push(c);
+  }
+  return out;
+}
 
 // One person as the rules see it. data: the person's data; extra: { parents: [name], spouses: [name], places: [placeId] }.
 function toCtx(id, family, data = {}, extra = {}) {
@@ -54,6 +79,9 @@ function overlap(xs, ys, wFull, wGiven, label, out) {
 function scorePair(a, b, opts = {}) {
   const reasons = [];
   if (!a || !b || (a.family === b.family && !opts.sameTree)) return { score: 0, reasons: ['cùng một cây'] };
+  for (const [x, y] of [[a, b], [b, a]]) {
+    if (x.alias && !SR.windowOverlaps(x.alias.win, { by: y.by, dy: y.dy })) return { score: 0, reasons: ['họ đã dùng không đúng thời kỳ'] };
+  }
   if (!a.given || a.given !== b.given) return { score: 0, reasons: ['khác tên'] };
   if (a.surname && b.surname && a.surname !== b.surname) return { score: 0, reasons: ['khác họ'] };
   if (a.sex && b.sex && a.sex !== b.sex) return { score: 0, reasons: ['khác giới tính'] };
@@ -71,6 +99,7 @@ function scorePair(a, b, opts = {}) {
   else if (a.placeTexts.some((x) => b.placeTexts.includes(x))) { pl = 0.05; reasons.push('cùng nơi (theo chữ ghi)'); }
   s += pl; if (pl > 0) evidence++;
   if (!evidence) { s = Math.min(s, 0.6); reasons.push('chỉ trùng tên, chưa có gì khác để đối chiếu'); }
+  if (a.alias || b.alias) reasons.push(`theo họ đã dùng: ${[a, b].filter((x) => x.alias).map((x) => x.alias.of).join(', ')}`);
   return { score: Math.round(Math.max(0, Math.min(1, s)) * 100) / 100, reasons };
 }
 
@@ -109,7 +138,7 @@ function allPairs(list, { cap = 400 } = {}) {
     if (xs.length > cap) { skipped.push({ key: k, size: xs.length }); continue; }
     for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++) {
       const a = xs[i]; const b = xs[j];
-      if (a.family === b.family) continue;
+      if (a.family === b.family || a.id === b.id) continue;
       if (a.by != null && b.by != null && Math.abs(Math.floor(a.by / 10) - Math.floor(b.by / 10)) > 1) continue;
       pairs.push(a.family < b.family || (a.family === b.family && a.id < b.id) ? [a, b] : [b, a]);
     }
@@ -128,6 +157,7 @@ function withinPairs(list, { cap = 400 } = {}) {
     if (xs.length > cap) { skipped.push({ key: k, size: xs.length }); continue; }
     for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++) {
       const a = xs[i]; const b = xs[j];
+      if (a.id === b.id) continue; // a person and its own alias
       if (a.by != null && b.by != null && Math.abs(Math.floor(a.by / 10) - Math.floor(b.by / 10)) > 1) continue;
       pairs.push(a.id < b.id ? [a, b] : [b, a]);
     }
@@ -135,4 +165,18 @@ function withinPairs(list, { cap = 400 } = {}) {
   return { pairs, skipped };
 }
 
-module.exports = { fold, toCtx, scorePair, candidatePairs, allPairs, withinPairs, keyOf, MIN };
+// Possible duplicates of a person about to be added to one tree (the add flow, web/js/addflow.js): the tree's own
+// people scored with the same duplicate rules (sameTree). people: toCtx() contexts of the tree; data: the entered
+// { name, sex, born, birth_date, died, death_date }. Best first, at most `limit`, only at or above `min`.
+function candidatesFor(people, data = {}, { min = MIN, limit = 5 } = {}) {
+  const me = toCtx('', '', data, {});
+  const out = [];
+  for (const c of people) {
+    const r = scorePair(me, c, { sameTree: true });
+    if (r.score >= min) out.push({ id: c.id, score: r.score, reasons: r.reasons });
+  }
+  out.sort((x, y) => y.score - x.score || x.id.localeCompare(y.id));
+  return out.slice(0, limit);
+}
+
+module.exports = { fold, toCtx, aliasCtxs, scorePair, candidatePairs, allPairs, withinPairs, candidatesFor, keyOf, MIN };

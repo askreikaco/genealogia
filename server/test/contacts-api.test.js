@@ -93,3 +93,31 @@ test('save path: the confirmed field goes through /api/ops and leaves a history 
   const { rows } = await pool.query('select data->>\'contact_public\' as cp from persons where id = $1', [PID.khong]);
   assert.equal(rows[0].cp, null, 'contact visibility is not changed by an import (private by default)');
 });
+
+test('list save: a valid list goes through /api/ops as one field; a bad item is rejected; members see the list, guests the teaser', { skip }, async () => {
+  const list = [{ type: 'phone', value: '0977 000 111' }, { type: 'email', value: 'cha@example.test' }];
+  const op = { op_id: 'contacts-list-' + TAG, id: PID.cha, fields: { contacts: list }, ts: Date.now() };
+  const r = await call('POST', `/api/ops?family=${FAM}`, { ops: [op] }, cookieEditor);
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual(r.json.applied, [op.op_id]);
+  const bad = { op_id: 'contacts-bad-' + TAG, id: PID.cha, fields: { contacts: [{ type: 'phone', value: 'abc' }] }, ts: Date.now() };
+  const rb = await call('POST', `/api/ops?family=${FAM}`, { ops: [bad] }, cookieEditor);
+  assert.equal(rb.status, 200, rb.text);
+  assert.deepEqual(rb.json.applied, []);
+  assert.match(rb.json.rejected[0].reason, /Số điện thoại/);
+  const h = await pool.query('select new_value from history where person_id = $1 and field = $2 order by at desc limit 1', [PID.cha, 'contacts']);
+  assert.deepEqual(h.rows[0].new_value, list, 'the history keeps the list');
+  const m = await call('GET', `/api/persons?family=${FAM}&since=0`, undefined, cookieMember);
+  const asMember = m.json.items.find((x) => x.id === PID.cha).data;
+  assert.deepEqual(asMember.contacts, list, 'a member gets the list');
+  // a guest reads a public family only: the family is public for this check, then private again
+  await pool.query("update families set visibility = 'public' where id = $1", [FAM]);
+  let g;
+  try { g = await call('GET', `/api/persons?family=${FAM}&since=0`); }
+  finally { await pool.query("update families set visibility = 'private' where id = $1", [FAM]); }
+  assert.ok(g.json && g.json.items, g.status + ' ' + g.text.slice(0, 200));
+  const asGuest = g.json.items.find((x) => x.id === PID.cha).data;
+  assert.equal(asGuest.contacts, undefined, 'a guest gets no contact values');
+  assert.equal(asGuest.has_contact, true, 'a guest gets the teaser flag only');
+  assert.equal(JSON.stringify(g.json).includes('0977 000 111'), false);
+});

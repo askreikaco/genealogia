@@ -8,6 +8,7 @@ const TRASH = require('./trash');
 const REL = require('./relations');
 const RULES = require('./merge-rules');
 const { MergeError, mergeData, checkMerge, WHY } = RULES;
+const ageOf = (r) => ({ id: r.id, created: r.created ? new Date(r.created).getTime() : null, row: r });
 
 // Tables whose rows point at a person. cols: the person-id columns; pk: the key columns (restore finds the row by it).
 const TABLES = [
@@ -118,10 +119,17 @@ async function repointLists(q, famId, tableMode, dropId, keepId, entries) {
 }
 
 // Plan and checks only (no writes): the two people, the merged record, the cycle / relation guard.
-async function preview(q, fam, keepId, dropId, choices = {}) {
-  const { rows } = await q.query('select id, family_id, data, deleted from persons where id = any($1::text[])', [[keepId, dropId]]);
-  const keep = rows.find((r) => r.id === keepId); const drop = rows.find((r) => r.id === dropId);
-  if (!keep || !drop || keep.family_id !== fam || drop.family_id !== fam || keep.deleted || drop.deleted) throw new MergeError(404, 'Không tìm thấy hai người này trong dòng họ.');
+// The kept person is always the older profile (MR.olderFirst on the first history time, else the id); the order of the
+// ids passed in does not matter and the returned keep / drop are that decision.
+async function preview(q, fam, aId, bId, choices = {}) {
+  if (aId === bId) throw new MergeError(409, WHY.same);
+  const { rows } = await q.query(`select p.id, p.family_id, p.data, p.deleted,
+      (select min(h.at) from history h where h.person_id = p.id) as created
+      from persons p where p.id = any($1::text[])`, [[aId, bId]]);
+  const found = rows.filter((r) => r.family_id === fam && !r.deleted);
+  if (found.length !== 2) throw new MergeError(404, 'Không tìm thấy hai người này trong dòng họ.');
+  const [keep, drop] = RULES.olderFirst(ageOf(found[0]), ageOf(found[1])).map((x) => x.row);
+  const keepId = keep.id; const dropId = drop.id;
   // access granted to the merged-away person (elder sign-in, device, manager) is not moved: remove it first
   const access = (await q.query(`select (select count(*) from device_accounts where family_id=$1 and person_id=$2 and revoked_at is null)
       + (select count(*) from sign_in_cards where family_id=$1 and person_id=$2 and revoked_at is null)
@@ -136,10 +144,11 @@ async function preview(q, fam, keepId, dropId, choices = {}) {
 }
 
 // Apply a passed merge (inside the caller's transaction). Returns { trash_id, changed, moved }.
-async function apply(q, fam, { keepId, dropId, choices = {}, by, w, reason, decisionId = null }) {
-  const locked = (await q.query('select id from persons where id = any($1::text[]) order by id for update', [[keepId, dropId]])).rows;
+async function apply(q, fam, { keepId: aId, dropId: bId, choices = {}, by, w, reason, decisionId = null }) {
+  const locked = (await q.query('select id from persons where id = any($1::text[]) order by id for update', [[aId, bId]])).rows;
   if (locked.length !== 2) throw new MergeError(409, 'Không còn đủ hai người để gộp.');
-  const { keep, drop, data, changed, table } = await preview(q, fam.id, keepId, dropId, choices);
+  const { keep, drop, data, changed, table } = await preview(q, fam.id, aId, bId, choices);
+  const keepId = keep.id; const dropId = drop.id;
   const entries = [];
   const touched = new Set([keepId]);
   const g0 = await graphOf(q, fam.id);

@@ -25,7 +25,12 @@ async function loadPeople(q, fams = []) {
     if (r.data.spouse_of) { push(spouses, r.id, nameOf(r.data.spouse_of)); push(spouses, r.data.spouse_of, r.data.name || ''); }
   }
   const uniq = (xs) => [...new Set(xs || [])];
-  return rows.map((r) => R.toCtx(r.id, r.family_id, r.data, { parents: uniq(parents.get(r.id)), spouses: uniq(spouses.get(r.id)), places: uniq(places.get(r.id)) }));
+  const out = [];
+  for (const r of rows) {
+    const extra = { parents: uniq(parents.get(r.id)), spouses: uniq(spouses.get(r.id)), places: uniq(places.get(r.id)) };
+    out.push(R.toCtx(r.id, r.family_id, r.data, extra), ...R.aliasCtxs(r.id, r.family_id, r.data, extra)); // the name, then each alias name
+  }
+  return out;
 }
 
 // Score all candidate pairs. family: only pairs with one side in that family. Returns { scored: [{a,b,score,reasons}]
@@ -41,8 +46,19 @@ async function scoreAll(q, { family = '', min = 0 } = {}) {
     const r = R.scorePair(a, b);
     if (r.score >= min) scored.push({ a, b, score: r.score, reasons: r.reasons });
   }
-  scored.sort((x, y) => y.score - x.score || x.a.id.localeCompare(y.a.id));
-  return { people: people.length, pairs: pairs.length, scored, skipped, alreadyLinked };
+  const best = bestPerPerson(scored);
+  best.sort((x, y) => y.score - x.score || x.a.id.localeCompare(y.a.id));
+  return { people: people.length, pairs: pairs.length, scored: best, skipped, alreadyLinked };
+}
+
+// One pair of people, one suggestion: a person with aliases can meet the same person through several names.
+function bestPerPerson(scored) {
+  const best = new Map();
+  for (const s of scored) {
+    const k = [s.a.id, s.b.id].sort().join('|');
+    if (!best.has(k) || best.get(k).score < s.score) best.set(k, s);
+  }
+  return [...best.values()];
 }
 
 // Candidate pairs of ONE tree: duplicates inside the tree (merge.js). Same scoring; persons of this tree only.
@@ -55,8 +71,9 @@ async function scoreWithin(q, fam, { min = 0 } = {}) {
     const r = R.scorePair(a, b, { sameTree: true });
     if (r.score >= min) scored.push({ a, b, score: r.score, reasons: r.reasons });
   }
-  scored.sort((x, y) => y.score - x.score || x.a.id.localeCompare(y.a.id));
-  return { scored, skipped };
+  const best = bestPerPerson(scored);
+  best.sort((x, y) => y.score - x.score || x.a.id.localeCompare(y.a.id));
+  return { scored: best, skipped };
 }
 
 // Store pairs at or above `min` (default MIN). Idempotent: a 'new' row gets the fresh score; a dismissed or linked

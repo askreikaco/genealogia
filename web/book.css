@@ -11,7 +11,7 @@ html.inapp .pages{background:var(--c-bg)}
 .loading{padding:48px;text-align:center;color:var(--uit)}
 /* toolbar: list toolbar (listui.css) + book results; Carbon tokens (tokens.css), sticky over the pages */
 /* the list toolbar column: same max width, gutter and gap as the list pages (main); the controls are the shared listui.css ones */
-.tbar{position:sticky;top:0;z-index:10;background:var(--c-bg);color:var(--c-text);padding:var(--sp-5) var(--sp-5) var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-5);max-width:1024px;margin:0 auto}
+#tbar{position:sticky;top:0;z-index:10;background:var(--c-bg);color:var(--c-text);padding:var(--sp-5) var(--sp-5) var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-5);max-width:1024px;margin:0 auto}
 .bhits{display:flex;flex-direction:column;background:var(--c-layer);max-height:50vh;overflow:auto}
 .bhits[hidden]{display:none}
 .bhit{display:block;width:100%;min-height:44px;padding:var(--sp-3) var(--sp-5);border:0;background:transparent;color:var(--c-text);font:inherit;font-size:14px;text-align:left;cursor:pointer}
@@ -126,7 +126,7 @@ html.inapp .pages{background:var(--c-bg)}
 
 .toc a{color:inherit;text-decoration:none;display:flex;gap:0.571em;align-items:baseline;flex:1}
 @page{size:A4 landscape;margin:0}
-@media print{body{background:#fff}.tbar,.prog{display:none!important}.pages{padding:0;gap:0}.pgw{width:auto;height:auto;overflow:visible;box-shadow:none;break-after:page}.pg{transform:none;box-shadow:none;break-after:page;zoom:1.33}}
+@media print{body{background:#fff}#tbar,.prog{display:none!important}.pages{padding:0;gap:0}.pgw{width:auto;height:auto;overflow:visible;box-shadow:none;break-after:page}.pg{transform:none;box-shadow:none;break-after:page;zoom:1.33}}
 
 /* landscape book: 3 text columns,tree charts */
 .chartpg{gap:0.762em}

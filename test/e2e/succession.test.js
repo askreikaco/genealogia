@@ -88,6 +88,8 @@ test.after(async () => {
     await pool.query('delete from history where person_id in (select id from persons where family_id = any($1))', [ids]).catch(() => {});
     await pool.query('delete from persons where family_id = any($1)', [ids]).catch(() => {});
     await pool.query('delete from members where family_id = any($1) or email like $2', [ids, `%-${TAG}@test.local`]).catch(() => {});
+    // the app writes a relation_migrations row when it creates a family (succession-routes): it goes first (FK)
+    await pool.query('delete from relation_migrations where family_id = any($1)', [ids]).catch(() => {});
     await pool.query('delete from families where id = any($1)', [ids]).catch(() => {});
     await pool.end().catch(() => {});
   }

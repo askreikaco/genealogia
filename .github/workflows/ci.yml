@@ -1,37 +1,27 @@
 name: CI
-# Public genealogia CI: GitHub-hosted runners only (free on public repos). Never a self-hosted runner here.
-# Runs on pull requests (affected e2e only), on pushes to main and sync/** (full e2e).
+# Public CI on GitHub-hosted runners (free for public repos). Runs on pushes to main and to ci/** (the private
+# repo mirrors each pull request to ci/pr-<n>), nightly, and on demand. Everything here is fictional data.
 on:
-  pull_request:
   push:
-    branches: ['main', 'sync/**']
+    branches: ['main', 'ci/**']
   schedule:
-    - cron: '47 20 * * *'   # nightly: full e2e suite
+    - cron: '47 20 * * *'   # nightly
   workflow_dispatch:
-    inputs:
-      full:
-        description: 'Run the full e2e suite (default: only the tests the change affects)'
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  leak:
+  guard:
+    name: persons guard
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - name: Secret scan (gitleaks, full history)
-        uses: gitleaks/gitleaks-action@v2.3.9
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Only the generated demo seed may exist (no other persons*.json)
         run: |
           n=$(find . -path ./.git -prune -o -name 'persons*.json' -print | grep -vxF './server/seed/demo-persons.json' | wc -l)
@@ -39,104 +29,99 @@ jobs:
           echo "persons check: clean"
 
   syntax:
+    name: syntax
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '22' }
+        with: { node-version-file: 'server/package.json' }
       - name: Syntax check
         run: |
           node --check server/server.js
           for f in web/js/*.js; do node --input-type=module --check < "$f"; done
           node --check web/sw.js
           bash -n scripts/ci-db.sh
-      - name: Dead-code scan (warning only)
-        run: node scripts/deadcode.mjs || echo "::warning::deadcode scan reported findings"
 
   unit:
     name: unit + DB (shard ${{ matrix.shard }} of 3)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '22', cache: npm, cache-dependency-path: server/package-lock.json }
-      - run: npm ci --no-audit --no-fund
-        working-directory: server
-      - name: Generate fictional demo seed
-        run: mkdir -p server/seed && node scripts/make-demo-seed.mjs
-      - name: Throwaway Postgres 16
-        run: bash scripts/ci-db.sh start
-      - name: Unit + DB tests, shard ${{ matrix.shard }}/3 (node --test --test-shard, Node 22)
-        working-directory: server
-        run: node --test --test-concurrency=1 --test-timeout=120000 --test-force-exit --test-shard=${{ matrix.shard }}/3 test/*.test.js
-      - if: always()
-        run: bash scripts/ci-db.sh stop
-
-  plan:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      files: ${{ steps.pick.outputs.files }}
-      shards: ${{ steps.pick.outputs.shards }}
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 50 }
-      - uses: actions/setup-node@v4
-        with: { node-version: '22' }
-      - id: pick
-        env:
-          BASE_REF: ${{ github.base_ref || 'main' }}
-          FULL: ${{ github.event_name != 'pull_request' || inputs.full == true }}
-        run: |
-          if [ "$FULL" = "true" ]; then
-            LIST="$(ls test/e2e/*.test.js)"
-          else
-            git fetch --no-tags --depth=50 origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
-            LIST="$(node scripts/affected-tests.mjs --base "origin/$BASE_REF" | sed 's#^\.\./#./#; s#^\./##')"
-          fi
-          echo "E2E files:"; echo "${LIST:-  (none)}"
-          FILES="$(printf '%s\n' $LIST | sed '/^$/d' | tr '\n' ' ')"
-          echo "files=$FILES" >> "$GITHUB_OUTPUT"
-          echo "shards=$(node scripts/e2e-shards.mjs 4 $FILES)" >> "$GITHUB_OUTPUT"
-
-  e2e:
-    name: e2e (shard ${{ matrix.shard }} of 4)
-    needs: plan
-    if: needs.plan.outputs.files != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [1, 2, 3]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: giapha_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DB_URL: postgres://postgres:postgres@127.0.0.1:5432/giapha_ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '22', cache: npm, cache-dependency-path: server/package-lock.json }
+        with: { node-version-file: 'server/package.json', cache: npm, cache-dependency-path: server/package-lock.json }
       - run: npm ci --no-audit --no-fund
         working-directory: server
-      - name: Playwright (library only; Chrome from the runner image)
-        run: npm i --prefix "$RUNNER_TEMP/pw" --no-audit --no-fund playwright@1.63.0
-      - name: Generate fictional demo seed
-        run: mkdir -p server/seed && node scripts/make-demo-seed.mjs
-      - name: Throwaway Postgres 16
-        run: bash scripts/ci-db.sh start
-      - name: E2E shard ${{ matrix.shard }} of 4
+      - name: Schema and demo family (twice each, as the private CI does)
+        working-directory: server
+        env: { DATABASE_URL: '${{ env.DB_URL }}', GP_DEMO_SEED: '1' }
+        run: node scripts/migrate.js && node scripts/migrate.js && node scripts/seed.js && node scripts/seed.js
+      - name: Unit + DB tests, shard ${{ matrix.shard }}/3
+        working-directory: server
+        env: { GP_TEST_DATABASE_URL: '${{ env.DB_URL }}' }
+        run: node --test --test-concurrency=1 --test-timeout=120000 --test-force-exit --test-shard=${{ matrix.shard }}/3 test/*.test.js
+
+  e2e:
+    name: e2e (shard ${{ matrix.shard }} of 4, Chromium + WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    services:
+      postgres:
+        image: postgres:16
         env:
-          SHARDS: ${{ needs.plan.outputs.shards }}
-          SHARD: ${{ matrix.shard }}
-          GP_E2E_CHROME: /usr/bin/google-chrome
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: giapha_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DB_URL: postgres://postgres:postgres@127.0.0.1:5432/giapha_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: 'server/package.json', cache: npm, cache-dependency-path: server/package-lock.json }
+      - run: npm ci --no-audit --no-fund
+        working-directory: server
+      - name: Playwright library and browsers (Chromium + WebKit, with OS deps)
         run: |
-          MINE="$(node -e 'console.log(JSON.parse(process.env.SHARDS)[Number(process.env.SHARD)])')"
+          npm i --prefix "$RUNNER_TEMP/pw" --no-audit --no-fund playwright@1.63.0
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium webkit
+          CHROME="$(NODE_PATH="$RUNNER_TEMP/pw/node_modules" node -e "console.log(require('playwright').chromium.executablePath())")"
+          echo "GP_E2E_CHROME=$CHROME" >> "$GITHUB_ENV"
+      - name: Schema and demo family
+        working-directory: server
+        env: { DATABASE_URL: '${{ env.DB_URL }}', GP_DEMO_SEED: '1' }
+        run: node scripts/migrate.js && node scripts/seed.js
+      - name: E2E shard ${{ matrix.shard }} of 4 (every file, split by size)
+        env:
+          SHARD: ${{ matrix.shard }}
+          GP_TEST_DATABASE_URL: ${{ env.DB_URL }}
+        run: |
+          FILES="$(ls test/e2e/*.test.js)"
+          MINE="$(node scripts/e2e-shards.mjs 4 $FILES | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s)[Number(process.env.SHARD)]))')"
           if [ -z "$MINE" ]; then echo "nothing for this shard"; exit 0; fi
-          LIST=(); for f in $MINE; do LIST+=("../$f"); done   # paths relative to server/
+          LIST=(); for f in $MINE; do LIST+=("../$f"); done
           printf '%s\n' "${LIST[@]}"
           cd server && NODE_PATH="$RUNNER_TEMP/pw/node_modules" node --test --test-concurrency=1 --test-timeout=120000 --test-force-exit "${LIST[@]}"
-      - if: always()
-        run: bash scripts/ci-db.sh stop

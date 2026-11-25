@@ -153,7 +153,7 @@ test('Cần bổ sung: the row is the link, the header is the count, no per-row 
   try {
     const { page, ctx, errors } = await openPage(b, 'guest', '#/duong/verify');
     assert.equal(await page.locator('.lcount').innerText(), '1 chỗ còn thiếu');
-    assert.equal(await page.locator('.cd a.li').count(), 1, 'the row is a link');
+    assert.equal(await page.locator('.cd a.calm').count(), 1, 'the row is a link');
     assert.equal(await page.locator('.cd button').count(), 0, 'no per-row button');
     assert.deepStrictEqual(errors, []);
     await ctx.close();
