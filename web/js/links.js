@@ -3,7 +3,7 @@
 // family page is drawn (one small request, cached for a minute) and are not part of the offline store: offline the
 // profile simply shows no link line. Owner/admin of both trees -> accepted at once; otherwise pending for the other tree.
 import { esc } from './model.js';
-import { toast, sheet } from './ui.js';
+import { toast, sheet, section } from './ui.js';
 import { personItem } from './person-item.js';
 
 const cache = new Map(); // family -> { at, items, byPerson: Map(personId -> link[]) }
@@ -99,7 +99,7 @@ export function openSheet({ fam, personId, personName, families, done }) {
 export function pendingHtml(fam) {
   const ls = pendingIncoming(fam);
   if (!ls.length) return '';
-  return `<section class="cd xl-pend"><h2>Liên kết chờ duyệt</h2>${ls.map((l) => `<div class="rv"><p>Cây <b>${esc(l.other_label)}</b> đề nghị: <a href="${href(fam, l.person)}">người này</a> là cùng một người với <b>${esc(l.other_name || '(riêng tư)')}</b>${l.reason ? ` · “${esc(l.reason)}”` : ''}</p><div class="row end"><button type="button" class="btn ter sm" data-xl="reject" data-id="${l.id}">Không nhận</button><button type="button" class="btn sm" data-xl="accept" data-id="${l.id}">Nhận</button></div></div>`).join('')}</section>`;
+  return section('Liên kết chờ duyệt', `${ls.map((l) => `<div class="rv"><p>Cây <b>${esc(l.other_label)}</b> đề nghị: <a href="${href(fam, l.person)}">người này</a> là cùng một người với <b>${esc(l.other_name || '(riêng tư)')}</b>${l.reason ? ` · “${esc(l.reason)}”` : ''}</p><div class="row end"><button type="button" class="btn ter sm" data-xl="reject" data-id="${l.id}">Không nhận</button><button type="button" class="btn sm" data-xl="accept" data-id="${l.id}">Nhận</button></div></div>`).join('')}`, { variant: 'card', cls: 'xl-pend', level: 2 });
 }
 export function wirePending(root, fam) {
   root.querySelectorAll('[data-xl]').forEach((b) => { b.onclick = async () => {

@@ -3,7 +3,7 @@
 // the compare sheet: the two records side by side, one choice per field, a reason. The merge is then a family vote
 // (Biểu quyết): nothing moves until it passes; the merged-away person goes to the Thùng rác and can be restored there.
 import { esc } from './model.js';
-import { toast, cic, tag } from './ui.js';
+import { toast, cic, tag, section } from './ui.js';
 
 const q = (fam) => `family=${encodeURIComponent(fam)}`;
 async function api(method, url, body) {
@@ -26,13 +26,13 @@ export async function reviewSection(main, before, fams) {
   const rows = got.flatMap(({ f, items }) => items.map((s) => ({ ...s, f })));
   let box = main.querySelector('#dpend');
   if (!box) { box = document.createElement('div'); box.id = 'dpend'; before.parentNode.insertBefore(box, before); }
-  box.innerHTML = rows.length ? `<section class="cd dp-pend"><h2>Có thể trùng trong cây này</h2>
+  box.innerHTML = rows.length ? section('Có thể trùng trong cây này', `
     <p class="sub">Hai hồ sơ có thể là cùng một người. Gộp cần biểu quyết của dòng họ; hồ sơ bị gộp vào Thùng rác và khôi phục được.</p>
     ${rows.map((s) => `<div class="rv dp-row" data-dp-row="${s.id}">
       <p>${who(s.a.name, s.a.years)} <span aria-hidden="true">⇄</span><span class="vh">và</span> ${who(s.b.name, s.b.years)}</p>
       <p class="sub dp-why">${tag(`khớp ${Math.round(s.score * 100)}%`, { tone: 'gray', sm: true })} ${s.reasons.map(esc).join(' · ')}</p>
       ${s.pending ? '<p class="sub dp-why"><span class="tag sm">Đang biểu quyết</span> Đề nghị gộp hai hồ sơ này đang chờ dòng họ.</p>' : `<div class="row end"><button type="button" class="btn ter sm" data-dp="dismiss" data-id="${s.id}" data-fam="${esc(s.f)}">Không phải</button>
-        <button type="button" class="btn sm" data-dp="compare" data-keep="${esc(s.a.id)}" data-drop="${esc(s.b.id)}" data-fam="${esc(s.f)}">So sánh và gộp</button></div>`}</div>`).join('')}</section>` : '';
+        <button type="button" class="btn sm" data-dp="compare" data-keep="${esc(s.a.id)}" data-drop="${esc(s.b.id)}" data-fam="${esc(s.f)}">So sánh và gộp</button></div>`}</div>`).join('')}`, { variant: 'card', cls: 'dp-pend', level: 2 }) : '';
   box.onclick = async (e) => {
     const b = e.target.closest('[data-dp]'); if (!b) return;
     if (b.dataset.dp === 'compare') return openCompare(b.dataset.fam, b.dataset.keep, b.dataset.drop, () => reviewSection(main, before, fams));

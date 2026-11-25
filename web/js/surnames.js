@@ -5,6 +5,7 @@
 import { esc } from './model.js';
 import { NAME_TYPES, CONFIDENCE, timelineOf, surnameAt, namesError, yearOf } from './surname-rules.js';
 import { dangerButton, confirmDanger } from './danger.js';
+import { section } from './ui.js';
 
 const TYPE_LABEL = { birth: 'Họ khi sinh', changed: 'Đổi họ', aka: 'Họ khác (bí danh)', religious: 'Họ tôn giáo', abroad: 'Họ dùng ở nước ngoài' };
 const CONF_LABEL = { confirmed: 'đã xác nhận', tradition: 'theo truyền thống', uncertain: 'chưa chắc chắn' };
@@ -94,9 +95,9 @@ export function originCardHtml(f, admin) {
   const vis = f.origin_visibility || 'members';
   if (!admin) {
     if (!f.origin_surname) return '';
-    return `<div class="cd" id="origin"><h3>Họ gốc</h3><p><b>${esc(f.origin_surname)}</b>${f.origin_surname_han ? ` <span lang="zh-Hant">${esc(f.origin_surname_han)}</span>` : ''}${f.origin_year ? ` · đổi họ ${esc(f.origin_year)}` : ''}</p>${f.origin_reason ? `<p class="sub">${esc(f.origin_reason)}</p>` : ''}</div>`;
+    return section('Họ gốc', `<p><b>${esc(f.origin_surname)}</b>${f.origin_surname_han ? ` <span lang="zh-Hant">${esc(f.origin_surname_han)}</span>` : ''}${f.origin_year ? ` · đổi họ ${esc(f.origin_year)}` : ''}</p>${f.origin_reason ? `<p class="sub">${esc(f.origin_reason)}</p>` : ''}`, { variant: 'card', attrs: 'id="origin"' });
   }
-  return `<div class="cd" id="origin"><h3>Họ gốc</h3>
+  return section('Họ gốc', `
     <form id="origin-form" class="form-stack">
       <label class="fld">Họ gốc<input name="origin_surname" value="${esc(f.origin_surname || '')}" maxlength="40" placeholder="ví dụ: Lý"></label>
       <label class="fld">Chữ Hán của họ gốc<input name="origin_surname_han" value="${esc(f.origin_surname_han || '')}" maxlength="40" lang="zh-Hant"></label>
@@ -106,5 +107,5 @@ export function originCardHtml(f, admin) {
         ${Object.entries(ROLE_NAMES).map(([v, l]) => `<label class="radio"><input type="radio" name="origin_visibility" value="${v}" ${vis === v ? 'checked' : ''}> <span>${esc(l)}</span></label>`).join('')}
       </fieldset>
       <div class="row end"><button class="btn">Lưu họ gốc</button></div><p class="err" hidden></p>
-    </form></div>`;
+    </form>`, { variant: 'card', attrs: 'id="origin"' });
 }

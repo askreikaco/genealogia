@@ -3,7 +3,7 @@
 // Shared pieces: toolbar + addBtn, .li rows, danger components (dangerButton, dangerZone, confirmDanger).
 // Pure helpers live in lich-merge.js.
 import { esc } from './model.js';
-import { toast, toolbar, addBtn, calmRow, tag } from './ui.js';
+import { toast, toolbar, addBtn, calmRow, tag, card, section } from './ui.js';
 import { icsCalendar, icsDay, icsText, saveIcs } from './ics.js';
 import { ico, choiceRow } from './choice.js';
 import { collapsedGroups } from './groups.js';
@@ -65,20 +65,20 @@ export const gatheringRow = (p, hf, today, hidden = false) => {
 export function topCardsHtml(fam, hf, getPrefs) {
   const c = cache.get(fam);
   const top = c ? topNews(c.posts.filter((p) => p.status === 'live'), seenAt(fam, getPrefs)) : [];
-  const cards = top.map((p) => `<div class="cd${p.pinned ? ' hl' : ''}"><div class="sub">${p.pinned ? 'Ghim' : 'Mới'} · ${kindLabel(p)} · ${esc(p.created_by)}</div>`
-    + `<h2><a class="plink" href="${esc(hf('tin/' + p.id))}">${esc(p.title)}</a></h2></div>`).join('');
+  const cards = top.map((p) => card(`<div class="sub">${p.pinned ? 'Ghim' : 'Mới'} · ${kindLabel(p)} · ${esc(p.created_by)}</div>`
+    + `<h2><a class="plink" href="${esc(hf('tin/' + p.id))}">${esc(p.title)}</a></h2>`, { cls: p.pinned ? 'hl' : '' })).join('');
   return `<div class="row wrap" style="justify-content:space-between;align-items:center"><b>Tin họ</b><a href="${esc(hf('tin'))}">Xem tất cả tin →</a></div>${cards}`;
 }
 
 // Settings card (Cài đặt dòng họ): who may post. Only the owner changes it.
 export function postersCard(isOwner) {
   const opt = (v, l, h) => `<label class="vr-opt"><input type="radio" name="ptrule" value="${v}"${isOwner ? '' : ' disabled'}><span><b>${l}</b><span class="sub">${h}</span></span></label>`;
-  return `<div class="cd" id="ptrule"><h3>Tin họ</h3>
+  return section('Tin họ', `
     <fieldset class="vrule"><legend>Ai được đăng tin</legend>
       ${opt('admin', 'Chủ họ và Quản trị', 'Mặc định. Biên tập viên và thành viên góp ý qua Góp ý.')}
       ${opt('editor', 'Thêm Biên tập viên', 'Biên tập viên cũng đăng được tin.')}</fieldset>
     <p class="sub">Tin có liên kết, số điện thoại, số tài khoản hoặc từ bị chặn chờ chủ họ hoặc quản trị duyệt. Mọi thay đổi ghi vào lịch sử.</p>
-    ${isOwner ? '' : '<p class="sub">Chỉ Chủ họ đổi được.</p>'}</div>`;
+    ${isOwner ? '' : '<p class="sub">Chỉ Chủ họ đổi được.</p>'}`, { variant: 'card', attrs: 'id="ptrule"' });
 }
 // Cài đặt dòng họ hook: binds the posting radios (called from council.js decorate for the settings page).
 export async function decorateSettings(main, fam) {
@@ -105,13 +105,13 @@ export async function feedPage(main, { fam, hf, getPrefs, setPrefs, isMember }) 
   const seen = seenAt(fam, getPrefs);
   const st = feedPage.st || (feedPage.st = { q: '' });
   const review = c.is_admin ? c.posts.filter((p) => p.status === 'held' || p.status === 'hidden') : [];
-  const reviewHtml = review.length ? `<div class="cd hl" id="nreview"><h2>Cần xem (${review.length})</h2>${review.map((p) => {
+  const reviewHtml = review.length ? `${card(`<h2>Cần xem (${review.length})</h2>${review.map((p) => {
     const why = p.status === 'held' ? `Chờ duyệt: ${(p.hold || []).map((h) => HOLD_VI[h] || h).join(', ') || 'cần xem'}.` : `Bị ẩn sau ${p.reports} báo cáo. Lý do báo cáo không hiện tên người báo.`;
     const acts = p.status === 'held'
       ? `<button type="button" class="btn sm" data-approve="${p.id}">Duyệt đăng</button>${dangerButton('Từ chối', `data-reject="${p.id}"`, { size: 'sm' })}`
       : `<button type="button" class="btn sm" data-restore="${p.id}">Khôi phục</button>${dangerButton('Xóa', `data-rdel="${p.id}"`, { size: 'sm' })}`;
     return `<div class="li-stack"><b>${esc(p.title)}</b> <span class="sub">${esc(p.created_by)} · ${why}</span><div class="row wrap">${acts}</div></div>`;
-  }).join('')}</div>` : '';
+  }).join('')}`, { cls: 'hl', attrs: `id="nreview"` })}` : '';
   const rows = c.posts.map((p) => {
     const unread = p.status === 'live' && Date.parse(p.created_at) > seen;
     const date = p.kind === 'gathering' ? fmtDay(p.starts_at) : new Date(p.created_at).toLocaleDateString('vi-VN');
@@ -121,7 +121,7 @@ export async function feedPage(main, { fam, hf, getPrefs, setPrefs, isMember }) 
   }).join('');
   main.innerHTML = `<h1>Tin họ</h1>${reviewHtml}
     ${toolbar({ id: 'nq', ph: 'Tìm tiêu đề hoặc nội dung', val: st.q, active: 0, add: c.can_post ? addBtn(`data-tin-go="${esc(hf('tin-sua'))}"`, 'Đăng tin mới') : '' })}
-    <div class="cd" id="nlist">${rows || '<p class="sub pad">Chưa có tin nào.</p>'}</div>`;
+    ${card(`${rows || '<p class="sub pad">Chưa có tin nào.</p>'}`, { attrs: `id="nlist"` })}`;
   if (setPrefs) setPrefs({ [SEEN_KEY]: { ...((getPrefs?.() || {})[SEEN_KEY] || {}), [fam]: Date.now() } }); // seen once the feed is open
   main.querySelector('#nq')?.addEventListener('input', (e) => {
     const s = e.target.value.trim().toLowerCase(); st.q = e.target.value;
@@ -171,7 +171,7 @@ export async function fillCalCard(main, fam, follows) {
   const st = await calState(fam);
   if (st.exists) api('PUT', `/api/cal-token/follows?${q(fam)}`, { follows: follows || [] }).catch(() => {});
   const redraw = () => fillCalCard(main, fam, follows);
-  box.innerHTML = `<div class="cd"><b>Tự động thêm vào lịch điện thoại</b>${st.subscribed ? '<p class="sub">Đã thêm vào lịch của bạn (có thể chậm vài giờ).</p>' : ''}${calBody(fam, st)}</div>`;
+  box.innerHTML = `${card(`<b>Tự động thêm vào lịch điện thoại</b>${st.subscribed ? '<p class="sub">Đã thêm vào lịch của bạn (có thể chậm vài giờ).</p>' : ''}${calBody(fam, st)}`)}`;
   wireCal(box, { fam, exists: st.exists, follows, redraw });
 }
 // RSVP prompt: after a Đi or Chưa biết answer, while no feed fetch is recorded for this account. "Để sau" hides it on this device.
@@ -181,7 +181,7 @@ async function showCalPrompt(main, fam, follows) {
   if (!slot.isConnected) return;
   if (st.subscribed) { slot.innerHTML = '<p class="sub">Đã thêm vào lịch của bạn (có thể chậm vài giờ).</p>'; return; }
   const redraw = () => showCalPrompt(main, fam, follows);
-  slot.innerHTML = `<div class="cd cal-prompt"><b>Tự động thêm vào lịch điện thoại?</b>${calBody(fam, st, true)}<div class="row"><button type="button" class="btn ter sm" data-cal-off>Để sau</button></div></div>`;
+  slot.innerHTML = `${card(`<b>Tự động thêm vào lịch điện thoại?</b>${calBody(fam, st, true)}<div class="row"><button type="button" class="btn ter sm" data-cal-off>Để sau</button></div>`, { cls: 'cal-prompt' })}`;
   wireCal(slot, { fam, exists: st.exists, follows, redraw });
 }
 

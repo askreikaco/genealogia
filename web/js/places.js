@@ -151,10 +151,10 @@ export async function placePage(main, id, { fam, personOf, personHref, nameOf })
   }
   main.innerHTML = `<div class="row wrap">${tag(`${esc(KIND[p.kind] || 'Địa danh')}`, { tone: 'gray' })}${p.status === 'pending' ? '<span class="tag gray">chưa xác minh</span>' : ''}</div>
     <h1 class="big keep">${esc(p.name || '')}</h1>${p.label && p.label !== p.name ? `<p class="sub">${esc(p.label.split(', ').slice(1).join(', '))}</p>` : ''}
-    ${section(`Tên qua các thời kỳ`, `<ol class="tl2">${nameRows}</ol>`, { variant: 'card', label: 'Tên qua các thời kỳ', cls: 'pl-sec' })}
-    ${parentRows ? `${section(`Thuộc đơn vị`, `<ol class="tl2">${parentRows}</ol>`, { variant: 'card', label: 'Thuộc đơn vị', cls: 'pl-sec' })}` : ''}
-    ${eventRows ? `${section(`Thay đổi`, `<ol class="tl2">${eventRows}</ol>`, { variant: 'card', label: 'Thay đổi', cls: 'pl-sec' })}` : ''}
-    ${section(`Người trong họ${rows.length ? ` · ${rows.length}` : ''}`, `${rows.length ? `<div class="calm-list">${rows.join('')}</div>` : '<p class="sub">Chưa có ai trong họ gắn với địa danh này.</p>'}`, { variant: 'card', label: 'Người trong họ', cls: 'pl-sec' })}
+    ${section(`Tên qua các thời kỳ`, `<ol class="tl2">${nameRows}</ol>`, { variant: 'card', label: 'Tên qua các thời kỳ', cls: 'pl-sec sec-card', level: 2 })}
+    ${parentRows ? `${section(`Thuộc đơn vị`, `<ol class="tl2">${parentRows}</ol>`, { variant: 'card', label: 'Thuộc đơn vị', cls: 'pl-sec sec-card', level: 2 })}` : ''}
+    ${eventRows ? `${section(`Thay đổi`, `<ol class="tl2">${eventRows}</ol>`, { variant: 'card', label: 'Thay đổi', cls: 'pl-sec sec-card', level: 2 })}` : ''}
+    ${section(`Người trong họ${rows.length ? ` · ${rows.length}` : ''}`, `${rows.length ? `<div class="calm-list">${rows.join('')}</div>` : '<p class="sub">Chưa có ai trong họ gắn với địa danh này.</p>'}`, { variant: 'card', label: 'Người trong họ', cls: 'pl-sec sec-card', level: 2 })}
     ${p.wikidata_id ? `<p class="sub pl-ext"><a href="https://www.wikidata.org/wiki/${esc(p.wikidata_id)}" target="_blank" rel="noopener">Wikidata ${esc(p.wikidata_id)}</a></p>` : ''}
     ${(p.attribution || []).map((a) => `<p class="sub pl-attr">Một phần dữ liệu: <a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.text)}</a></p>`).join('')}`;
 }
@@ -171,10 +171,10 @@ function suggText(s) {
 }
 function pendingPlacesHtml(items) {
   if (!items.length) return '';
-  return `<section class="cd pl-pend"><h2>Địa danh chờ duyệt</h2>${items.map((p) => `<div class="rv pl-pend-place">
+  return section('Địa danh chờ duyệt', `${items.map((p) => `<div class="rv pl-pend-place">
     <div class="row wrap"><a class="pl-link" href="#place/${p.id}"><b>${esc(p.name || '(chưa có tên)')}</b></a>${tag(`${esc(KIND[p.kind] || 'Địa danh')}`, { tone: 'gray', sm: true })}${p.status === 'pending' ? '<span class="tag gray sm">chưa xác minh</span>' : ''}${JOB[p.job] ? `<span class="sub">${JOB[p.job]}</span>` : ''}</div>
     ${p.suggestions.map((s) => `<div class="pl-sug"><p>${suggText(s)}<br><span class="sub">${SRC[s.source]} · độ khớp ${Math.round(s.confidence * 100)}%</span></p><div class="row end"><button type="button" class="btn ter sm" data-psug="reject" data-id="${s.id}">Không nhận</button><button type="button" class="btn sm" data-psug="accept" data-id="${s.id}">Nhận</button></div></div>`).join('')}
-    ${p.status === 'pending' ? `<div class="row end"><button type="button" class="btn gh sm" data-pverify="${p.id}">Xác minh địa danh</button></div>` : ''}</div>`).join('')}</section>`;
+    ${p.status === 'pending' ? `<div class="row end"><button type="button" class="btn gh sm" data-pverify="${p.id}">Xác minh địa danh</button></div>` : ''}</div>`).join('')}`, { variant: 'card', cls: 'pl-pend', level: 2 });
 }
 // Draws the section before `before` (nothing when the viewer is no curator or nothing waits); redraws after a decision.
 export async function reviewSection(main, before) {
