@@ -123,11 +123,11 @@ test('the editor saves the birth estimate as an event (between, with the basis i
     await birth.locator('summary', { hasText: 'Cách tính' }).click();
     await shot(page, 'est-dark-390.png');
     await birth.locator('button[data-est-save]').click();
-    await page.waitForSelector('dialog#cfm[open] [data-rds-confirm]', { timeout: 10000 });
-    assert.match(await page.textContent('dialog#cfm[open]'), /Lưu thành sự kiện\?/);
-    assert.match(await page.textContent('dialog#cfm[open]'), /Ước tính từ /);
-    await page.click('dialog#cfm[open] [data-rds-confirm]');
-    await page.waitForFunction(() => !document.querySelector('dialog#cfm[open]'), null, { timeout: 10000 });
+    await page.waitForSelector('dialog.dlg[open] .btn.dng', { timeout: 10000 });
+    assert.match(await page.textContent('dialog.dlg[open]'), /Lưu thành sự kiện\?/);
+    assert.match(await page.textContent('dialog.dlg[open]'), /Ước tính từ /);
+    await page.click('dialog.dlg[open] .btn.dng');
+    await page.waitForFunction(() => !document.querySelector('dialog.dlg[open]'), null, { timeout: 10000 });
     await page.waitForSelector('.tl2 li:not(.est)', { timeout: 20000 });
     const { rows } = await pool.query("select type, date_kind, date_from, date_to, description from events where person_id=$1 and type='sinh'", [QUYEN]);
     assert.equal(rows.length, 1, 'one stored birth event');

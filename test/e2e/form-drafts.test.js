@@ -29,7 +29,7 @@ test('draft: autosaved, offered on reopen, restored on Tiếp tục, dropped on 
     const p3 = await openIn(ctx, { role: 'editor', path: '#sua/K2' });
     await p3.page.waitForSelector('.fp-draft');
     await p3.page.click('[data-dr-drop]');
-    await p3.page.click('dialog#dcf [data-rds-confirm]');
+    await p3.page.click('dialog.dcf [data-dcf-ok]');
     assert.equal(await p3.page.locator('.fp-draft').count(), 0);
     await wait(p3.page, 400); // let the delete commit before the page goes
     await p3.page.close();

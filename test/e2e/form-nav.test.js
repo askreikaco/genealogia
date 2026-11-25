@@ -18,13 +18,13 @@ test('sign-out: Huỷ keeps the session, Đăng xuất logs out (confirm on Thê
   try {
     const s = await open(browser, { role: 'editor', path: '#more' });
     await s.page.click('main #logout');
-    await s.page.waitForSelector('dialog#cfm');
-    assert.equal(await s.page.textContent('dialog#cfm h2'), 'Đăng xuất khỏi tài khoản này?');
-    assert.match(await s.page.textContent('dialog#cfm'), /Bạn sẽ cần đăng nhập lại/);
-    await s.page.click('.rds-btn--ghost');
+    await s.page.waitForSelector('dialog.cfm');
+    assert.equal(await s.page.textContent('dialog.cfm h2'), 'Đăng xuất khỏi tài khoản này?');
+    assert.match(await s.page.textContent('dialog.cfm'), /Bạn sẽ cần đăng nhập lại/);
+    await s.page.click('[data-cfm-no]');
     assert.equal(s.log.logout, 0, 'cancel keeps the session');
     await s.page.click('main #logout');
-    await s.page.click('[data-rds-confirm]');
+    await s.page.click('[data-cfm-ok]');
     for (let i = 0; i < 40 && s.log.logout < 1; i++) await wait(s.page, 100);
     assert.equal(s.log.logout, 1, 'confirm logs out');
     await s.ctx.close();

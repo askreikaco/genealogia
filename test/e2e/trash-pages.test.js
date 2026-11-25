@@ -99,7 +99,7 @@ test('event delete: "Hoàn tác" for 10 s restores it', { skip }, async () => {
       await page.goto(`${base}/#/${SLUG}/su-kien/${PD}?id=${st.event.id}`);
       await page.waitForSelector('.dzone [data-evp-del]', { timeout: 20000 });
       await page.click('.dzone [data-evp-del]');
-      await page.click('dialog#dcf [data-rds-confirm]');
+      await page.click('dialog.dcf [data-dcf-ok]');
       await page.waitForSelector('.toast.undo [data-undo]', { timeout: 10000 });
       assert.equal(await events(), before - 1);
       assert.match(await page.textContent('.toast.undo'), /Đã xóa sự kiện · trong Thùng rác\s*Hoàn tác/);

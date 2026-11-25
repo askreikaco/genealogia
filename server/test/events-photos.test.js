@@ -35,7 +35,7 @@ test.before(async () => {
   if (skip) return;
   process.env.DATABASE_URL = URL_;
   process.env.SESSION_SECRET = crypto.randomBytes(24).toString('hex');
-  process.env.EDITORS = `Tester:${crypto.createHash('sha256').update(CODE).digest('hex')}`;
+  process.env.EDITORS = `Tester:${FAM}:${crypto.createHash('sha256').update(CODE).digest('hex')}`;
   const { app, pool: p } = require('../server');
   pool = p;
   for (const f of fs.readdirSync(path.join(__dirname, '..', 'migrations')).filter((x) => x.endsWith('.sql')).sort()) await pool.query(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
