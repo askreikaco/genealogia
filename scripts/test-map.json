@@ -63,6 +63,15 @@
         "test/e2e/add-person-flow.test.js"
       ]
     },
+    "relpath": {
+      "paths": [
+        "web/js/relpath*.js",
+        "server/test/relpath*.test.js"
+      ],
+      "e2e": [
+        "test/e2e/relpath*.test.js"
+      ]
+    },
     "consistency": {
       "paths": [
         "server/consistency-*.js",

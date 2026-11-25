@@ -57,7 +57,7 @@ function neighbours(ix, id) {
 }
 
 // Cheapest walk from -> to: { cost, steps: [{ from, to, hop, kind, row }] } or null.
-function shortest(ix, from, to) {
+export function shortest(ix, from, to) {
   if (from === to) return null;
   const dist = new Map([[from, 0]]); const prev = new Map(); const done = new Set();
   const h = new Heap(); h.push([0, from]);
