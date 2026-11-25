@@ -2,7 +2,7 @@
 // (Thêm › Dòng họ), the banner on a person's page, and the link from Thùng rác. Server: server/decisions.js.
 // Removal is never the default: the chooser asks first, and the vote needs a reason.
 import { esc } from './model.js';
-import { toast, calmRow } from './ui.js';
+import { toast, calmRow, section } from './ui.js';
 import { choiceRow } from './choice.js';
 import { collapsedGroups } from './groups.js';
 
@@ -202,10 +202,10 @@ export async function decorate(view, main, { fam, hf, personId }) {
 export function voteRuleCard(isOwner) {
   const opts = Object.entries(RULE_OPTS).map(([v, o]) => `<label class="vr-opt"><input type="radio" name="vrule" value="${v}"${isOwner ? '' : ' disabled'}>
     <span><b>${esc(o.label)}</b><span class="sub">${esc(o.help)}</span></span></label>`).join('');
-  return `<div class="cd" id="vrule"><h3>Biểu quyết</h3>
+  return section('Biểu quyết', `
     <fieldset class="vrule"><legend>Ai được biểu quyết gỡ người khỏi gia phả</legend>${opts}</fieldset>
     <p class="sub">Mỗi người bỏ một phiếu, phiếu bằng nhau. Chỉ người đang hoạt động (đăng nhập trong 180 ngày, chưa đánh dấu đã mất) được biểu quyết.</p>
-    ${isOwner ? '' : '<p class="sub">Chỉ Chủ họ đổi được.</p>'}</div>`;
+    ${isOwner ? '' : '<p class="sub">Chỉ Chủ họ đổi được.</p>'}`, { variant: 'card', attrs: 'id="vrule"' });
 }
 async function decorateSettings(main, fam) {
   let j;

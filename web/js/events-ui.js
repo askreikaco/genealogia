@@ -2,7 +2,7 @@
 // Plain ES module, no build step. Imported by app.js. Styles: app.css ("Dòng đời").
 import { esc } from './model.js';
 import { searchPeople } from './fuzzy.js';
-import { toolbar, ltags, fpanel, cic, addBtn, tag } from './ui.js';
+import { toolbar, ltags, fpanel, cic, addBtn, tag, card } from './ui.js';
 import { EVENT_TYPES, EVENT_TYPE_KEYS, SOURCE_QUALITY, parseEventDate, formatEventDate, sortEvents, eventDays, yearOfDays,
   birthIso, ageAt, stageOf, STAGES, autoSummary } from './events.js';
 
@@ -212,17 +212,17 @@ export function lifeStoriesHtml({ name, events, summary, stories, canEdit, canAd
   const body = summary ? summary.body : autoSummary(name, events);
   const more = (text) => (text.length > STORY_LONG ? '<button type="button" class="btn gh sm" data-st-more>Đọc tiếp</button>' : '');
   const clamp = (text) => `<p${text.length > STORY_LONG ? ' class="rv-clamp"' : ''}>${esc(text)}</p>`;
-  const sumCard = body ? `<section class="cd lifestory" aria-label="Câu chuyện đời"><div class="lshead"><h3 class="lsh">Câu chuyện đời${summary ? '' : ' <span class="tag gray">tự tạo</span>'}</h3>`
+  const sumCard = body ? `${card(`<div class="lshead"><h3 class="lsh">Câu chuyện đời${summary ? '' : ' <span class="tag gray">tự tạo</span>'}</h3>`
     + (canEdit ? `<button type="button" class="ib" data-sum-edit aria-label="Sửa" title="Sửa">${cic('pencil', 16)}</button>` : '') + `</div>`
-    + `${clamp(body)}${more(body)}</section>` : '';
-  const card = (s) => {
+    + `${clamp(body)}${more(body)}`, { tag: 'section', cls: 'lifestory', attrs: `aria-label="Câu chuyện đời"` })}` : '';
+  const storyCard = (s) => {
     const photos = (s.photos || []).length ? `<div class="stry-ph">${s.photos.map((u) => `<img src="${esc(u)}" alt="" loading="lazy">`).join('')}</div>` : '';
-    return `<article class="cd stry"><h3>${esc(s.title || 'Câu chuyện')}</h3>${photos}${clamp(s.body || '')}${more(s.body || '')}</article>`;
+    return `${card(`<h3>${esc(s.title || 'Câu chuyện')}</h3>${photos}${clamp(s.body || '')}${more(s.body || '')}`, { tag: 'article', cls: 'stry' })}`;
   };
   const add = canAdd ? '<button type="button" class="btn ter sm" data-st-add>+ Thêm câu chuyện</button>' : '';
   if (!add && !sumCard && !list.length) return '';
   const folded = list.length > STORY_SHOW;
-  const cards = list.slice(0, STORY_SHOW).map(card).join('');
+  const cards = list.slice(0, STORY_SHOW).map(storyCard).join('');
   const rest = folded ? `<button type="button" class="btn ter sm" data-st-all>Xem tất cả ${list.length} câu chuyện</button><div class="stry-more" hidden>${list.slice(STORY_SHOW).map(card).join('')}</div>` : '';
   return `<div class="stories lifeblock">${add}${sumCard}${cards}${rest}</div>`;
 }

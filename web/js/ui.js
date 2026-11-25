@@ -47,11 +47,15 @@ export const tag = (label, { kind = 'tag', tone = '', sm = false, on = false, hr
   if (kind === 'family') return `<span class="tag family">${lead}<span class="tag-n">${label}</span></span>`;
   return `<span class="tag${tone ? ' ' + tone : ''}${sm ? ' sm' : ''}">${label}</span>`;
 };
-// Section: one labelled block of a page. variant 'card': a bordered panel (.sec-card) with a heading row (.relhead h2, extra html
-// after it); cls adds hooks (relsec, consec, pl-sec). 'group' (Thêm and account lists: .mg, optional heading, a grid of rows) or
-// 'members' (members page: .msec with its own heading id, for aria-labelledby).
-export const section = (title, body, { variant = 'group', id = '', label = '', cls = '', extra = '' } = {}) => {
-  if (variant === 'card') return `<section class="sec-card${cls ? ' ' + cls : ''}"${label ? ` aria-label="${esc(label)}"` : ''}><div class="relhead"><h2>${title}</h2>${extra}</div>${body}</section>`;
+// Card: the one bordered panel (.cd, app.css). Untitled containers (lists, forms, sticky hosts, button or article
+// wrappers) go through card(); a titled block goes through section(title, body, { variant: 'card' }).
+export const card = (body, { tag = 'div', cls = '', attrs = '' } = {}) => `<${tag} class="cd${cls ? ' ' + cls : ''}"${attrs ? ' ' + attrs : ''}>${body}</${tag}>`;
+// Section: one labelled block of a page. variant 'card': a .cd panel whose heading (level: 2 or 3, default 3) sits in a
+// .relhead row with extra html after it; no heading element when title is empty. cls adds hooks (relsec, consec, pl-sec).
+// 'group' (Thêm and account lists: .mg, optional heading, a grid of rows) or 'members' (members page: .msec with its own
+// heading id, for aria-labelledby).
+export const section = (title, body, { variant = 'group', id = '', label = '', cls = '', extra = '', level = 3, attrs = '', hcls = '' } = {}) => {
+  if (variant === 'card') { const h = `h${level === 2 ? 2 : 3}`; return `<section class="cd${cls ? ' ' + cls : ''}"${label ? ` aria-label="${esc(label)}"` : ''}${attrs ? ' ' + attrs : ''}>${title || extra ? `<div class="relhead">${title ? `<${h}${hcls ? ` class="${hcls}"` : ''}>${title}</${h}>` : ''}${extra}</div>` : ''}${body}</section>`; }
   if (variant === 'members') return `<section class="msec" aria-labelledby="${id}"><h2 id="${id}">${title}</h2>${body}</section>`;
   return `<section class="mg">${title ? `<h2 class="mg-h">${title}</h2>` : ''}${body}</section>`;
 };

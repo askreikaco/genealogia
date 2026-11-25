@@ -2,7 +2,7 @@
 // links (⇄), oldest founder first, 50 entries a page (server: clan-routes.js; rules: clan-core.js). Read only.
 // Trees the viewer cannot see are a count only. Online only: the page needs the server.
 import { esc } from './model.js';
-import { calmRow, surnameTile, surnameTileOf, tag } from './ui.js';
+import { calmRow, surnameTile, surnameTileOf, tag, card } from './ui.js';
 import { clanHref, familySurname, inClan } from './clan-core.js';
 import { countryName } from './countries.js';
 
@@ -70,13 +70,13 @@ function treeRow(t, surname) {
 }
 // Editors only (the server sends hints to editors): historical mass changes that may relate to this surname. A hint is a
 // suggestion; it is never assigned to a tree.
-const hintsHtml = (hs) => (hs && hs.length ? `<section class="cd clan-hint" aria-label="Gợi ý lịch sử"><b class="clan-h">Gợi ý lịch sử · có thể liên quan</b>
+const hintsHtml = (hs) => (hs && hs.length ? `${card(`<b class="clan-h">Gợi ý lịch sử · có thể liên quan</b>
   <span class="sub">Chỉ để đối chiếu, không gán cho cây nào.</span>
-  ${hs.map((h) => `<p class="clan-hint-row"><b>${esc(h.title)}</b> <span class="sub">${esc(h.year)} · ${esc(h.confidence === 'tradition' ? 'theo truyền thống' : h.confidence)}</span><br><span class="sub">${esc(h.note)}</span><br><span class="sub">Nguồn: ${esc(h.source)}</span></p>`).join('')}</section>` : '');
-const groupHtml = (g, surname) => `<section class="cd clan-clu" aria-label="Cụm ${esc(g.label)}">
+  ${hs.map((h) => `<p class="clan-hint-row"><b>${esc(h.title)}</b> <span class="sub">${esc(h.year)} · ${esc(h.confidence === 'tradition' ? 'theo truyền thống' : h.confidence)}</span><br><span class="sub">${esc(h.note)}</span><br><span class="sub">Nguồn: ${esc(h.source)}</span></p>`).join('')}`, { tag: 'section', cls: 'clan-hint', attrs: `aria-label="Gợi ý lịch sử"` })}` : '');
+const groupHtml = (g, surname) => `${card(`
   <b class="clan-h">Cụm ${esc(g.trees[0].founder ? g.trees[0].founder.name : g.label)}${g.year ? ` (${g.year})` : ''}</b>
   <span class="sub">${g.trees.length} cây · ${num(g.people)} người</span>
-  <div class="clan-rows">${g.trees.map((t) => treeRow(t, surname)).join('')}</div></section>`;
+  <div class="clan-rows">${g.trees.map((t) => treeRow(t, surname)).join('')}</div>`, { tag: 'section', cls: 'clan-clu', attrs: `aria-label="Cụm ${esc(g.label)}"` })}`;
 
 let seq = 0; // the newest request wins (the user may move on while one loads). The loading state has no h1, so the bar
 // takes the page title (Họ X) when it arrives.
@@ -104,10 +104,10 @@ export async function clanPage(main, slug, { page = 1, country = '' } = {}) {
   const total = (j.countries || []).reduce((n, c) => n + c.trees, 0);
   const chip = (code, label, n) => tag(`${esc(label)} <span class="sub">${num(n)}</span>`, { kind: 'chip', on: (j.country || '') === code, href: `#ho/${esc(slug)}${code ? '?qg=' + esc(code) : ''}` });
   const chips = j.countries?.length ? `<nav class="clan-qg" aria-label="Quốc gia">${chip('', 'Tất cả', total)}${j.countries.map((c) => chip(c.code, c.code === 'NONE' ? 'Chưa rõ' : countryName(c.code), c.trees)).join('')}</nav>` : '';
-  const unlinked = j.unlinked.length || (j.page === j.pages && j.private_count) ? `<section class="cd clan-clu clan-un" aria-label="Cây chưa liên kết">
+  const unlinked = j.unlinked.length || (j.page === j.pages && j.private_count) ? `${card(`
     <b class="clan-h">Cây chưa liên kết</b><span class="sub">Chưa có người nào được hai cây xác nhận là cùng một người.</span>
     <div class="clan-rows">${j.unlinked.map((t) => treeRow(t, s)).join('')}</div>
-    ${j.page === j.pages && j.private_count ? `<p class="clan-priv">+${num(j.private_count)} cây riêng tư</p>` : ''}</section>` : '';
+    ${j.page === j.pages && j.private_count ? `<p class="clan-priv">+${num(j.private_count)} cây riêng tư</p>` : ''}`, { tag: 'section', cls: 'clan-clu clan-un', attrs: `aria-label="Cây chưa liên kết"` })}` : '';
   main.innerHTML = `<h1>Họ ${esc(s)}${j.han ? ` <span lang="zh-Hant">${esc(j.han)}</span>` : ''}</h1>
     <div class="kpis s"><div class="kpi"><span class="sub">Cụm dòng họ</span><b>${num(j.kpis.groups)}</b></div><div class="kpi"><span class="sub">Cây</span><b>${num(j.kpis.trees)}</b></div><div class="kpi"><span class="sub">Người</span><b>${num(j.kpis.people)}</b></div></div>
     ${chips}

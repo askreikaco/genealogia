@@ -101,7 +101,7 @@ export function relSection(M, p, ctx = {}) {
   setUntag(relUntag);
   const note = relsOf(M).source !== 'table' ? '<p class="sub">Quan hệ hiện theo dữ liệu cũ. Quản trị cần chạy chuyển dữ liệu quan hệ để sửa ở đây.</p>' : '';
   return section('Quan hệ', `${ctx.links || ''}${note}
-    <div id="reltb" class="stk">${relToolbar(M, p)}</div>${relSheet(M, p)}<div id="relbody">${relBody(M, p, ctx)}</div>`, { variant: 'card', label: 'Quan hệ', cls: 'relsec' });
+    <div id="reltb" class="stk">${relToolbar(M, p)}</div>${relSheet(M, p)}<div id="relbody">${relBody(M, p, ctx)}</div>`, { variant: 'card', label: 'Quan hệ', cls: 'relsec sec-card', level: 2 });
 }
 function relBody(M, p, ctx) {
   const id = p.id; const { parents, partners, kids, sibs, ix } = rowsFor(M, id);
@@ -190,7 +190,7 @@ export function pedigreeHtml(M, id, shown = 4, ctx = {}) {
     const own = it.ghost ? `<li class="ped-fold" style="--d:${it.ghost.d}">${ghostRow({ closed: `Họ ${surnameOf(nameOf(it.ghost.root))} · ${it.ghost.n} đời`, tiles: it.ghost.tiles.map((x) => surnameOf(nameOf(x))), body: `<ul class="ped ped-hid">${list(it.ghost.items)}</ul>` })}</li>` : '';
     return row(it) + own;
   }).join('');
-  return section('Tổ tiên', `<ul class="ped">${list(items)}</ul>`, { variant: 'card', label: 'Tổ tiên', cls: 'relsec' });
+  return section('Tổ tiên', `<ul class="ped">${list(items)}</ul>`, { variant: 'card', label: 'Tổ tiên', cls: 'relsec sec-card', level: 2 });
 }
 
 // ---------- sheets ----------

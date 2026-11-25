@@ -2,7 +2,7 @@
 // trees who may be one person, with the reasons; an editor of either tree answers "Không phải" or "Đề nghị liên kết".
 // A proposal goes through the normal links flow, so the other tree still decides (owner/admin of both: linked at once).
 import { esc } from './model.js';
-import { toast, tag } from './ui.js';
+import { toast, tag, section } from './ui.js';
 
 async function getJson(url, opts) {
   const r = await fetch(url, { cache: 'no-store', ...opts });
@@ -28,7 +28,7 @@ export async function reviewSection(main, before, fams, href) {
   for (const { s, f } of lists.flat()) { if (seen.has(s.id)) continue; seen.add(s.id); rows.push(rowHtml(s, f, href)); }
   let box = main.querySelector('#mtpend');
   if (!box) { box = document.createElement('div'); box.id = 'mtpend'; before.parentNode.insertBefore(box, before); }
-  box.innerHTML = rows.length ? `<section class="cd mt-pend"><h2>Có thể là cùng một người</h2><p class="sub">Gợi ý tự động từ tên, năm sinh, năm mất, cha mẹ, vợ chồng và nơi chốn. Không có gì được nối nếu không ai đồng ý.</p>${rows.join('')}</section>` : '';
+  box.innerHTML = rows.length ? section('Có thể là cùng một người', `<p class="sub">Gợi ý tự động từ tên, năm sinh, năm mất, cha mẹ, vợ chồng và nơi chốn. Không có gì được nối nếu không ai đồng ý.</p>${rows.join('')}`, { variant: 'card', cls: 'mt-pend', level: 2 }) : '';
   box.onclick = async (e) => {
     const b = e.target.closest('[data-mt]'); if (!b) return;
     b.disabled = true;

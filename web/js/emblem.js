@@ -2,6 +2,7 @@
 // The server keeps one raster image per family (PNG, JPEG or WebP, 256 KB at most); without one, the colored surname crest shows (ui.js).
 
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger } from './danger.js';
+import { section } from './ui.js';
 
 const TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX = 256 * 1024;
@@ -18,7 +19,7 @@ export function emblemField(f) {
     ? `<div class="emb"><span class="crest-sq crest-lg" aria-hidden="true">${famCrest(f)}</span>
       <div class="emb-acts"><label class="btn ter sm">Đổi ảnh…${pick}</label>${dangerButton('Gỡ biểu tượng', 'id="emb-del"', { size: 'sm' })}</div></div>`
     : `<label class="calm dense emb-add" tabindex="0">${pick}<span class="calm-t"><b class="calm-n">Thêm biểu tượng</b><span class="calm-s">Ảnh PNG, JPEG hoặc WebP, tối đa 256 KB</span></span></label>`;
-  return `<div class="cd"><h3>Biểu tượng dòng họ</h3>${body}<p class="err" id="emb-err" hidden></p></div>`;
+  return section('Biểu tượng dòng họ', `${body}<p class="err" id="emb-err" hidden></p>`, { variant: 'card' });
 }
 
 // Wires the field after it is in the page. onDone(message) runs after a save or a removal.
