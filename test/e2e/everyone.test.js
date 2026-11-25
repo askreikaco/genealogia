@@ -74,9 +74,9 @@ test('list: default count line is everyone, N / N (married-in people included)',
     const { ctx, page, errors } = await open(b, '/duong/list');
     // the count line and cards render after the persons arrive: wait for the final values, not the element
     await page.waitForFunction((n) => (document.querySelector('.lcount')?.textContent || '').trim().startsWith(n), `${N} / ${N}`);
-    await page.waitForFunction((n) => document.querySelectorAll('.cards .card').length === n, N);
+    await page.waitForFunction((n) => document.querySelectorAll('.cards .pi-card').length === n, N);
     assert.equal((await page.textContent('.lcount')).trim().split(' người')[0], `${N} / ${N}`);
-    assert.equal(await page.locator('.cards .card').count(), N);
+    assert.equal(await page.locator('.cards .pi-card').count(), N);
     assert.deepStrictEqual(errors, []);
     await ctx.close();
   } finally { await b.close(); }

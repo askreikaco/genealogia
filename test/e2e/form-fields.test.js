@@ -33,25 +33,27 @@ test('guest, member and editor get the same field set (contact and guest-only fi
   } finally { await browser.close(); }
 });
 
-test('add a child under a parent with 3 dated siblings: Đời 7 and Thứ 3 are prefilled', { skip }, async () => {
+test('add a child under a parent with 3 dated siblings: Đời 7 and Thứ 3 are saved with the child', { skip }, async () => {
   const browser = await launch();
   try {
     const s = await open(browser, { role: 'editor', path: '#them' });
-    // use the list row's own action: "Thêm con" of PA opens this same form with the parent filled (the profile ⋯ menu no longer repeats it)
+    // "Thêm con" of PA: the search first ("Không thấy" goes on to the basic form); the child is saved with Đời and Thứ
     await s.page.evaluate(() => { location.hash = '#list'; });
     await s.page.waitForSelector('main');
     await s.page.locator('[data-menu="PA"]').first().click();
     await s.page.locator('.menu [data-act="child"][data-id="PA"]').click();
-    await s.page.waitForSelector('#fpform');
-    const gen = await s.page.textContent('[data-au="gen"] .fp-ro-v');
-    assert.equal(gen.trim(), '7', 'Đời = parent 6 + 1');
-    assert.equal(await s.page.locator('[data-acc="gd"]').getAttribute('class').then((c) => /open/.test(c)), true, 'Gia đình opens when adding');
-    await expand(s.page, 'sinh');
-    await s.page.fill('input[name=birth_smart]', '1958');
-    const thu = await s.page.textContent('[data-au="thu"] .fp-ro-v');
-    assert.equal(thu.trim(), '3', 'after 1950 and 1955, before 1960');
-    const sum = await s.page.textContent('[data-acc-sum="gd"]');
-    assert.match(sum, /Cha\/mẹ Dương Văn Cha/);
+    await s.page.waitForSelector('#add-q');
+    await s.page.click('[data-new]');
+    await s.page.waitForSelector('#add-f input[name=name]');
+    await s.page.fill('#add-f input[name=name]', 'Dương Văn Ba');
+    await s.page.fill('#add-f input[name=birth]', '1958');
+    await s.page.click('#add-f button[type=submit]');
+    for (let i = 0; i < 50 && !s.log.ops.some((o) => o.fields && o.fields.name === 'Dương Văn Ba'); i++) await s.page.waitForTimeout(100);
+    const added = s.log.ops.find((o) => o.fields && o.fields.name === 'Dương Văn Ba');
+    assert.ok(added, 'the child is saved');
+    assert.equal(added.fields.parent, 'PA');
+    assert.equal(added.fields.gen, 7, 'Đời = parent 6 + 1');
+    assert.equal(added.fields.thu, '3', 'after 1950 and 1955, before 1960');
     assert.deepEqual(s.log.errors, []);
     await s.ctx.close();
   } finally { await browser.close(); }

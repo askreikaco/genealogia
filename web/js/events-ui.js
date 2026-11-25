@@ -2,7 +2,7 @@
 // Plain ES module, no build step. Imported by app.js. Styles: app.css ("Dòng đời").
 import { esc } from './model.js';
 import { searchPeople } from './fuzzy.js';
-import { lbar, ltags, fpanel, cic, addBtn } from './ui.js';
+import { toolbar, ltags, fpanel, cic, addBtn, tag } from './ui.js';
 import { EVENT_TYPES, EVENT_TYPE_KEYS, SOURCE_QUALITY, parseEventDate, formatEventDate, sortEvents, eventDays, yearOfDays,
   birthIso, ageAt, stageOf, STAGES, autoSummary } from './events.js';
 
@@ -114,7 +114,7 @@ export function tlToolbar(f, wide) {
     + `<button type="button" class="chipb${f.desc ? ' on' : ''}" data-tl-f="desc" aria-pressed="${f.desc}">Con cháu</button>`
     + `<button type="button" class="chipb${f.hist ? ' on' : ''}" data-tl-f="hist" aria-pressed="${f.hist}">Lịch sử</button>`
     + `<button type="button" class="chipb${f.source ? ' on' : ''}" data-tl-f="source" aria-pressed="${f.source}">Có nguồn</button>`;
-  return lbar('tlq', 'Tìm trong dòng đời', f.q, active, wide ? quick : '', addBtn('data-ev-add', 'Thêm sự kiện'));
+  return toolbar({ id: 'tlq', ph: 'Tìm trong dòng đời', val: f.q, active: active, quick: wide ? quick : '', add: addBtn('data-ev-add', 'Thêm sự kiện') });
 }
 // The one compact approximate value: "~" on screen, "khoảng …" for screen readers (role img + aria-label).
 export const approxHtml = (text, aria) => `<span role="img" aria-label="${esc(aria)}">~${esc(text)}</span>`;
@@ -151,7 +151,7 @@ function estCardHtml(row, { estSave }) {
   const basis = (e.basis || []).map((b) => `<span class="est-line">${esc(b)}</span>`).join('') || '<span class="est-line">Chưa có căn cứ.</span>';
   return `<li class="rel est"><div class="dt"><b class="tl-approx">~${esc(e.mid)}</b></div>`
     + `<div class="rail"><span class="dot"></span></div>`
-    + `<div class="card"><span class="kind">${typeIcon(e.type, 16)}${esc(e.label)} <span class="tag gray sm">tự động</span> <span class="tag gray sm">ước tính</span></span>`
+    + `<div class="card"><span class="kind">${typeIcon(e.type, 16)}${esc(e.label)} ${tag(`tự động`, { tone: 'gray', sm: true })} ${tag(`ước tính`, { tone: 'gray', sm: true })}</span>`
     + `<p class="est-range">khoảng ${esc(e.range)}</p>`
     + `<details class="est-basis"><summary>Cách tính</summary><div class="est-lines">${basis}</div></details>`
     + (estSave ? `<button type="button" class="btn sm gh" data-est-save="${esc(row.id)}">Lưu thành sự kiện</button>` : '')

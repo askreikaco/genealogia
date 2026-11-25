@@ -1,5 +1,5 @@
 // E2E: the side nav toggle (#sntoggle, footer of the side nav) collapses and expands the nav, and the choice persists.
-// Same rules as reika-app (app/src/shell.tsx): no stored choice means desktop (>= 66rem) starts expanded and tablet
+// Same rules as the REIKA shell: no stored choice means desktop (>= 66rem) starts expanded and tablet
 // (42-65.98rem) starts as rail; a stored choice ('gp_rail' = '1' rail, '0' expanded) wins.
 // Tablet (672-1055 px, e.g. iPad landscape) used to hide .sn-foot, so the toggle was 0x0 and could not be tapped.
 // Mocked /api responses (no database). Needs playwright and Chrome: see _e2e-harness.js.

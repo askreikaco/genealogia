@@ -12,6 +12,7 @@ const RULES = require('./match-rules');
 const yearOf = (v) => { const m = /(\d{4})/.exec(String(v || '')); return m ? m[1] : ''; };
 const years = (d) => [yearOf(d.born || d.birth_date), yearOf(d.died || d.death_date)].filter(Boolean).join('–');
 const EDIT = ['owner', 'admin', 'editor'];
+const MEMBERS = ['owner', 'admin', 'editor', 'member']; // see living people (the same set as the client's isMember)
 
 function mount(app, d) {
   const { pool, who, famOf, findFamily, canRead, H, HttpError, propose } = d;
@@ -104,6 +105,31 @@ function mount(app, d) {
     }
     await pool.query("update match_suggestions set status='linked', decided_by=$2, decided_at=now() where id=$1", [r.id, actor(w)]);
     res.json({ ok: true, status: out.status, id: out.id || null });
+  }));
+
+  // The add flow's duplicate check (web/js/addflow.js, "Có thể đã có người này"): the people of this tree that a new
+  // person with the entered data may be, scored with the duplicate rules (match-rules candidatesFor). Read only: who
+  // may read the tree may ask. A guest sees deceased people only (a living person's name and years are for members).
+  app.post('/api/persons/candidates', H(async (req, res) => {
+    const f = await famOf(req); const w = await who(req, f.id);
+    if (!canRead(f, w)) throw new HttpError(403, 'Dòng họ này là riêng tư.');
+    const b = req.body?.data && typeof req.body.data === 'object' ? req.body.data : {};
+    const str = (v, n) => String(v ?? '').trim().slice(0, n);
+    const data = { name: str(b.name, 200), sex: b.sex === 'm' || b.sex === 'f' ? b.sex : '', born: str(b.born, 20), birth_date: str(b.birth_date, 20),
+      died: str(b.died, 20), death_date: str(b.death_date, 20) };
+    res.set('Cache-Control', 'no-store');
+    if (!data.name) return res.json({ items: [] });
+    const member = MEMBERS.includes(w.role);
+    const hits = RULES.candidatesFor(await M.loadPeople(pool, [f.id]), data, { limit: 50 });
+    const rows = hits.length ? (await pool.query('select id, data from persons where family_id = $1 and not deleted and id = any($2::text[])', [f.id, hits.map((h) => h.id)])).rows : [];
+    const byId = new Map(rows.map((r) => [r.id, r.data]));
+    const items = [];
+    for (const h of hits) {
+      const d = byId.get(h.id); if (!d) continue;
+      if (!member && !(d.died || d.death_date)) continue;
+      items.push({ id: h.id, name: d.name || '', years: years(d), score: h.score, reasons: h.reasons });
+    }
+    res.json({ items: items.slice(0, 5) });
   }));
 }
 

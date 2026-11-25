@@ -9,7 +9,8 @@
         "server/mail-templates.js"
       ],
       "e2e": [
-        "test/e2e/claim-pages.test.js"
+        "test/e2e/claim-pages.test.js",
+        "test/e2e/nav-claim.test.js"
       ]
     },
     "decisions": {
@@ -51,6 +52,15 @@
         "test/e2e/match*.test.js"
       ]
     },
+    "addperson": {
+      "paths": [
+        "web/js/addflow.js",
+        "server/test/add-candidates.test.js"
+      ],
+      "e2e": [
+        "test/e2e/add-person-flow.test.js"
+      ]
+    },
     "dupes": {
       "paths": [
         "server/merge*.js",
@@ -85,6 +95,17 @@
       ],
       "e2e": [
         "test/e2e/places*.test.js"
+      ]
+    },
+    "branch-trees": {
+      "paths": [
+        "server/branch-*.js",
+        "server/test/branch*.test.js",
+        "web/js/branch-trees.js",
+        "server/migrations/036_branch_trees.sql"
+      ],
+      "e2e": [
+        "test/e2e/branch*.test.js"
       ]
     },
     "links": {
@@ -187,7 +208,8 @@
         "web/js/relui.js"
       ],
       "e2e": [
-        "test/e2e/relations*.test.js"
+        "test/e2e/relations*.test.js",
+        "test/e2e/profile-add-relative.test.js"
       ]
     },
     "elder": {
@@ -205,10 +227,13 @@
     "contacts": {
       "paths": [
         "server/test/contacts*.test.js",
+        "server/contact-rules.js",
+        "server/scripts/backfill-contacts.js",
         "web/js/contacts-*.js"
       ],
       "e2e": [
-        "test/e2e/contacts-*.test.js"
+        "test/e2e/contacts-import.test.js",
+        "test/e2e/contacts-list.test.js"
       ]
     },
     "events": {
@@ -254,7 +279,26 @@
         "server/test/gedcom*.test.js"
       ],
       "e2e": [
-        "test/e2e/gedcom*.test.js"
+        "test/e2e/gedcom*.test.js",
+        "test/e2e/gedcom-branch.test.js"
+      ]
+    },
+    "surnames": {
+      "paths": [
+        "server/surname-rules.js",
+        "server/surname-hints.json",
+        "server/migrations/035_surnames.sql",
+        "server/test/surname-rules.test.js",
+        "server/test/surnames-api.test.js",
+        "server/match-rules.js",
+        "server/match-store.js",
+        "server/clan-routes.js",
+        "web/js/surname-rules.js",
+        "web/js/surnames.js",
+        "test/e2e/surnames-pages.test.js"
+      ],
+      "e2e": [
+        "test/e2e/surnames-pages.test.js"
       ]
     },
     "han": {
@@ -288,10 +332,12 @@
     "profile": {
       "paths": [
         "web/js/profile*.js",
+        "web/js/person-item.js",
         "server/test/profile*.test.js"
       ],
       "e2e": [
-        "test/e2e/profile-*.test.js"
+        "test/e2e/profile-*.test.js",
+        "test/e2e/person-contract.test.js"
       ]
     },
     "facts": {
@@ -367,6 +413,10 @@
         "scripts/raw-values.mjs",
         "scripts/raw-values-baseline.json",
         "server/test/raw-values.test.js",
+        "scripts/sync-ds.mjs",
+        "scripts/reika-ds.pin.json",
+        "server/test/ds-vendor.test.js",
+        "web/vendor/reika-ds/**",
         "web/listui.css",
         "web/fields.css"
       ],
@@ -421,6 +471,7 @@
         "web/js/emblem.js",
         "web/js/surnames-vi.js",
         "server/test/crest-guard.test.js",
+        "server/test/ui-ds-helpers.test.js",
         "web/tokens.css"
       ],
       "e2e": [

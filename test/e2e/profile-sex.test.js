@@ -83,9 +83,9 @@ test('Tìm list: labelled shapes replace the colour-only dots; unknown sex has n
   for (const scheme of ['light', 'dark']) {
     const { page, ctx, errors } = await open('list', { scheme });
     try {
-      await page.waitForSelector('.cards .card', { timeout: 8000 });
+      await page.waitForSelector('.cards .pi-card', { timeout: 8000 });
       assert.equal(await page.locator('.cards .dot').count(), 0, 'no colour-only dot');
-      const card = (name) => page.locator('.cards .card', { hasText: name });
+      const card = (name) => page.locator('.cards .pi-card', { hasText: name });
       assert.equal(await card('Giả Văn An').locator('.sx.m[aria-label="Nam"]').count(), 1);
       assert.equal(await card('Vương Thị Lan').locator('.sx.f[aria-label="Nữ"]').count(), 1);
       assert.equal(await card('Dương Chưa Rõ').locator('.sx').count(), 0, 'unknown sex: no shape');

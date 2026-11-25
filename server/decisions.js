@@ -272,18 +272,22 @@ function mount(app, d) {
   app.get('/api/merge/preview', H(async (req, res) => {
     const { f, w } = await role(req, 'editor');
     try {
+      // the older profile is always the kept one, whatever order the two ids come in (merge.js preview)
       const pv = await MERGE.preview(pool, f.id, String(req.query.keep || ''), String(req.query.drop || ''), {});
       const el = await electorate(pool, f.id, Date.now());
       const side = (p) => ({ id: p.id, name: p.data?.name || p.id, data: p.data || {} });
-      res.json({ keep: side(pv.keep), drop: side(pv.drop), defaults: MR.defaultChoices(pv.keep.data, pv.drop.data), voters: el.voters.length, solo: el.solo,
+      res.json({ keep: side(pv.keep), drop: side(pv.drop), defaults: MR.defaultChoices(pv.keep.data, pv.drop.data),
+        fields: MR.classifyFields(pv.keep.data, pv.drop.data), voters: el.voters.length, solo: el.solo,
         days: R.RULE.windowDays, can_propose: !!el.voters.length, who: w.role });
     } catch (e) { if (e.name === 'MergeError') throw new HttpError(e.status, e.message); throw e; }
   }));
 
   // POST /api/merge/propose { keep, drop, choices, reason }: opens a family vote (kind merge_person). Nothing moves until it passes.
+  // The kept person is the older profile: the client's keep id is not trusted (merge.js preview decides); choices are per
+  // conflicting field, relative to that kept person.
   app.post('/api/merge/propose', H(async (req, res) => {
     const { f, w } = await role(req, 'editor');
-    const keep = String(req.body?.keep || ''); const drop = String(req.body?.drop || '');
+    const idA = String(req.body?.keep || ''); const idB = String(req.body?.drop || '');
     const reason = String(req.body?.reason || '').trim().slice(0, 500);
     const choices = req.body?.choices && typeof req.body.choices === 'object' ? req.body.choices : {};
     if (reason.length < 3) throw new HttpError(400, 'Cần ghi lý do gộp.');
@@ -292,7 +296,8 @@ function mount(app, d) {
     try {
       await c.query('begin');
       let pv;
-      try { pv = await MERGE.preview(c, f.id, keep, drop, choices); } catch (e) { if (e.name === 'MergeError') throw new HttpError(e.status, e.message); throw e; }
+      try { pv = await MERGE.preview(c, f.id, idA, idB, choices); } catch (e) { if (e.name === 'MergeError') throw new HttpError(e.status, e.message); throw e; }
+      const keep = pv.keep.id; const drop = pv.drop.id;
       if ((await c.query(`select 1 from decisions where state='open' and ((kind='remove_person' and subject_ref = any($1::text[]))
           or (kind='merge_person' and (subject_ref = any($1::text[]) or payload->>'keep' = any($1::text[]))))`, [[keep, drop]])).rowCount) {
         throw new HttpError(409, 'Đã có biểu quyết đang mở cho một trong hai người.');

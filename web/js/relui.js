@@ -4,8 +4,9 @@ import * as S from './store.js';
 import { esc, rank, years, isDead } from './model.js';
 import { index, siblingsOf, descendantLevels, pedigreeRows, ancestorChain, coupleNotes, PC_LABEL, CP_LABEL, PC_KINDS, CP_KINDS } from './relgraph.js';
 import { kinPath, lineDesc, term as kinTerm, resolveRegion, KIN_REGION_KEY } from './kin/index.js';
-import { calmRow, calmAct, popMenu, cic, surnameTile, surnameOf, ghostRow, moreFold, lbar, ltags, fpanel, addBtn, setUntag } from './ui.js';
+import { calmRow, calmAct, popMenu, cic, surnameTile, surnameOf, ghostRow, moreFold, toolbar, ltags, fpanel, addBtn, setUntag, sheet as openDialog, KEEP } from './ui.js';
 import { relPrefill, nextOrder } from './prefill.js';
+import { personItem } from './person-item.js';
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger, undoToast, restoreTrash } from './danger.js';
 
 const cache = new WeakMap();
@@ -82,7 +83,7 @@ function addStart(id) {
 }
 function relToolbar(M, p) {
   const add = relsOf(M).editable ? addBtn(`data-rel-add="${esc(p.id)}"`, 'Thêm quan hệ') : '';
-  return lbar('relq', 'Tìm trong quan hệ', RF.q, rfActive(), '', add);
+  return toolbar({ id: 'relq', ph: 'Tìm trong quan hệ', val: RF.q, active: rfActive(), add: add });
 }
 function relSheet(M, p) {
   const sel = (k, label, opts) => `<label>${label}<select data-relf="${k}"><option value="">Tất cả</option>${opts.map(([v, l]) => `<option value="${esc(v)}" ${RF[k] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
@@ -182,7 +183,7 @@ export function pedigreeHtml(M, id, shown = 4, ctx = {}) {
     let label;
     if (it.type === 'root') label = it.mother ? `Thủy tổ họ ${surnameOf(nameOf(it.id))}` : `Thủy tổ${gen ? ' · Đời ' + gen : ''}`;
     else { label = kinLabel(it.id); if (label === 'Thủy tổ') label = `Tổ đời ${it.gen}`; } // a line top that is not a father-line root is "Tổ đời N"
-    return `<li style="--d:${it.d}">${calmRow({ href: ctx.personHref ? ctx.personHref(it.id) : '#', tile: surnameTile(nameOf(it.id)), title: nameOf(it.id), subtitle: esc(label) + ref, sex: sexOfId(it.id) })}</li>`;
+    return `<li style="--d:${it.d}">${personItem({ name: nameOf(it.id), sex: sexOfId(it.id) }, { href: ctx.personHref ? ctx.personHref(it.id) : '#', sub: esc(label) + ref })}</li>`;
   };
   const list = (its) => its.map((it) => {
     if (it.type === 'fold') return `<li class="ped-fold" style="--d:${it.d}">${ghostRow({ closed: `${it.gens} đời ẩn · ${it.people} người`, tiles: it.tiles.map((x) => surnameOf(nameOf(x))), body: `<ul class="ped ped-hid">${list(it.body)}</ul>` })}</li>`;
@@ -193,15 +194,15 @@ export function pedigreeHtml(M, id, shown = 4, ctx = {}) {
 }
 
 // ---------- sheets ----------
-let sheet = null;
+// The relation sheet is the shared sheet() (no submit: the body's own buttons act), with the rel-sheet look.
+let current = null;
 export function openSheet(html) {
-  sheet?.remove();
-  const d = document.createElement('dialog'); d.className = 'dlg rel-sheet'; d.innerHTML = `<div class="rel-body">${html}</div>`;
-  document.body.append(d); d.showModal(); sheet = d;
-  d.addEventListener('close', () => { d.remove(); if (sheet === d) sheet = null; });
+  const d = openDialog(`<div class="rel-body">${html}</div>`, () => KEEP, { cls: 'rel-sheet' });
+  d.addEventListener('close', () => { d.remove(); if (current === d) current = null; });
+  current = d;
   return d;
 }
-const closeSheet = () => { sheet?.close(); };
+const closeSheet = () => { current?.close(); };
 const err = (d, msg) => { const e = d.querySelector('.err') || d.querySelector('.rel-body').appendChild(Object.assign(document.createElement('p'), { className: 'err' })); e.textContent = msg; };
 
 async function postRel(family, body) {
@@ -267,7 +268,7 @@ function openAdd(M, anchorId, preset = null, start = null) {
         <label class="fld">Tìm người<input id="rel-q" value="${esc(st.q)}" autocomplete="off" placeholder="Nhập tên"></label>
         ${d0 ? `<div class="rel-dup"><b>Có thể là cùng một người: ${esc(d0.data.name)}${d0.data.born ? ' (' + esc(d0.data.born) + ')' : ''}</b><button class="btn ter sm" type="button" data-pick="${esc(d0.id)}">Dùng người này ›</button></div>` : ''}
         ${list.length ? `<p class="sub">Kết quả (${list.length})</p>` + list.map((p) => calmRow({ attrs: `data-pick="${esc(p.id)}"`, sex: p.data.sex, title: `${rank(p.data)} ${p.data.name}`, subtitle: esc([p.data.gen ? 'Đời ' + p.data.gen : '', years(p.data)].filter(Boolean).join(' · ')), dense: true })).join('') : ''}
-        ${S.isEditor() ? `<div class="relrows">${calmRow({ attrs: 'data-newp', title: 'Tạo người mới', subtitle: 'Mở biểu mẫu người mới; quan hệ được ghi sau khi lưu' })}</div>` : '<p class="sub">Người mới: gửi góp ý trước (nút Sửa), quản trị sẽ duyệt.</p>'}
+        ${S.isEditor() ? `<div class="relrows">${calmRow({ attrs: 'data-newp', title: 'Không thấy — tạo người mới', subtitle: 'Nhập tên, giới tính, năm sinh và mất; quan hệ được ghi sau khi lưu' })}</div>` : '<p class="sub">Người mới: gửi góp ý trước (nút Sửa), quản trị sẽ duyệt.</p>'}
         <div class="rel-foot"><button class="btn ter" type="button" data-back>Quay lại</button>${st.pick ? '<button class="btn" type="button" data-next>Tiếp</button>' : ''}</div>`;
       const qi = b.querySelector('#rel-q'); qi?.addEventListener('input', (e) => { st.q = e.target.value; draw(d); requestAnimationFrame(() => { const x = d.querySelector('#rel-q'); x?.focus(); x?.setSelectionRange(x.value.length, x.value.length); }); });
     } else {

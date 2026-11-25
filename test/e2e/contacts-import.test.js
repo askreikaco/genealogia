@@ -1,6 +1,6 @@
 // E2E: Nhập từ danh bạ. Family import (Thêm > Nhập danh bạ): upload a .vcf, review the matches (exact pre-checked,
-// a candidate and an unmatched contact not), save only the checked ones (empty fields only, already-filled skipped).
-// Person import (Liên hệ card, editors): one contact picked and saved to that person. Members see no import entry.
+// a candidate and an unmatched contact not), save only the checked ones (only the missing phone or email is added).
+// Person import (the person form's Liên hệ list, editors): one contact picked, its numbers and emails become rows. Members see no import entry.
 // Contact Picker path: when navigator.contacts.select exists, the picker button is the one primary action.
 // Parsing and matching run in the browser (web/js/contacts-parse.js); the test asserts that no contact data is sent to any
 // /api/contacts route. Only the confirmed contacts are saved, through /api/ops.
@@ -50,6 +50,7 @@ async function openApp(browser, base, { role = 'editor', picker = false, route =
       return json({ applied: (body.ops || []).map((o) => o.op_id), rejected: [] });
     }
     if (p.startsWith('/api/suggestions')) return json([]);
+    if (p.startsWith('/api/events')) return json({ items: [], stories: [] });
     return json({});
   });
   await page.goto(base + '/' + route);
@@ -75,7 +76,7 @@ test('family import: picker entry, then file review: exact pre-checked, candidat
     const dlg = page.locator('dialog.contact-import');
     await dlg.waitFor({ state: 'visible' });
     assert.equal(await dlg.locator('[data-pick]').count(), 1, 'the picker is the one primary action');
-    assert.equal(await dlg.locator('[data-file]').count(), 0, 'no file input when the picker exists');
+    assert.equal(await dlg.locator('[data-file]').count(), 1, 'the file is the secondary path, always there');
     await shot(page, 'contacts-entry.png');
     await ctx.close();
 
@@ -105,7 +106,7 @@ test('family import: picker entry, then file review: exact pre-checked, candidat
       // only PN gets fields: phone and email were empty. PA is already filled, so nothing is sent for it.
       const pn = again.ops.filter((o) => o.id === 'PN');
       assert.equal(pn.length, 1, 'one op for PN');
-      assert.deepEqual(pn[0].fields, { phone: '0912345678', email: 'khong@example.test' });
+      assert.deepEqual(pn[0].fields, { contacts: [{ type: 'phone', value: '0912345678' }, { type: 'email', value: 'khong@example.test' }] });
       assert.equal(again.ops.some((o) => o.id === 'PD' || o.id === 'PA'), false, 'no op for the candidate or the filled person');
       assert.deepEqual(again.errors, []);
       assert.deepEqual(errors, []);
@@ -113,24 +114,27 @@ test('family import: picker entry, then file review: exact pre-checked, candidat
   } finally { await ctx.close().catch(() => {}); }
 });
 
-test('person import: Liên hệ card for an editor picks one contact for this person (empty fields only)', { skip }, async () => {
+test('person import: from the person form (Liên hệ list) the chosen contact fills rows; nothing is saved until Lưu', { skip }, async () => {
   const { ctx, page, errors, ops } = await openApp(browser, base, { route: '#/duong/person/PN' });
   try {
-    await page.waitForSelector('[data-contact-import="PN"]', { timeout: 8000 });
-    await page.click('[data-contact-import="PN"]');
+    await page.waitForSelector('[data-ct-edit="PN"]', { timeout: 8000 });
+    await page.click('[data-ct-edit="PN"]');
+    await page.waitForSelector('[data-ct-import]', { timeout: 8000 });
+    await page.click('[data-ct-import]');
     const dlg = page.locator('dialog.contact-import');
     await dlg.waitFor({ state: 'visible' });
     assert.match(await dlg.locator('h2').textContent(), /Nhập từ danh bạ/);
     await dlg.locator('[data-file]').setInputFiles(VCF_FILE);
     await dlg.locator('.ci-list').waitFor({ state: 'visible' });
-    assert.equal(await dlg.locator('input[name=pick]').count(), 4, 'every contact of the file can be picked');
-    assert.match(await dlg.locator('.ci-note').textContent(), /Sẽ thêm: điện thoại, email/);
-    await dlg.getByRole('button', { name: 'Lưu' }).click();
+    await dlg.getByRole('button', { name: 'Thêm vào danh sách' }).click();
     await page.waitForFunction(() => !document.querySelector('dialog.contact-import'), null, { timeout: 8000 });
+    assert.equal(ops.filter((o) => o.id === 'PN').length, 0, 'the import does not save by itself');
+    assert.equal(await page.locator('[data-ct-row]').count(), 2, 'the first contact fills two rows: phone and email');
+    await page.click('#fpsave');
     await page.waitForTimeout(400);
     const pn = ops.filter((o) => o.id === 'PN');
     assert.equal(pn.length, 1);
-    assert.deepEqual(pn[0].fields, { phone: '0912345678', email: 'khong@example.test' });
+    assert.deepEqual(pn[0].fields.contacts, [{ type: 'phone', value: '0912345678' }, { type: 'email', value: 'khong@example.test' }]);
     assert.deepEqual(errors, []);
   } finally { await ctx.close(); }
 });
@@ -146,6 +150,6 @@ test('members do not see the import entries (Thêm row and Liên hệ button)', 
   try {
     await second.page.waitForSelector('section[aria-label="Hồ sơ"], .ptabs, h1', { timeout: 8000 });
     await second.page.waitForTimeout(300);
-    assert.equal(await second.page.locator('[data-contact-import]').count(), 0);
+    assert.equal(await second.page.locator('[data-ct-edit]').count(), 0, 'no edit link on the Liên hệ card for a member');
   } finally { await second.ctx.close(); }
 });

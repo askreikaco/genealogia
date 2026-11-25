@@ -1,17 +1,22 @@
-/* REIKA DS tokens (Carbon g10 / g100). The only place for colour, space, size, radius, z-index and motion values.
-   Colours are light-dark(light, dark): the page's color-scheme (system, or data-theme on <html>) picks one. */
+/* Tokens: the only place for colour, space, size, radius, z-index and motion values.
+   REIKA DS 0.2.0 (--rk-* and --cds-*, Carbon g10 / g100) and its IBM Plex faces come from web/vendor/reika-ds/ (sync: scripts/sync-ds.mjs).
+   Colours here are light-dark(light, dark) or aliases of --cds-*: the page's color-scheme (system, or data-theme on <html>) picks one. */
+@import url("vendor/reika-ds/tokens.css");
+@import url("vendor/reika-ds/fonts/fonts.css");
 :root{
   --sp-1:2px;--sp-2:4px;--sp-3:8px;--sp-4:12px;--sp-5:16px;--sp-6:24px;--sp-7:32px;--sp-8:48px;
-  --sz-touch:44px;--tree-indent:20px;--bw-strong:3px;--sz-field:48px;--sz-field-min:12rem;--sn-w:256px;--sn-rail:48px;--hd-btn:#292929;--hd-rule:#393939;
+  --sz-touch:44px;--tree-indent:20px;--bw-strong:3px;--sz-field:48px;--sz-field-min:168px;--sn-w:256px;--sn-rail:48px;--hd-btn:#292929;--hd-rule:#393939;
   --topbar-h:48px;--tabs-h:49px;--sticky-top:var(--topbar-h);
   --z-page:2;--z-sticky:5;--z-nav:20;--z-fixed-bar:19;--z-side:25;--z-header:30;--z-pop:40;--z-menu:50;--z-toast:60;
   --ease:cubic-bezier(.2,0,.38,.9);--dur-fast:.15s;--dur-rail:110ms;--r-0:0;--r-round:50%;
   --sans:'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;
-  --c-bg:light-dark(#f4f4f4,#161616);--c-layer:light-dark(#fff,#262626);--c-layer-2:light-dark(#e8e8e8,#333);--c-layer-sel:light-dark(#e0e0e0,#393939);
-  --c-border:light-dark(#e0e0e0,#393939);--c-border-strong:light-dark(#8d8d8d,#6f6f6f);
-  --c-text:light-dark(#161616,#f4f4f4);--c-text-2:light-dark(#525252,#c6c6c6);--c-text-3:light-dark(#6f6f6f,#a8a8a8);
-  --c-accent:light-dark(#0f62fe,#4589ff);--c-accent-soft:light-dark(#d0e2ff,#002d9c);
-  --c-danger:light-dark(#da1e28,#fa4d56);--c-warn:#f1c21b;--c-ok:light-dark(#198038,#42be65);
+  --c-bg:var(--cds-background);--c-layer:light-dark(#fff,#262626);--c-layer-2:light-dark(#e8e8e8,#333);--c-layer-sel:var(--cds-layer-selected-01);
+  --c-border:light-dark(#e0e0e0,#393939);--c-border-strong:var(--cds-border-strong-01);
+  /* list toolbar fields (search, Bộ lọc, +): a translucent text tint, so they show on any layer (card, page, sticky bar) in both themes */
+  --c-field-tint:color-mix(in srgb,var(--c-text) 8%,transparent);--c-field-tint-2:color-mix(in srgb,var(--c-text) 12%,transparent);
+  --c-text:var(--cds-text-primary);--c-text-2:var(--cds-text-secondary);--c-text-3:var(--cds-text-helper);
+  --c-accent:var(--cds-interactive);--c-accent-soft:light-dark(#d0e2ff,#002d9c);
+  --c-danger:var(--cds-support-error);--c-warn:#f1c21b;--c-ok:light-dark(#198038,#42be65);
   --c-scrim:light-dark(rgba(22,22,22,.5),rgba(0,0,0,.65));
   --c1:light-dark(#6929c4,#8a3ffc);--c2:#1192e8;--c4:#ee538b;
   --c-sex-m:light-dark(#0043ce,#a6c8ff);--c-sex-f:light-dark(#9f1853,#ffafd2);
@@ -22,25 +27,18 @@
   --yellow-b:light-dark(#fddc69,#483700);--yellow-f:light-dark(#684e00,#fddc69);
   --magenta-b:light-dark(#ffd6e8,#740937);--magenta-f:light-dark(#9f1853,#ffafd2);
   --purple-b:light-dark(#e8daff,#491d8b);--purple-f:light-dark(#6929c4,#d4bbff);
-  /* REIKA DS v0.1.3 + D1 (reika-ds feat/tokens-d1 db51dfd) --rk-* values, from REIKA DS vX (D1), replace on U8 vendor sync.
-     Written in px: giapha's root font is 14px while DS rem assume 16px (U8 moves the root to 100% and uses the DS file). */
-  --rk-fs-1:12px;--rk-lh-1:16px;--rk-ls-1:.32px;--rk-fs-2:14px;--rk-lh-2:20px;--rk-ls-2:.16px;--rk-fs-3:16px;--rk-lh-3:24px;--rk-ls-3:0;
-  --rk-fs-4:20px;--rk-lh-4:28px;--rk-ls-4:0;--rk-fs-5:28px;--rk-lh-5:36px;--rk-ls-5:0;--rk-fs-6:42px;--rk-lh-6:50px;--rk-ls-6:0;
-  --rk-dur-fast:110ms;--rk-dur-moderate:150ms;--rk-dur-slow:240ms;
-  --rk-ease-standard:cubic-bezier(.2,0,.38,.9);--rk-ease-entrance:cubic-bezier(0,0,.38,.9);--rk-ease-exit:cubic-bezier(.2,0,1,.9);
-  --rk-z-raised:1;--rk-z-sticky:40;--rk-z-bar:50;--rk-z-shell:100;--rk-z-pop:8000;--rk-z-modal:8500;--rk-z-toast:9000;
-  --rk-tile:40px;--rk-tile-sm:32px;--rk-tile-xs:20px;--rk-tile-lg:64px;--rk-radius-pill:1000px;--rk-radius-icon:8px;--rk-shadow-pop:0 2px 6px var(--c-shadow);
-  --rk-tile-1:light-dark(#6929c4,#8a3ffc);--rk-tile-2:light-dark(#198038,#198038);--rk-tile-3:light-dark(#0043ce,#0f62fe);--rk-tile-4:light-dark(#8a3800,#ba4e00);--rk-tile-5:light-dark(#005d5d,#007d79);--rk-tile-6:light-dark(#9f1853,#d02670);--rk-tile-7:light-dark(#00539a,#0072c3);--rk-tile-8:light-dark(#a2191f,#da1e28);
-  /* giapha semantic layer (conv §36: components use these, never raw values or --rk-* directly) */
+  /* giapha semantic layer (conv §36: components use these names, never raw values or --rk-* / --cds-* directly) */
   --fs-1:var(--rk-fs-1);--fs-2:var(--rk-fs-2);--fs-3:var(--rk-fs-3);--fs-4:var(--rk-fs-4);--fs-5:var(--rk-fs-5);--fs-6:var(--rk-fs-6);
   --lh-1:var(--rk-lh-1);--lh-2:var(--rk-lh-2);--lh-3:var(--rk-lh-3);--lh-4:var(--rk-lh-4);--lh-5:var(--rk-lh-5);--lh-6:var(--rk-lh-6);
   --ls-1:var(--rk-ls-1);--ls-2:var(--rk-ls-2);
-  --sz-tile:var(--rk-tile);--sz-tile-sm:var(--rk-tile-sm);--sz-crest-sm:var(--rk-tile-xs);--sz-crest-md:var(--rk-tile);--sz-crest-lg:var(--rk-tile-lg);--r-pill:var(--rk-radius-pill);--r-icon:var(--rk-radius-icon);
+  --sz-tile:var(--rk-tile);--sz-tile-sm:var(--rk-tile-sm);--sz-crest-sm:20px;--sz-crest-md:var(--rk-tile);--sz-crest-lg:64px;--r-pill:var(--rk-radius-pill);--r-icon:8px; /* crest and icon sizes are giapha-only (not in DS 0.2.0) */
   --sz-dialog:440px;
   --sz-icon:16px;--sz-icon-lg:20px;
-  --c-on-color:#fff;--c-shadow:rgba(0,0,0,.3);--shadow-pop:var(--rk-shadow-pop);
+  --c-on-color:#fff;--c-shadow:rgba(0,0,0,.3);--shadow-pop:0 2px 6px var(--c-shadow); /* local: DS dark shadow is .8 alpha, giapha pops stay .3 */
   --mono:'IBM Plex Mono',monospace;--c-qr-bg:#fff; --sz-qr:200px; /* QR codes need a light quiet zone in both themes */
   /* surname tiles: today's colours in both themes (= --rk-tile-1..6 light). U2 moves dark to --rk-tile-* (contrast) with screenshots. */
   --c-tile-1:#6929c4;--c-tile-2:#198038;--c-tile-3:#0043ce;--c-tile-4:#8a3800;--c-tile-5:#005d5d;--c-tile-6:#9f1853;
   color-scheme:light dark}
+/* browsers without color-mix (before Safari 16.2): a plain grey tint at the same strengths */
+@supports not (color:color-mix(in srgb,red 50%,transparent)){:root{--c-field-tint:rgba(128,128,128,.08);--c-field-tint-2:rgba(128,128,128,.12)}}
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}

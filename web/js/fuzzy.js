@@ -41,7 +41,8 @@ export function scorePerson(query, person) {
   const q = tokens(query);
   const d = person?.data || {};
   const name = tokens(d.name);
-  const alias = tokens(d.alias);
+  // alias names: the alias field and every other surname or name the person carried (names[], surname-rules.js)
+  const alias = [...tokens(d.alias), ...(Array.isArray(d.names) ? d.names.flatMap((e) => (e && e.surname ? tokens(`${e.surname} ${e.given || ''}`) : [])) : [])];
   if (!q.length) return { score: 0, matched: 0, total: 0 };
   let sum = 0; let matched = 0;
   for (const qt of q) {

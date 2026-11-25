@@ -6,6 +6,7 @@
 // Pending places (not yet verified by a curator) are shown to signed-in people only. Mounted by server.js.
 'use strict';
 const R = require('./places-rules');
+const BRN = require('./branch-routes'); // a branch lists its scope (people of a place)
 
 function mount(app, d) {
   const { pool, readSession, who, famOf, canRead, H, HttpError } = d;
@@ -160,10 +161,13 @@ function mount(app, d) {
     if (!R.isId(req.params.id)) throw new HttpError(400, 'Mã địa danh không hợp lệ.');
     const f = await famOf(req); const w = await who(req, f.id);
     if (!canRead(f, w)) throw new HttpError(403, 'Dòng họ này là riêng tư.');
-    const { rows } = await pool.query(
+    // a branch lists its people (scope of the home tree) who have the place
+    const view = await BRN.viewOf(pool, f, ['owner', 'admin', 'editor', 'member'].includes(w.role));
+    const { rows: all } = await pool.query(
       `select pp.person_id, pp.field from person_places pp join persons p on p.id = pp.person_id
         where pp.place_id=$1 and p.family_id=$2 and not p.deleted and pp.field = any($3) order by pp.person_id, pp.field`,
-      [Number(req.params.id), f.id, R.PERSON_FIELDS]);
+      [Number(req.params.id), view.famId, R.PERSON_FIELDS]);
+    const rows = view.ids ? all.filter((r) => view.ids.includes(r.person_id)) : all;
     res.json({ items: rows });
   }));
 }

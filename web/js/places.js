@@ -3,7 +3,7 @@
 // the provinces / districts it belonged to, and the people of this family linked to it. Links are fetched per person
 // when a profile is drawn (small request, cached for a minute) and are not part of the offline store.
 import { esc } from './model.js';
-import { toast, calmRow } from './ui.js';
+import { toast, calmRow, tag } from './ui.js';
 
 // Person fields that can point to a place. Address stays free text (it is contact data).
 export const PLACE_FIELDS = { place: 'Nơi sống', birth_place: 'Nơi sinh', burial: 'An táng' };
@@ -149,7 +149,7 @@ export async function placePage(main, id, { fam, personOf, personHref, nameOf })
     const per = personOf(x.person_id); if (!per || seen.has(x.person_id)) continue; seen.add(x.person_id);
     rows.push(calmRow({ href: personHref(x.person_id), sex: per.data?.sex, title: nameOf(per), subtitle: esc(people.filter((y) => y.person_id === x.person_id).map((y) => PLACE_FIELDS[y.field] || y.field).join(' · ')) }));
   }
-  main.innerHTML = `<div class="row wrap"><span class="tag gray">${esc(KIND[p.kind] || 'Địa danh')}</span>${p.status === 'pending' ? '<span class="tag gray">chưa xác minh</span>' : ''}</div>
+  main.innerHTML = `<div class="row wrap">${tag(`${esc(KIND[p.kind] || 'Địa danh')}`, { tone: 'gray' })}${p.status === 'pending' ? '<span class="tag gray">chưa xác minh</span>' : ''}</div>
     <h1 class="big keep">${esc(p.name || '')}</h1>${p.label && p.label !== p.name ? `<p class="sub">${esc(p.label.split(', ').slice(1).join(', '))}</p>` : ''}
     <section class="grpsec pl-sec" aria-label="Tên qua các thời kỳ"><div class="relhead"><h2>Tên qua các thời kỳ</h2></div><ol class="tl2">${nameRows}</ol></section>
     ${parentRows ? `<section class="grpsec pl-sec" aria-label="Thuộc đơn vị"><div class="relhead"><h2>Thuộc đơn vị</h2></div><ol class="tl2">${parentRows}</ol></section>` : ''}
@@ -172,7 +172,7 @@ function suggText(s) {
 function pendingPlacesHtml(items) {
   if (!items.length) return '';
   return `<section class="cd pl-pend"><h2>Địa danh chờ duyệt</h2>${items.map((p) => `<div class="rv pl-pend-place">
-    <div class="row wrap"><a class="pl-link" href="#place/${p.id}"><b>${esc(p.name || '(chưa có tên)')}</b></a><span class="tag gray sm">${esc(KIND[p.kind] || 'Địa danh')}</span>${p.status === 'pending' ? '<span class="tag gray sm">chưa xác minh</span>' : ''}${JOB[p.job] ? `<span class="sub">${JOB[p.job]}</span>` : ''}</div>
+    <div class="row wrap"><a class="pl-link" href="#place/${p.id}"><b>${esc(p.name || '(chưa có tên)')}</b></a>${tag(`${esc(KIND[p.kind] || 'Địa danh')}`, { tone: 'gray', sm: true })}${p.status === 'pending' ? '<span class="tag gray sm">chưa xác minh</span>' : ''}${JOB[p.job] ? `<span class="sub">${JOB[p.job]}</span>` : ''}</div>
     ${p.suggestions.map((s) => `<div class="pl-sug"><p>${suggText(s)}<br><span class="sub">${SRC[s.source]} · độ khớp ${Math.round(s.confidence * 100)}%</span></p><div class="row end"><button type="button" class="btn ter sm" data-psug="reject" data-id="${s.id}">Không nhận</button><button type="button" class="btn sm" data-psug="accept" data-id="${s.id}">Nhận</button></div></div>`).join('')}
     ${p.status === 'pending' ? `<div class="row end"><button type="button" class="btn gh sm" data-pverify="${p.id}">Xác minh địa danh</button></div>` : ''}</div>`).join('')}</section>`;
 }

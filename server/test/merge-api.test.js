@@ -41,6 +41,8 @@ test.before(async () => {
   await ins(ids.par, { name: 'Lạc Văn Tổ', sex: 'm', gen: 1, died: '1880' });
   await ins(ids.keep, { name: 'Lạc Văn Gốc', sex: 'm', born: '1900', parent: ids.par });
   await ins(ids.drop, { name: 'Lạc Văn Gốc', sex: 'm', born: '1900', place: 'Xã Bến Thử' });
+  // the older profile is the kept one: ids.keep was made 30 days ago (history time), ids.drop just now
+  await pool.query("insert into history (person_id, field, at) values ($1,'born', now() - interval '30 days'), ($2,'born', now())", [ids.keep, ids.drop]);
   await ins(ids.child, { name: 'Lạc Thị Con', sex: 'f', born: '1925' });
   await ins(ids.spouse, { name: 'Trần Thị Vợ', sex: 'f', born: '1902' });
   await ins(ids.other, { name: 'Lạc Văn Khác', sex: 'm', born: '1930' });
@@ -113,10 +115,12 @@ test('a family vote merges: relations re-pointed without duplicates, events and 
     rels: (await pool.query('select parent_id, child_id from parent_child where family_id=$1 order by 1,2', [FA])).rows,
     couples: (await pool.query('select a_id, b_id from couple where family_id=$1', [FA])).rows,
   };
-  const pr = await call('POST', '/api/merge/propose', { family: FA, keep: ids.keep, drop: ids.drop, reason: 'Hai hồ sơ cùng một người', choices: { place: 'drop' } }, ck.ed);
+  // the ids are sent the other way round: the older profile is still the kept one
+  const pr = await call('POST', '/api/merge/propose', { family: FA, keep: ids.drop, drop: ids.keep, reason: 'Hai hồ sơ cùng một người', choices: { place: 'drop' } }, ck.ed);
   assert.equal(pr.status, 200, JSON.stringify(pr.json));
   assert.equal(pr.json.decision.kind, 'merge_person');
-  assert.equal(pr.json.decision.keep.id, ids.keep);
+  assert.equal(pr.json.decision.keep.id, ids.keep, 'older profile kept regardless of the order sent');
+  assert.equal(pr.json.decision.subject_ref, ids.drop);
   assert.equal((await call('POST', '/api/merge/propose', { family: FA, keep: ids.keep, drop: ids.drop, reason: 'Lần hai' }, ck.ed)).status, 409);
   const dec = (await pool.query("select id from decisions where kind='merge_person' and subject_ref=$1 and state='open'", [ids.drop])).rows[0];
   assert.ok(dec, 'the vote is open');
@@ -167,6 +171,8 @@ test('a partnership is one row in either order; access granted to the merged-awa
   await pool.query('insert into persons (id, data, updated_by, family_id) values ($1,$2,$3,$4), ($5,$6,$3,$4), ($7,$8,$3,$4)',
     [ids.x, { name: 'Lạc Văn Chính', sex: 'm', born: '1880' }, 'test', FA, ids.y, { name: 'Lạc Văn Chính', sex: 'm', born: '1880' }, `T${TAG}`, { name: 'Trần Thị Hai', sex: 'f', born: '1882' }]);
   ALL.push(ids.x, ids.y, `T${TAG}`);
+  // X is the older profile (kept), Y the newer one (merged away): the access check is about Y
+  await pool.query("insert into history (person_id, field, at) values ($1,'born', now() - interval '30 days'), ($2,'born', now())", [ids.x, ids.y]);
   await pool.query("insert into couple (family_id, a_id, b_id, kind) values ($1,$2,$3,'cuoi'), ($1,$4,$5,'cuoi')", [FA, ids.y, `T${TAG}`, `T${TAG}`, ids.x]);
   const c = await pool.connect();
   try {

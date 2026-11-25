@@ -8,6 +8,7 @@
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { isDead } = require('./core');
+const SR = require('./surname-rules');
 
 let coreMod = null;
 const core = () => coreMod || (coreMod = import(pathToFileURL(path.join(__dirname, '..', 'web', 'js', 'clan-core.js')).href));
@@ -30,8 +31,14 @@ function mount(app, d) {
     const ver = await version();
     const hit = cache.get(slug);
     if (hit && hit.ver === ver && Date.now() - hit.at < TTL) return hit.base;
-    const all = (await pool.query('select id, slug, name, han, short_name, founder_person_id, origin_place, place, visibility, country from families')).rows;
-    const fams = all.filter((f) => C.inClan(f.name, f.country) && C.clanSlug(C.familySurname(f.name)) === slug);
+    const all = (await pool.query(`select id, slug, name, han, short_name, founder_person_id, origin_place, place, visibility, country,
+      origin_surname, origin_surname_han, origin_year, origin_reason, origin_visibility from families`)).rows;
+    // The trees of this surname, plus the trees that carried it as their họ gốc (carried: true). Which of them a viewer
+    // may see is decided per request (origin_visibility), never here: the cache is shared by all viewers.
+    const primary = all.filter((f) => C.inClan(f.name, f.country) && C.clanSlug(C.familySurname(f.name)) === slug);
+    const carried = all.filter((f) => f.origin_surname && C.clanSlug(f.origin_surname) === slug && C.clanSlug(C.familySurname(f.name)) !== slug && C.inClan(f.name, f.country))
+      .map((f) => ({ ...f, carried: true }));
+    const fams = [...primary, ...carried];
     let base = null;
     if (fams.length) {
       const ids = fams.map((f) => f.id);
@@ -49,9 +56,10 @@ function mount(app, d) {
       const edges = (await pool.query(
         `select least(a_family, b_family) a, greatest(a_family, b_family) b, count(*)::int n from person_links
           where status = 'accepted' and a_family = any($1) and b_family = any($1) and a_family <> b_family group by 1, 2`, [ids])).rows;
-      const hanCount = new Map(); for (const f of fams) if (f.han) hanCount.set(f.han, (hanCount.get(f.han) || 0) + 1);
+      const hanOf = (f) => (f.carried ? f.origin_surname_han : f.han);
+      const hanCount = new Map(); for (const f of fams) if (hanOf(f)) hanCount.set(hanOf(f), (hanCount.get(hanOf(f)) || 0) + 1);
       base = {
-        surname: C.familySurname(fams[0].name),
+        surname: primary.length ? C.familySurname(primary[0].name) : fams[0].origin_surname,
         han: [...hanCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '',
         fams: fams.map((f) => {
           const p = (f.founder_person_id && chosen.get(f.id)) || auto.get(f.id) || null;
@@ -75,13 +83,20 @@ function mount(app, d) {
     const code = !!s && !s.email && !s.dev; // editor-code session: admin in every family
     const roles = code ? {} : await rolesByFamily(req);
     const member = (f) => code || !!roles[f.id];
-    const visible = (f) => member(f) || f.visibility === 'public';
+    const roleOf = (f) => (code ? 'admin' : roles[f.id] || null);
+    // Họ gốc: a viewer sees it only as its visibility allows (all | members | editors). A carried tree whose origin this
+    // viewer may not see is not listed at all, and not counted either.
+    const originOk = (f) => !!f.origin_surname && SR.originVisibleTo(f.origin_visibility, roleOf(f));
+    const visible = (f) => (member(f) || f.visibility === 'public') && (!f.carried || originOk(f));
     const vis = base.fams.filter(visible);
+    const seen = base.fams.filter((f) => !f.carried || originOk(f));
     const trees = vis.map((f) => {
       const show = f.founder && (f.founder.dead || member(f));
       const year = show ? (f.founder.born ?? f.founder.died) : null;
+      const change = originOk(f) ? { from: f.origin_surname, han: f.origin_surname_han || '', year: f.origin_year || '', reason: f.origin_reason || '',
+        now: C.familySurname(f.name), carried: !!f.carried } : null;
       return { id: f.id, slug: f.slug || f.id, label: f.short_name || f.name, han: f.han || '', origin: f.origin_place || f.place || '',
-        people: f.people, year, country: f.country || '', founder: show ? { name: f.founder.name, born: f.founder.born, died: f.founder.died } : null };
+        people: f.people, year, country: f.country || '', founder: show ? { name: f.founder.name, born: f.founder.born, died: f.founder.died } : null, change };
     });
     // Quốc gia level: counts over the trees this viewer may see (private trees never add to a country), and an
     // optional ?country=XX (or NONE: no country set) filter for the clan page chips.
@@ -97,7 +112,9 @@ function mount(app, d) {
     res.json({
       surname: base.surname, han: base.han, slug,
       kpis: { groups: grouped.groups.length, trees: trees.length, people: trees.reduce((n, t) => n + t.people, 0) },
-      private_count: base.fams.length - vis.length, countries, country: qc,
+      private_count: seen.length - vis.length, countries, country: qc,
+      // Historical hints (surname-hints.json): editors only, a suggestion ("có thể liên quan"), never assigned.
+      hints: (code || Object.values(roles).some((r) => r === 'owner' || r === 'admin' || r === 'editor')) ? SR.hintsFor(base.surname) : [],
       ...out,
     });
   }));

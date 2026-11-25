@@ -242,7 +242,7 @@ test('person form in "Tất cả": Dòng họ is the first field, defaults to th
     const st = fresh();
     // the last family used on this device is dong-a (opened first, then "Tất cả")
     const { ctx, page, errors } = await open(b, { st, width: 390, hash: '/dong-a/list' });
-    await page.waitForSelector('.cards .card');
+    await page.waitForSelector('.cards .pi-card');
     await page.goto(base + '/#/tat-ca/them');
     await page.waitForSelector('#fpfam');
     assert.equal(await page.locator('#fpform > *').first().locator('#fpfam').count(), 1);

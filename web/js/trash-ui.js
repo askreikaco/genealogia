@@ -1,7 +1,7 @@
 // Thùng rác page (Thêm › Thùng rác), the person delete flow (impact, reason, approval) and the badges.
 // Server: server/trash.js. Every destructive control here comes from danger.js (guard test).
 import { esc } from './model.js';
-import { toast, fmtTime } from './ui.js';
+import { toast, fmtTime, tag } from './ui.js';
 import { dangerButton, dangerZone, dangerLabel, confirmDanger, undoToast, restoreTrash } from './danger.js';
 
 const q = (fam) => `family=${encodeURIComponent(fam)}`;
@@ -44,7 +44,7 @@ function card(t, d) {
   const meta = t.state === 'pending'
     ? `Đề nghị: ${esc(t.requested_by || '')} · ${when(t.requested_at)}${t.due_at ? ` · tự chạy lúc ${when(t.due_at)}` : ' · chờ duyệt'}`
     : `Người xóa: ${esc(t.deleted_by || '')} · ${when(t.deleted_at)}${t.days_left != null ? ` · còn ${t.days_left} ngày` : ''}`;
-  return `<li class="cd tr-item" data-tr="${t.id}"><div class="row btw"><b>${esc(t.label)}</b><span class="tag sm">${esc(t.kind_vi)}</span></div>
+  return `<li class="cd tr-item" data-tr="${t.id}"><div class="row btw"><b>${esc(t.label)}</b>${tag(`${esc(t.kind_vi)}`, { sm: true })}</div>
     ${t.reason ? `<span class="sub">Lý do: ${esc(t.reason)}</span>` : ''}${im}<span class="sub">${meta}</span>
     ${acts.length ? `<div class="row wrap tr-acts">${acts.join('')}</div>` : ''}</li>`;
 }

@@ -23,7 +23,31 @@ function defaultChoices(keep, drop) {
   return out;
 }
 
-// The merged record. choices: { field: 'keep' | 'drop' }; a field left out takes the default. Throws on a bad choice.
+// Which of two records is kept: the older profile (earliest created time; a missing time sorts last; tie -> lower id).
+// a, b: { id, created } with created in ms or null. Returns [older, newer]. The client's choice of keeper is never used.
+function olderFirst(a, b) {
+  const ca = a.created ?? Infinity; const cb = b.created ?? Infinity;
+  if (ca !== cb) return ca < cb ? [a, b] : [b, a];
+  return a.id <= b.id ? [a, b] : [b, a];
+}
+
+// Per field of two records: 'conflict' (both set, different: the owner chooses), 'filled' (one side empty: the other
+// side's value is used, no choice), 'same' (both set, equal). Fields empty on both sides are left out.
+function classifyFields(keep = {}, drop = {}) {
+  const out = { conflicts: [], filled: [], same: [] };
+  for (const f of fieldNames(keep, drop)) {
+    const k = keep[f]; const d = drop[f];
+    if (empty(k) && empty(d)) continue;
+    if (empty(k)) out.filled.push({ field: f, from: 'drop' });
+    else if (empty(d)) out.filled.push({ field: f, from: 'keep' });
+    else if (JSON.stringify(k) === JSON.stringify(d)) out.same.push(f);
+    else out.conflicts.push(f);
+  }
+  return out;
+}
+
+// The merged record. choices: { field: 'keep' | 'drop' } for conflicting fields only; a conflict left out takes the
+// default (kept person's value). A field with a value on one side only takes that value whatever the choice says.
 function mergeData(keep = {}, drop = {}, choices = {}) {
   const def = defaultChoices(keep, drop);
   for (const [f, c] of Object.entries(choices)) {
@@ -32,7 +56,8 @@ function mergeData(keep = {}, drop = {}, choices = {}) {
   }
   const out = {}; const changed = [];
   for (const f of Object.keys(def)) {
-    const pick = (choices[f] || def[f]) === 'drop' ? 'drop' : 'keep';
+    const kEmpty = empty(keep[f]); const dEmpty = empty(drop[f]);
+    const pick = kEmpty !== dEmpty ? (kEmpty ? 'drop' : 'keep') : ((choices[f] || def[f]) === 'drop' ? 'drop' : 'keep');
     const from = keep[f]; const to = pick === 'drop' ? drop[f] : keep[f];
     if (!empty(to)) out[f] = to;
     if (JSON.stringify(from ?? null) !== JSON.stringify(to ?? null)) changed.push({ field: f, from: from ?? null, to: to ?? null });
@@ -72,4 +97,4 @@ const WHY = {
   access: 'Người này đang có quyền truy cập (người cao tuổi, người quản lý). Gỡ các quyền đó trước khi gộp.',
 };
 
-module.exports = { MERGE_LABEL, REL_FIELDS, defaultChoices, mergeData, checkMerge, MergeError, WHY };
+module.exports = { MERGE_LABEL, REL_FIELDS, defaultChoices, olderFirst, classifyFields, mergeData, checkMerge, MergeError, WHY };

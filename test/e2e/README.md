@@ -36,6 +36,7 @@ Tests skip (with a reason) when playwright, Chrome or the database URL is missin
 | `keep-mounted.test.js` | a sync re-render keeps the book iframe (same element, scroll kept), the map instance (zoom kept) and the tree canvas scroll | no |
 | `descendants.test.js` | Hồ sơ lineage rows and ancestor list (own schema `e2e_descendants`) | yes |
 | `relations.test.js` | relationships: add spouse, child, relative couple, edit and remove (own schema `e2e_relations`) | yes |
+| `profile-add-relative.test.js` | profile ⋯ in a legacy-relations family shows Thêm cha / mẹ, Thêm con, Thêm anh chị em and Thêm con opens the search-first flow; a relation-table family's profile ⋯ is unchanged | no (mocked API) |
 | `e2e-signin.test.js` | signed-in owner leaves the loading state, also when an old tab holds IndexedDB | yes |
 | `minimal-ui.test.js` | minimal UI cuts (one primary per screen, sub-pages, ⋯ menus, one-line copy): settings, person header, export, members, verify, form, create-family, emblem, stats, tree, more | no (mocked API) |
 | `succession.test.js` | trusted contact invite and accept; inactive owner (time injected): member banner, offer with email code, previous owner reclaims; create a family | yes (+ fake mail) |

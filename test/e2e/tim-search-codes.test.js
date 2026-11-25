@@ -89,9 +89,9 @@ test('Tìm: the stable ID, with or without the dash, any case', { skip }, async 
     const { page, ctx, errors } = await open('list/' + encodeURIComponent(q), { scheme });
     try {
       await page.waitForSelector('.cards', { timeout: 8000 });
-      const names = (await page.locator('.cards .card b').allInnerTexts()).map((t) => t.trim());
+      const names = (await page.locator('.cards .pi-card b').allInnerTexts()).map((t) => t.trim());
       assert.equal(names.length, 1, names.join(' | ')); assert.ok(names[0].includes('Vương Thị Lan'));
-      assert.match(await page.locator('.cards .card').first().innerText(), new RegExp(SID_A2.slice(0, 4) + '-' + SID_A2.slice(4) + ' ·'));
+      assert.match(await page.locator('.cards .pi-card').first().innerText(), new RegExp(SID_A2.slice(0, 4) + '-' + SID_A2.slice(4) + ' ·'));
       if (SHOT_DIR) await page.screenshot({ path: path.join(SHOT_DIR, `ids-search-390-${scheme}.png`) });
       assert.deepStrictEqual(errors, []);
     } finally { await ctx.close(); }
@@ -103,10 +103,10 @@ test('Tìm: exact code and prefix', { skip }, async () => {
     const { page, ctx, errors } = await open('list/' + encodeURIComponent('d-3.2'), { scheme });
     try {
       await page.waitForSelector('.cards', { timeout: 8000 });
-      const names = (await page.locator('.cards .card b').allInnerTexts()).map((t) => t.trim());
+      const names = (await page.locator('.cards .pi-card b').allInnerTexts()).map((t) => t.trim());
       assert.equal(names.length, 3, names.join(' | '));
       for (const n of ['Giả Văn An', 'Vương Thị Lan', 'Dương Chưa Rõ']) assert.ok(names.some((x) => x.includes(n)), n);
-      assert.match(await page.locator('.cards .card').first().innerText(), /D-3\.2\.1 ·/, 'the code leads line 2 for a code search');
+      assert.match(await page.locator('.cards .pi-card').first().innerText(), /D-3\.2\.1 ·/, 'the code leads line 2 for a code search');
       if (SHOT_DIR) await page.screenshot({ path: path.join(SHOT_DIR, `codes-search-390-${scheme}.png`) });
       assert.deepStrictEqual(errors, []);
     } finally { await ctx.close(); }
@@ -114,7 +114,7 @@ test('Tìm: exact code and prefix', { skip }, async () => {
   const { page, ctx } = await open('list/' + encodeURIComponent('D-2.1'));
   try {
     await page.waitForSelector('.cards', { timeout: 8000 });
-    const names = await page.locator('.cards .card b').allInnerTexts();
+    const names = await page.locator('.cards .pi-card b').allInnerTexts();
     assert.equal(names.length, 1); assert.ok(names[0].includes('Dương Văn Bình'), 'Thứ 1 is D-2.1');
   } finally { await ctx.close(); }
 });
