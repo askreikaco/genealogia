@@ -5,7 +5,7 @@ import { SURNAME_HAN } from './surnames-vi.js';
 import * as S from './store.js';
 import { famCrest } from './emblem.js';
 import { iconButton as dsIconButton, emptyState as dsEmptyState } from '../vendor/reika-ds/js/components.js';
-import { openConfirm } from '../vendor/reika-ds/js/index.js';
+import { openConfirm, openMenu as openDsMenu } from '../vendor/reika-ds/js/index.js';
 
 export const CI = {"star": `<path fill-rule="evenodd" d="M16.00 3.80L19.29 12.47L28.55 12.92L21.33 18.73L23.76 27.68L16.00 22.60L8.24 27.68L10.67 18.73L3.45 12.92L12.71 12.47ZM16.00 7.40L18.41 13.68L25.13 14.03L19.90 18.27L21.64 24.77L16.00 21.10L10.36 24.77L12.10 18.27L6.87 14.03L13.59 13.68Z"/>`, "starOn": `<path d="M16.00 3.80L19.29 12.47L28.55 12.92L21.33 18.73L23.76 27.68L16.00 22.60L8.24 27.68L10.67 18.73L3.45 12.92L12.71 12.47Z"/>`, "check": `<path d="M13 24 4 15 5.414 13.586 13 21.171 26.586 7.586 28 9 13 24z"/>`, "plus": `<path d="M17 15V8h-2v7H8v2h7v7h2v-7h7v-2h-7z"/>`, "filter": `<path d="M18,28H14a2,2,0,0,1-2-2V18.41L4.59,11A2,2,0,0,1,4,9.59V6A2,2,0,0,1,6,4H26a2,2,0,0,1,2,2V9.59A2,2,0,0,1,27.41,11L20,18.41V26A2,2,0,0,1,18,28ZM6,6V9.59l8,8V26h4V17.59l8-8V6Z"/>`, "sun": `<path d="M15 2H17V7H15z"/><path d="M21.668 6.854H26.625999999999998V8.854H21.668z" transform="rotate(-45 24.147 7.853)"/><path d="M25 15H30V17H25z"/><path d="M23.147 21.668H25.147V26.625999999999998H23.147z" transform="rotate(-45 24.147 24.146)"/><path d="M15 25H17V30H15z"/><path d="M5.375 23.147H10.333V25.147H5.375z" transform="rotate(-45 7.853 24.146)"/><path d="M2 15H7V17H2z"/><path d="M6.854 5.375H8.854V10.333H6.854z" transform="rotate(-45 7.854 7.853)"/><path d="M16,12a4,4,0,1,1-4,4,4.0045,4.0045,0,0,1,4-4m0-2a6,6,0,1,0,6,6,6,6,0,0,0-6-6Z"/>`, "moon": `<path d="M13.5025,5.4136A15.0755,15.0755,0,0,0,25.096,23.6082a11.1134,11.1134,0,0,1-7.9749,3.3893c-.1385,0-.2782.0051-.4178,0A11.0944,11.0944,0,0,1,13.5025,5.4136M14.98,3a1.0024,1.0024,0,0,0-.1746.0156A13.0959,13.0959,0,0,0,16.63,28.9973c.1641.006.3282,0,.4909,0a13.0724,13.0724,0,0,0,10.702-5.5556,1.0094,1.0094,0,0,0-.7833-1.5644A13.08,13.08,0,0,1,15.8892,4.38,1.0149,1.0149,0,0,0,14.98,3Z"/>`, "gear": `<path fill-rule="evenodd" d="M26.01 13.18 L29.42 14.52 L29.42 17.48 L26.01 18.82 L25.07 21.08 L26.54 24.44 L24.44 26.54 L21.08 25.07 L18.82 26.01 L17.48 29.42 L14.52 29.42 L13.18 26.01 L10.92 25.07 L7.56 26.54 L5.46 24.44 L6.93 21.08 L5.99 18.82 L2.58 17.48 L2.58 14.52 L5.99 13.18 L6.93 10.92 L5.46 7.56 L7.56 5.46 L10.92 6.93 L13.18 5.99 L14.52 2.58 L17.48 2.58 L18.82 5.99 L21.08 6.93 L24.44 5.46 L26.54 7.56 L25.07 10.92 Z M11.80 16.00 a4.20 4.20 0 1 0 8.40 0 a4.20 4.20 0 1 0 -8.40 0 Z"/>`, "more": `<circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/><circle cx="24" cy="16" r="2"/>`, "switcher": "<path d=\"M14 4H18V8H14z\"/><path d=\"M4 4H8V8H4z\"/><path d=\"M24 4H28V8H24z\"/><path d=\"M14 14H18V18H14z\"/><path d=\"M4 14H8V18H4z\"/><path d=\"M24 14H28V18H24z\"/><path d=\"M14 24H18V28H14z\"/><path d=\"M4 24H8V28H4z\"/><path d=\"M24 24H28V28H24z\"/>", "tree": "<path d=\"M30,20V12H22v3H17V7a2,2,0,0,0-2-2H10V2H2v8h8V7h5V25a2,2,0,0,0,2,2h5v3h8V22H22v3H17V17h5v3ZM8,8H4V4H8ZM24,24h4v4H24Zm0-10h4v4H24Z\"/>", "search": "<path d=\"M29,27.5859l-7.5521-7.5521a11.0177,11.0177,0,1,0-1.4141,1.4141L27.5859,29ZM4,13a9,9,0,1,1,9,9A9.01,9.01,0,0,1,4,13Z\"/>", "book": "<path d=\"M19 10H26V12H19z\"/><path d=\"M19 15H26V17H19z\"/><path d=\"M19 20H26V22H19z\"/><path d=\"M6 10H13V12H6z\"/><path d=\"M6 15H13V17H6z\"/><path d=\"M6 20H13V22H6z\"/><path d=\"M28,5H4A2.002,2.002,0,0,0,2,7V25a2.002,2.002,0,0,0,2,2H28a2.002,2.002,0,0,0,2-2V7A2.002,2.002,0,0,0,28,5ZM4,7H15V25H4ZM17,25V7H28V25Z\"/>", "map": "<path d=\"M16,24l-6.09-8.6A8.14,8.14,0,0,1,16,2a8.08,8.08,0,0,1,8,8.13,8.2,8.2,0,0,1-1.8,5.13ZM16,4a6.07,6.07,0,0,0-6,6.13,6.19,6.19,0,0,0,1.49,4L16,20.52,20.63,14A6.24,6.24,0,0,0,22,10.13,6.07,6.07,0,0,0,16,4Z\"/><circle cx=\"16\" cy=\"9\" r=\"2\"/><path d=\"M28,12H26v2h2V28H4V14H6V12H4a2,2,0,0,0-2,2V28a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V14A2,2,0,0,0,28,12Z\"/>", "gio": "<path d=\"M26,4h-4V2h-2v2h-8V2h-2v2H6C4.9,4,4,4.9,4,6v20c0,1.1,0.9,2,2,2h20c1.1,0,2-0.9,2-2V6C28,4.9,27.1,4,26,4z M26,26H6V12h20 V26z M26,10H6V6h4v2h2V6h8v2h2V6h4V10z\"/>", "chart": "<path d=\"M4,2H2V28a2,2,0,0,0,2,2H30V28H4V25H26V17H4V13H18V5H4ZM24,19v4H4V19ZM16,7v4H4V7Z\"/>", "flag": "<path d=\"M6,30H4V2H28l-5.8,9L28,20H6ZM6,18H24.33L19.8,11l4.53-7H6Z\"/>", "dl": "<path d=\"M26,24v4H6V24H4v4H4a2,2,0,0,0,2,2H26a2,2,0,0,0,2-2h0V24Z\"/><path d=\"M26 14 24.59 12.59 17 20.17 17 2 15 2 15 20.17 7.41 12.59 6 14 16 24 26 14z\"/>", "chevL": "<path d=\"M10 16 20 6 21.4 7.4 12.8 16 21.4 24.6 20 26z\"/>", "chevR": "<path d=\"M22 16 12 26 10.6 24.6 19.2 16 10.6 7.4 12 6z\"/>", "close": "<path d=\"M17.4141 16 24 9.4141 22.5859 8 16 14.5859 9.4143 8 8 9.4141 14.5859 16 8 22.5859 9.4143 24 16 17.4141 22.5859 24 24 22.5859 17.4141 16z\"/>", "user": "<path d=\"M16,4a5,5,0,1,1-5,5,5,5,0,0,1,5-5m0-2a7,7,0,1,0,7,7A7,7,0,0,0,16,2Z\"/><path d=\"M26,30H24V25a5,5,0,0,0-5-5H13a5,5,0,0,0-5,5v5H6V25a7,7,0,0,1,7-7h6a7,7,0,0,1,7,7Z\"/>", "pencil": "<path d=\"M2 26H30V28H2z\"/><path d=\"M25.4,9c0.8-0.8,0.8-2,0-2.8c0,0,0,0,0,0l-3.6-3.6c-0.8-0.8-2-0.8-2.8,0c0,0,0,0,0,0l-15,15V24h6.4L25.4,9z M20.4,4L24,7.6 l-3,3L17.4,7L20.4,4z M6,22v-3.6l10-10l3.6,3.6l-10,10H6z\"/>", "share": `<path d="M23,20a5,5,0,0,0-3.89,1.89L11.8,17.32a4.46,4.46,0,0,0,0-2.64l7.31-4.57A5,5,0,1,0,18,7a4.79,4.79,0,0,0,.2,1.32l-7.31,4.57a5,5,0,1,0,0,6.22l7.31,4.57A4.79,4.79,0,0,0,18,25a5,5,0,1,0,5-5ZM23,4a3,3,0,1,1-3,3A3,3,0,0,1,23,4ZM7,19a3,3,0,1,1,3-3A3,3,0,0,1,7,19Zm16,9a3,3,0,1,1,3-3A3,3,0,0,1,23,28Z"/>`, "sheet": "<path d=\"M8 18H12V20H8z\"/><path d=\"M14 18H18V20H14z\"/><path d=\"M8 14H12V16H8z\"/><path d=\"M14 22H18V24H14z\"/><path d=\"M20 14H24V16H20z\"/><path d=\"M20 22H24V24H20z\"/><path d=\"M27,3H5A2.0025,2.0025,0,0,0,3,5V27a2.0025,2.0025,0,0,0,2,2H27a2.0025,2.0025,0,0,0,2-2V5A2.0025,2.0025,0,0,0,27,3Zm0,2,0,4H5V5ZM5,27V11H27l0,16Z\"/>"};
 // Layout breakpoints (match app.css): side menu and desktop tree from 672 / 1024 px. Markup is rendered for the
@@ -216,54 +216,28 @@ export const iconButton = ({ icon, label, attrs = '', size = 16 }) => (DS_ICON[i
   : `<button type="button" class="rds-ibtn" aria-label="${esc(label)}" title="${esc(label)}" ${attrs}>${cic(icon, size)}</button>`);
 // The trailing icon button of a calmRow (44 px, DS icon-button look). attrs carries data-* for the delegated handler.
 export const calmAct = ({ icon, label, attrs = '' }) => `<button type="button" class="calm-act" aria-label="${esc(label)}" title="${esc(label)}" ${attrs}>${icon}</button>`;
-// The app's anchored ⋯ menu (moved here from app.js so relui.js shares it): items [[label, fn, danger?, attrs?]], optional
-// note html at the bottom, optional title at the top. Opens upward when there is no room below. Closes on pick,
-// a tap outside, Escape (focus back on the trigger) and a second tap on the same trigger (toggle). The trigger gets
-// aria-haspopup="menu" and aria-expanded. One outside listener (capture phase) lives only while a menu is open, so a
-// click that opens another menu is never closed by a listener left over from an earlier one.
-let openMenu = null; // { m, anchor }
-const onOutside = (e) => {
-  if (!openMenu) return;
-  if (openMenu.m.contains(e.target) || openMenu.anchor.contains(e.target)) return; // its own trigger toggles in popMenu
-  closeMenu();
-};
-export function closeMenu({ focus } = {}) {
-  const cur = openMenu; openMenu = null;
-  removeEventListener('click', onOutside, true);
-  const hadFocus = cur && cur.m.contains(document.activeElement);
-  document.querySelectorAll('.menu').forEach((x) => x.remove());
-  if (cur) {
-    cur.anchor.setAttribute('aria-expanded', 'false');
-    if ((focus ?? hadFocus) && cur.anchor.isConnected) cur.anchor.focus();
-  }
+// The app's anchored more-menu (the three-dot button), on the DS openMenu (web/vendor/reika-ds menu-controller.js).
+// popMenu(anchor, items, note, { title }): items are [label, fn, danger?, attrs?]. label is plain text (the DS escapes
+// it), fn runs on pick, attrs is an object of data-* attributes, danger marks a red row with a divider above it (not
+// on the first row). note is html shown under the list (the tree legend). The DS does the rest: a second tap on the
+// same trigger closes it (toggle), Escape and a tap outside close it, Escape and a pick return focus to the trigger,
+// the first item gets focus, and the trigger gets aria-expanded and aria-controls.
+let activeMenu = null; // the DS handle { el, close } of the open menu
+const menuItem = ([label, fn, danger = false, attrs = {}], i) => ({
+  label, onSelect: () => fn(), attrs, tone: danger ? 'danger' : undefined, divider: Boolean(danger) && i > 0,
+});
+export function closeMenu({ focus = false } = {}) {
+  const cur = activeMenu; activeMenu = null;
+  if (cur) cur.close({ focus });
 }
 export function popMenu(anchor, items, note = '', { title = '' } = {}) {
-  if (openMenu && openMenu.anchor === anchor && openMenu.m.isConnected) { closeMenu({ focus: true }); return null; } // toggle
-  closeMenu();
-  const m = document.createElement('div'); m.className = 'menu'; m.setAttribute('role', 'menu');
-  m.innerHTML = (title ? `<div class="mh">${esc(title)}</div>` : '') + items.map(([l, , d, at = ''], i) => `<button role="menuitem" class="${d ? 'd' : ''}" data-i="${i}" ${at}>${l}</button>`).join('') + (note ? `<div class="mh">${note}</div>` : '');
-  document.body.append(m);
-  const r = anchor.getBoundingClientRect(); const h = m.offsetHeight;
-  // below the trigger when it fits, else above; a menu taller than both sides takes the larger side and scrolls
-  // inside, so it never covers its own trigger (a second tap must reach the trigger to close it)
-  const below = innerHeight - r.bottom - 8; const above = r.top - 8;
-  let top = r.bottom;
-  if (h > below) {
-    if (h <= above) top = r.top - h;
-    else if (above > below) { m.style.maxHeight = above + 'px'; m.style.overflowY = 'auto'; top = r.top - above; }
-    else { m.style.maxHeight = below + 'px'; m.style.overflowY = 'auto'; }
-  }
-  m.style.top = top + scrollY + 'px';
-  m.style.left = Math.max(8, Math.min(r.right - m.offsetWidth, innerWidth - m.offsetWidth - 8)) + 'px';
-  m.querySelector('button')?.focus({ preventScroll: true }); // never scroll the page under the trigger
-  m.onclick = (e) => { const b = e.target.closest('[data-i]'); if (b) { closeMenu(); items[+b.dataset.i][1](); } };
-  m.onkeydown = (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeMenu({ focus: true }); } };
-  anchor.setAttribute('aria-haspopup', 'menu'); anchor.setAttribute('aria-expanded', 'true');
-  openMenu = { m, anchor };
-  addEventListener('click', onOutside, true); // capture: fires even when a trigger stops propagation
-  return m;
+  const h = openDsMenu(anchor, { title, items: items.map(menuItem) });
+  activeMenu = h;
+  if (!h) return null; // this tap closed the open menu
+  if (note) h.el.insertAdjacentHTML('beforeend', `<div class="rds-menu__label">${note}</div>`);
+  anchor.setAttribute('aria-haspopup', 'menu');
+  return h.el;
 }
-
 // Sticky toolbars (.lbar / .stk / .ptabs): data-stuck while pinned under the top bar, for the divider only.
 // One IntersectionObserver for the app; new toolbars are picked up as pages render.
 if (typeof window !== 'undefined' && typeof IntersectionObserver === 'function' && typeof MutationObserver === 'function') {

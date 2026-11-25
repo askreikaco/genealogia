@@ -67,7 +67,7 @@ test('owner of both trees links a person; both profiles show "Cũng có trong c�
     await page.goto(base + '/#person/N-sp-p002-1');
     await page.waitForSelector('section.relsec', { timeout: 15000 });
     await page.locator('.acts2 [data-menu]').first().click();
-    await page.locator('.menu [data-act="xlink"]').click();
+    await page.locator('.rds-menu [data-act="xlink"]').click();
     await page.waitForSelector('dialog.xlink-sheet[open]');
     await page.selectOption('dialog.xlink-sheet select[name=fam]', FB);
     await page.fill('dialog.xlink-sheet input[name=q]', 'thu thi lan');

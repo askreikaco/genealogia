@@ -25,7 +25,7 @@ export function dangerZone(buttons, { title = 'Vùng nguy hiểm', note = '' } =
     + `${note ? `<p class="sub">${esc(note)}</p>` : ''}<div class="dzone-acts">${list.join('')}</div></section>`;
 }
 
-export function dangerItem(label, fn, attrs = '') { return [esc(label), fn, true, `data-danger ${attrs}`]; }
+export function dangerItem(label, fn, attrs = {}) { return [label, fn, true, { 'data-danger': '', ...attrs }]; }
 
 const norm = (s) => String(s || '').normalize('NFC').trim().toLowerCase().replace(/\s+/g, ' ');
 

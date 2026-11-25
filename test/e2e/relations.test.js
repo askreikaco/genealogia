@@ -71,7 +71,7 @@ const txt = (page) => page.locator('#main').innerText();
 // Quan hệ row ⋯ (editors) -> one menu item
 async function openRelMenu(page, name, item) {
   await page.getByRole('button', { name: `Tùy chọn cho ${name}` }).first().click();
-  await page.locator('.menu [role=menuitem]', { hasText: item }).click();
+  await page.locator('.rds-menu [role=menuitem]', { hasText: item }).click();
 }
 async function addFlow(page, id, type) {
   await page.locator('button[data-rel-add]').click();
@@ -177,10 +177,13 @@ test('a relation row opens that person\'s profile; ⋯ holds Sửa quan hệ; no
     assert.equal(await page.locator('.relrows a.calm[data-rel-edit], .relrows button.calm').count(), 0, 'rows are links');
     if (SHOT) await page.screenshot({ path: path.join(SHOT, 'quanhe-more-390.png'), fullPage: false, clip: await page.locator('section.relsec').boundingBox() });
     await box.getByRole('button', { name: 'Tùy chọn cho Giả Ngọc Giao' }).click();
-    await page.waitForSelector('.menu [role=menuitem]');
-    assert.deepEqual(await page.locator('.menu [role=menuitem]').allInnerTexts(), ['Sửa quan hệ', 'Xem trên cây', 'Xóa quan hệ']);
+    await page.waitForSelector('.rds-menu [role=menuitem]');
+    assert.deepEqual(await page.locator('.rds-menu [role=menuitem]').allInnerTexts(), ['Sửa quan hệ', 'Xem trên cây', 'Xóa quan hệ']);
+    // DS menu (relui.js): the first row has focus; the red last row is marked, with a divider above it
+    assert.equal(await page.evaluate(() => document.activeElement === document.querySelector('.rds-menu [role=menuitem]')), true, 'the first item has focus');
+    assert.equal(await page.locator('.rds-menu [role=menuitem]').last().evaluate((x) => x.classList.contains('rds-menu__item--danger') && !!x.previousElementSibling?.classList.contains('rds-menu__sep')), true, 'the danger row is red, with a divider above');
     if (SHOT) await page.screenshot({ path: path.join(SHOT, 'quanhe-menu-390.png') });
-    await page.locator('.menu [role=menuitem]', { hasText: 'Sửa quan hệ' }).click();
+    await page.locator('.rds-menu [role=menuitem]', { hasText: 'Sửa quan hệ' }).click();
     await page.waitForSelector('.rel-sheet[open]');
     await page.keyboard.press('Escape');
     await openProfile(page, 'P001');

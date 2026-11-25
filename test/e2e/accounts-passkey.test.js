@@ -104,7 +104,7 @@ test('passkey: add from Cách đăng nhập, sign out, sign in with it (no email
     // remove it through the menu and the danger confirm
     await openSub(page, 'tai-khoan/dang-nhap');
     await page.click('[data-pk-id]');
-    await page.click('.menu [role="menuitem"]:has-text("Gỡ passkey")');
+    await page.click('.rds-menu [role="menuitem"]:has-text("Gỡ passkey")');
     await page.waitForSelector('dialog#dcf[open]');
     await page.click('dialog#dcf [data-rds-confirm]');
     await toast(page, 'Đã gỡ passkey.');

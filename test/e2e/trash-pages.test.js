@@ -77,7 +77,7 @@ test('person delete: the one-person endpoint answers 409; the menu opens the cho
       await page.goto(`${base}/#/${SLUG}/list`);
       await page.waitForSelector(`[data-menu="${PA}"]`, { timeout: 20000 });
       await page.locator(`[data-menu="${PA}"]`).first().click();
-      await page.locator('.menu [role=menuitem]', { hasText: 'Gỡ khỏi gia phả' }).click();
+      await page.locator('.rds-menu [role=menuitem]', { hasText: 'Gỡ khỏi gia phả' }).click();
       await page.waitForSelector('dialog.dcs[open]', { timeout: 15000 });
       await page.keyboard.press('Escape');
       assert.deepEqual(errs, []);

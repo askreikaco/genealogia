@@ -158,9 +158,9 @@ test('person removal: the red last menu item opens the chooser (Gỡ khỏi gia 
     await page.goto(`${base}/#/${SLUG}/list`);
     await page.waitForSelector(`[data-menu="${P2}"]`, { timeout: 20000 });
     await page.locator(`[data-menu="${P2}"]`).first().click();
-    const items = await page.locator('.menu [role=menuitem]').evaluateAll((xs) => xs.map((x) => ({ t: x.textContent, d: x.classList.contains('d') && x.hasAttribute('data-danger') })));
+    const items = await page.locator('.rds-menu [role=menuitem]').evaluateAll((xs) => xs.map((x) => ({ t: x.textContent, d: x.classList.contains("rds-menu__item--danger") && x.hasAttribute('data-danger') })));
     assert.deepEqual(items[items.length - 1], { t: 'Gỡ khỏi gia phả…', d: true }, 'red, marked, last');
-    await page.locator('.menu [role=menuitem]').last().click();
+    await page.locator('.rds-menu [role=menuitem]').last().click();
     await page.waitForSelector('dialog.dcs[open]', { timeout: 15000 });
     const text = await page.textContent('dialog.dcs[open]');
     assert.ok(text.includes('Đề nghị gỡ'), 'the vote is offered');

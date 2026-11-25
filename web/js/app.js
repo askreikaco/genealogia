@@ -548,7 +548,7 @@ function rowMenu(id, anchor, ctx = '') {
     ...(S.signedIn() ? elder.MENU_ITEMS : []),
     ...(ed ? [...(prof ? profRelItems(p) : [['edit', 'Sửa thông tin'], ['parent', 'Thêm cha / mẹ'], ['child', 'Thêm con'], ['spouse', 'Thêm vợ / chồng'], ['sibling', 'Thêm anh chị em']]), ['xlink', 'Liên kết với người ở cây khác'], ['xvar', 'Thêm giá trị từ nguồn khác'], ['flag', 'Đánh dấu cần xác minh'], ['delete', dangerLabel('Gỡ khỏi gia phả…')]]
       : [...(prof ? [] : [['suggest', 'Sửa']]), ['login', 'Đăng nhập để sửa']])];
-  popMenu(anchor, items.map(([k, l]) => [l, () => act(k, id), k === 'delete', `data-act="${k}" data-id="${id}"${k === 'delete' ? ' data-danger' : ''}`]), '', { title: `${rank(p.data)} ${p.data.name}` });
+  popMenu(anchor, items.map(([k, l]) => [l, () => act(k, id), k === 'delete', { 'data-act': k, 'data-id': id, ...(k === 'delete' ? { 'data-danger': '' } : {}) }]), '', { title: `${rank(p.data)} ${p.data.name}` });
 }
 addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMenu({ focus: true }); closeSheets(); } });
 

@@ -93,7 +93,7 @@ async function flow(scheme, target) {
     await a.page.goto(`${base}/#/${SLUG}/person/${target}`);
     await a.page.waitForSelector(`[data-menu="${target}"]`, { timeout: 20000 });
     await a.page.locator(`[data-menu="${target}"]`).first().click();
-    await a.page.locator('.menu [role=menuitem]', { hasText: 'Gỡ khỏi gia phả' }).click();
+    await a.page.locator('.rds-menu [role=menuitem]', { hasText: 'Gỡ khỏi gia phả' }).click();
     await a.page.waitForSelector('dialog.dcs[open]', { timeout: 15000 });
     const text = await a.page.textContent('dialog.dcs[open]');
     assert.ok(!text.includes('Nhập nhầm'), 'the fast path is not offered for an old record');

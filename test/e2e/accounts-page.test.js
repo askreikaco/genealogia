@@ -149,7 +149,7 @@ test('subpages: each row opens its page with a back button; every capability is 
     assert.equal(await page.locator('.acc-root .calm', { hasText: 'Google' }).locator('.tag', { hasText: 'Đã liên kết' }).count(), 1);
     // unlink Google: the ⋯ of the Google row offers "Gỡ liên kết" (not clicked: it is the only sign-in method)
     await page.locator('.acc-root .calm-row', { hasText: 'Đã liên kết' }).locator('[data-idm]').click();
-    assert.deepEqual(await page.$$eval('.menu [role=menuitem]', (els) => els.map((e) => e.textContent.trim())), ['Gỡ liên kết']);
+    assert.deepEqual(await page.$$eval('.rds-menu [role=menuitem]', (els) => els.map((e) => e.textContent.trim())), ['Gỡ liên kết']);
     await page.keyboard.press('Escape');
     await shot(page, `account-dang-nhap-light.png`);
     // add an email, then remove it again from its ⋯ menu
@@ -160,8 +160,15 @@ test('subpages: each row opens its page with a back button; every capability is 
     await settled(page);
     assert.equal(await page.locator('.acc-root .calm', { hasText: EXTRA }).locator('.tag', { hasText: 'Chưa xác minh' }).count(), 1);
     await page.locator('.calm-row', { hasText: EXTRA }).locator('[data-em]').click();
-    assert.deepEqual(await page.$$eval('.menu [role=menuitem]', (els) => els.map((e) => e.textContent.trim())), ['Gửi lại đường dẫn xác minh', 'Gỡ email']);
-    await page.click('.menu [role=menuitem]:has-text("Gỡ email")');
+    // DS menu (account.js): the danger row is red with a divider above; Escape returns focus to the trigger, then it reopens
+    assert.equal(await page.locator('.rds-menu [data-danger]').evaluate((x) => x.classList.contains('rds-menu__item--danger') && !!x.previousElementSibling?.classList.contains('rds-menu__sep')), true, 'the danger row is red, with a divider above');
+    assert.equal(await page.evaluate(() => document.activeElement === document.querySelector('.rds-menu [role=menuitem]')), true, 'the first item has focus');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.rds-menu', { state: 'detached' });
+    assert.equal(await page.locator('.calm-row', { hasText: EXTRA }).locator('[data-em]').evaluate((b) => document.activeElement === b), true, 'Escape returns focus to the trigger');
+    await page.locator('.calm-row', { hasText: EXTRA }).locator('[data-em]').click();
+    assert.deepEqual(await page.$$eval('.rds-menu [role=menuitem]', (els) => els.map((e) => e.textContent.trim())), ['Gửi lại đường dẫn xác minh', 'Gỡ email']);
+    await page.click('.rds-menu [role=menuitem]:has-text("Gỡ email")');
     await page.click('dialog#dcf [data-rds-confirm]');
     await page.waitForSelector('text=Đã gỡ email.');
     await settled(page);

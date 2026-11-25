@@ -91,7 +91,7 @@ test('tree B: Toàn cầu card, then Cây trên (dotted "nhóm theo họ"), then
       assert.match(await page.locator('#tr .tgen.tlk.tl-solid').first().textContent(), /Thử Văn Tổ là cha\/mẹ của Ông Thử Văn Một/);
       assert.equal(await page.locator('#tr [data-tier-more]').count(), 0, 'no middle levels -> no toggle');
       assert.equal(await page.locator('#tr .tlg').count(), 0, 'no legend row on the tree page');
-      await page.click('#tmore'); await page.click('.menu [role=menuitem]:has-text("Ý nghĩa các đường nối")');
+      await page.click('#tmore'); await page.click('.rds-menu [role=menuitem]:has-text("Ý nghĩa các đường nối")');
       const sheet = page.locator('dialog.fpanel', { hasText: 'Ý nghĩa các đường nối' });
       await sheet.waitFor({ state: 'visible' });
       assert.match(await sheet.textContent(), /đã nối người.*chưa chứng minh.*nhóm theo họ/s);

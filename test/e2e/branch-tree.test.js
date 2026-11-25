@@ -73,7 +73,7 @@ test('owner creates a branch from the ⋯ menu; the branch tree shows its people
     await page.goto(`${base}/#/${HOME}/person/${P.root}`);
     await page.waitForSelector('nav.ptabs', { timeout: 15000 });
     await page.locator(`[data-menu="${P.root}"][data-menu-ctx="prof"]`).click();
-    await page.locator('.menu [role=menuitem]', { hasText: 'Tạo cây cho nhánh này' }).click();
+    await page.locator('.rds-menu [role=menuitem]', { hasText: 'Tạo cây cho nhánh này' }).click();
     const sheet = page.locator('dialog.btree-sheet');
     await sheet.waitFor({ timeout: 10000 });
     await page.waitForFunction(() => /Cây sẽ có 4 người/.test(document.querySelector('dialog.btree-sheet [data-count]')?.textContent || ''), null, { timeout: 10000 });

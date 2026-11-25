@@ -41,7 +41,7 @@ test('add a child under a parent with 3 dated siblings: Đời 7 and Thứ 3 are
     await s.page.evaluate(() => { location.hash = '#list'; });
     await s.page.waitForSelector('main');
     await s.page.locator('[data-menu="PA"]').first().click();
-    await s.page.locator('.menu [data-act="child"][data-id="PA"]').click();
+    await s.page.locator('.rds-menu [data-act="child"][data-id="PA"]').click();
     await s.page.waitForSelector('#add-q');
     await s.page.click('[data-new]');
     await s.page.waitForSelector('#add-f input[name=name]');

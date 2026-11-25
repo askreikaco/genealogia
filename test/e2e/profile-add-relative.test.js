@@ -77,14 +77,14 @@ test('legacy family: the profile ⋯ shows Thêm cha / mẹ, Thêm con, Thêm an
     const { page, ctx, log } = await open(b, REL_LEGACY, 'person/K1');
     await page.waitForSelector('button.ib[data-menu="K1"][data-menu-ctx="prof"]', { timeout: 10000 });
     await page.click('button.ib[data-menu="K1"][data-menu-ctx="prof"]');
-    await page.waitForSelector('.menu', { timeout: 5000 });
-    const labels = await page.locator('.menu [data-act]').allTextContents();
+    await page.waitForSelector('.rds-menu', { timeout: 5000 });
+    const labels = await page.locator('.rds-menu [data-act]').allTextContents();
     assert.ok(labels.includes('Thêm con'), 'Thêm con is in the profile ⋯ (menu: ' + labels.join(' | ') + ')');
     assert.ok(labels.includes('Thêm anh chị em'), 'Thêm anh chị em is in the profile ⋯');
     assert.ok(labels.includes('Thêm cha / mẹ'), 'Thêm cha / mẹ is in the profile ⋯');
     // the menu does not repeat what the page shows
     assert.ok(!labels.includes('Sửa thông tin') && !labels.includes('Xem hồ sơ'), 'no Sửa / Xem hồ sơ in the profile ⋯');
-    await page.click('.menu [data-act="child"][data-id="K1"]');
+    await page.click('.rds-menu [data-act="child"][data-id="K1"]');
     // the search-first add flow (step 1): the search box, titled for this person
     await page.waitForSelector('#add-q', { timeout: 8000 });
     assert.match(await page.locator('.rel-head h2').first().textContent(), /Thêm con của Dương Văn Một/);
@@ -101,8 +101,8 @@ test('relation-table family: the profile ⋯ has no add-relative items (Quan h�
     const { page, ctx, log } = await open(b, REL_TABLE, 'person/K1');
     await page.waitForSelector('button.ib[data-menu="K1"][data-menu-ctx="prof"]', { timeout: 10000 });
     await page.click('button.ib[data-menu="K1"][data-menu-ctx="prof"]');
-    await page.waitForSelector('.menu', { timeout: 5000 });
-    const labels = await page.locator('.menu [data-act]').allTextContents();
+    await page.waitForSelector('.rds-menu', { timeout: 5000 });
+    const labels = await page.locator('.rds-menu [data-act]').allTextContents();
     for (const l of ['Thêm con', 'Thêm anh chị em', 'Thêm cha / mẹ', 'Thêm vợ / chồng', 'Sửa thông tin']) {
       assert.ok(!labels.includes(l), `"${l}" is not in the profile ⋯ of a relation-table family`);
     }

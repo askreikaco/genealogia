@@ -68,7 +68,7 @@ test('list row ⋯ "Thêm con" in a relation-table family: form without parent, 
     await page.goto(base + '/#list');
     await page.waitForSelector('[data-menu="P001"]', { timeout: 15000 });
     await page.locator('[data-menu="P001"]').first().click();
-    await page.locator('.menu [data-act="child"][data-id="P001"]').click();
+    await page.locator('.rds-menu [data-act="child"][data-id="P001"]').click();
     // the basic form (web/js/addflow.js): name, sex, dates; the generation from the parent is saved with it, no parent field
     await page.waitForSelector('#add-f input[name=name]', { timeout: 8000 });
     await page.locator('#add-f input[name=name]').fill('Dương Văn Hàng');
@@ -103,19 +103,19 @@ test('⋯ menus toggle: a second tap on the same ⋯ closes it; Escape closes an
     const a = triggers.nth(3); // a row in the middle of the list, clear of the sticky bars
     await a.scrollIntoViewIfNeeded(); await page.evaluate(() => scrollBy(0, -200));
     await a.click();
-    assert.equal(await page.locator('.menu').count(), 1, 'opens');
+    assert.equal(await page.locator('.rds-menu').count(), 1, 'opens');
     assert.equal(await a.getAttribute('aria-expanded'), 'true');
     assert.equal(await a.getAttribute('aria-haspopup'), 'menu');
     await a.click();
-    assert.equal(await page.locator('.menu').count(), 0, 'a second tap on the same ⋯ closes it');
+    assert.equal(await page.locator('.rds-menu').count(), 0, 'a second tap on the same ⋯ closes it');
     assert.equal(await a.getAttribute('aria-expanded'), 'false');
     await a.click();
-    assert.equal(await page.locator('.menu').count(), 1, 'and opens again');
+    assert.equal(await page.locator('.rds-menu').count(), 1, 'and opens again');
     await page.keyboard.press('Escape');
-    assert.equal(await page.locator('.menu').count(), 0, 'Escape closes');
+    assert.equal(await page.locator('.rds-menu').count(), 0, 'Escape closes');
     assert.equal(await a.evaluate((el) => el === document.activeElement), true, 'focus is back on the ⋯');
     await a.click();
-    const t1 = await page.locator('.menu .mh').first().textContent();
+    const t1 = await page.locator('.rds-menu .rds-menu__title').first().textContent();
     // another ⋯ that the open menu does not cover (a real tap can only reach a visible one)
     const bi = await page.evaluate(() => [...document.querySelectorAll('[data-menu]')].findIndex((el, i) => {
       const r = el.getBoundingClientRect(); if (i === 3 || r.bottom < 60 || r.top > innerHeight - 70) return false;
@@ -124,12 +124,38 @@ test('⋯ menus toggle: a second tap on the same ⋯ closes it; Escape closes an
     assert.ok(bi >= 0, 'a second visible ⋯');
     const b = triggers.nth(bi);
     await b.click();
-    assert.equal(await page.locator('.menu').count(), 1, 'one menu at a time');
-    assert.notEqual(await page.locator('.menu .mh').first().textContent(), t1, 'the other ⋯ switches to its own menu');
+    assert.equal(await page.locator('.rds-menu').count(), 1, 'one menu at a time');
+    assert.notEqual(await page.locator('.rds-menu .rds-menu__title').first().textContent(), t1, 'the other ⋯ switches to its own menu');
     assert.equal(await a.getAttribute('aria-expanded'), 'false');
     assert.equal(await b.getAttribute('aria-expanded'), 'true');
     await page.mouse.click(5, 300);
-    assert.equal(await page.locator('.menu').count(), 0, 'a tap outside closes');
+    assert.equal(await page.locator('.rds-menu').count(), 0, 'a tap outside closes');
+    assert.deepEqual(errors, []);
+  } finally { await ctx.close(); }
+});
+
+test('row menu on the DS: first row has focus, the red last row has a divider, Escape returns focus, a pick runs its action', { skip }, async () => {
+  const { ctx, page, errors } = await ownerPage(390);
+  try {
+    await page.goto(base + '/#list');
+    await page.waitForSelector('[data-menu]', { timeout: 15000 });
+    const a = page.locator('[data-menu]').nth(3);
+    await a.scrollIntoViewIfNeeded(); await page.evaluate(() => scrollBy(0, -200));
+    const id = await a.getAttribute('data-menu');
+    await a.click();
+    await page.waitForSelector('.rds-menu [role=menuitem]');
+    assert.equal(await a.getAttribute('aria-expanded'), 'true');
+    assert.equal(await page.evaluate(() => document.activeElement === document.querySelector('.rds-menu [role=menuitem]')), true, 'the first item has focus');
+    const last = page.locator('.rds-menu [role=menuitem]').last();
+    assert.equal(await last.getAttribute('data-danger'), '', 'the last row is marked as danger');
+    assert.equal(await last.evaluate((x) => x.classList.contains('rds-menu__item--danger') && !!x.previousElementSibling?.classList.contains('rds-menu__sep')), true, 'the danger row is red, with a divider above');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.rds-menu', { state: 'detached' });
+    assert.equal(await a.evaluate((b) => document.activeElement === b), true, 'Escape returns focus to the trigger');
+    await a.click();
+    await page.locator(`.rds-menu [data-act="view"][data-id="${id}"]`).click();
+    await page.waitForFunction((pid) => location.hash.includes('person/' + pid), id, { timeout: 10000 });
+    assert.equal(await page.locator('.rds-menu').count(), 0, 'a pick closes the menu');
     assert.deepEqual(errors, []);
   } finally { await ctx.close(); }
 });

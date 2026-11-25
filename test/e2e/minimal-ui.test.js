@@ -104,7 +104,7 @@ test('person header: one Sửa for every role; the profile ⋯ repeats nothing o
     assert.equal(await acts.locator('button.btn.sm').innerText(), 'Sửa');
     assert.equal(await acts.locator('a').count(), 0, 'no link actions in the header');
     await page.locator('[data-menu="PA"]').click();
-    const menu = page.locator('.menu');
+    const menu = page.locator('.rds-menu');
     assert.ok(await menu.locator('[data-act="treeview"]').count() === 1, '⋯ has Xem trên cây');
     // the fixture family is legacy-relations: Quan hệ is read-only there, so the ⋯ adds relatives through the search-first
     // flow (#121). The items that repeat the page (view, edit, suggest, spouse) stay out.
