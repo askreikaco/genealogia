@@ -31,7 +31,7 @@
   --magenta-b:light-dark(#ffd6e8,#740937);--magenta-f:light-dark(#9f1853,#ffafd2);
   --purple-b:light-dark(#e8daff,#491d8b);--purple-f:light-dark(#6929c4,#d4bbff);
   /* giapha semantic layer (conv §36: components use these names, never raw values or --rk-* / --cds-* directly) */
-  --fs-1:var(--rk-fs-1);--fs-2:var(--rk-fs-2);--fs-3:var(--rk-fs-3);--fs-4:var(--rk-fs-4);--fs-5:var(--rk-fs-5);--fs-6:var(--rk-fs-6);
+  --fs-1:calc(var(--rk-fs-1) * var(--text-scale));--fs-2:calc(var(--rk-fs-2) * var(--text-scale));--fs-3:calc(var(--rk-fs-3) * var(--text-scale));--fs-4:calc(var(--rk-fs-4) * var(--text-scale));--fs-5:calc(var(--rk-fs-5) * var(--text-scale));--fs-6:calc(var(--rk-fs-6) * var(--text-scale));
   --lh-1:var(--rk-lh-1);--lh-2:var(--rk-lh-2);--lh-3:var(--rk-lh-3);--lh-4:var(--rk-lh-4);--lh-5:var(--rk-lh-5);--lh-6:var(--rk-lh-6);
   --ls-1:var(--rk-ls-1);--ls-2:var(--rk-ls-2);
   --sz-tile:var(--rk-tile);--sz-tile-sm:var(--rk-tile-sm);--sz-crest-sm:20px;--sz-crest-md:var(--rk-tile);--sz-crest-lg:64px;--r-pill:var(--rk-radius-pill);--r-icon:8px; /* crest and icon sizes are giapha-only (not in DS 0.2.0) */
@@ -44,4 +44,6 @@
   color-scheme:light dark}
 /* browsers without color-mix (before Safari 16.2): a plain grey tint at the same strengths */
 @supports not (color:color-mix(in srgb,red 50%,transparent)){:root{--c-field-tint:rgba(128,128,128,.08);--c-field-tint-2:rgba(128,128,128,.12)}}
+/* Cỡ chữ (Settings, per device): html[data-text] sets --text-scale. Every --fs-* token and the px font sizes in app.css multiply by it. */
+:root{--text-scale:1}:root[data-text=large]{--text-scale:1.15}:root[data-text=xlarge]{--text-scale:1.3}
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
