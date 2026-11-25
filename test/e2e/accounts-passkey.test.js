@@ -105,8 +105,8 @@ test('passkey: add from Cách đăng nhập, sign out, sign in with it (no email
     await openSub(page, 'tai-khoan/dang-nhap');
     await page.click('[data-pk-id]');
     await page.click('.menu [role="menuitem"]:has-text("Gỡ passkey")');
-    await page.waitForSelector('dialog.dcf[open]');
-    await page.click('dialog.dcf [data-dcf-ok]');
+    await page.waitForSelector('dialog#dcf[open]');
+    await page.click('dialog#dcf [data-rds-confirm]');
     await toast(page, 'Đã gỡ passkey.');
     await page.waitForFunction(() => document.querySelectorAll('[data-pk-id]').length === 0);
     const left = await pool.query('select count(*)::int as n from passkeys where account_id = $1', [acct.account_id]);

@@ -112,28 +112,28 @@ test('event edit is a page with back and a sticky Hủy · Lưu bar; delete is i
       await del.scrollIntoViewIfNeeded();
       await shot(page, `danger-zone-390-${scheme}.png`);
       await del.click();
-      await page.waitForSelector('dialog.dcf[open]');
-      const dlg = await page.evaluate(() => ({ focus: document.activeElement?.id, role: document.querySelector('dialog.dcf').getAttribute('role'), text: document.querySelector('dialog.dcf').innerText, ok: document.querySelector('[data-dcf-ok]').textContent }));
-      assert.equal(dlg.focus, 'dcf-h', 'focus on the heading, not on the red button');
+      await page.waitForSelector('dialog#dcf[open]');
+      const dlg = await page.evaluate(() => ({ focus: document.activeElement?.id, role: document.querySelector('dialog#dcf').getAttribute('role'), text: document.querySelector('dialog#dcf').innerText, ok: document.querySelector('[data-rds-confirm]').textContent }));
+      assert.equal(dlg.focus, 'dcf-title', 'focus on the heading, not on the red button');
       assert.equal(dlg.role, 'alertdialog');
       assert.match(dlg.text, /Không thể hoàn tác/);
       assert.match(dlg.text, /Dương Văn Sự/);
       assert.equal(dlg.ok, 'Xóa vĩnh viễn');
       await shot(page, `confirm-390-${scheme}.png`);
       await page.keyboard.press('Escape');
-      await page.waitForFunction(() => !document.querySelector('dialog.dcf'));
+      await page.waitForFunction(() => !document.querySelector('dialog#dcf'));
       assert.equal(await eventCount(page), 1, 'Escape cancels');
       // Enter in the confirm does nothing: focus is on the heading, the red button is never the default
       await del.click();
-      await page.waitForSelector('dialog.dcf[open]');
+      await page.waitForSelector('dialog#dcf[open]');
       await page.keyboard.press('Enter'); await page.waitForTimeout(300);
-      assert.equal(await page.locator('dialog.dcf[open]').count(), 1);
+      assert.equal(await page.locator('dialog#dcf[open]').count(), 1);
       assert.equal(await eventCount(page), 1);
-      await page.click('dialog.dcf [data-dcf-no]');
-      await page.waitForFunction(() => !document.querySelector('dialog.dcf'));
+      await page.click('dialog#dcf .rds-btn--ghost');
+      await page.waitForFunction(() => !document.querySelector('dialog#dcf'));
       if (scheme === 'dark') {
         await del.click();
-        await page.click('dialog.dcf [data-dcf-ok]');
+        await page.click('dialog#dcf [data-rds-confirm]');
         await page.waitForFunction((pid) => location.hash.endsWith(`/person/${pid}`), P1, { timeout: 15000 });
         assert.equal(await eventCount(page), 0, 'deleted after the confirm');
       } else {

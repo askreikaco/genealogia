@@ -25,6 +25,7 @@ const MEMBERS = {
     'package/dist/html.js': 'js/html.js',
     'package/dist/components.js': 'js/components.js',
     'package/dist/menu-controller.js': 'js/menu-controller.js',
+    'package/dist/confirm.js': 'js/confirm.js',
   },
   [`reika-ds-styles-${PIN.version}.tgz`]: {
     'package/fonts/fonts.css': 'fonts/fonts.css',

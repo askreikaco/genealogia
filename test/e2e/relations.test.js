@@ -204,8 +204,8 @@ test('edit a spouse kind, then remove the relation after a confirm (history kept
     assert.match(await txt(page), /Giả Ngọc Giao[\s\S]*vợ lẽ|vợ lẽ/);
     // remove: row ⋯ Xóa quan hệ opens the shared destructive confirm
     await openRelMenu(page, 'Giả Ngọc Giao', 'Xóa quan hệ');
-    await page.locator('dialog.dcf [data-dcf-ok]').click();
-    await page.waitForFunction(() => !document.querySelector('dialog.dcf'), null, { timeout: 8000 }); // closes once the removal is saved
+    await page.locator('dialog#dcf [data-rds-confirm]').click();
+    await page.waitForFunction(() => !document.querySelector('dialog#dcf'), null, { timeout: 8000 }); // closes once the removal is saved
     await openProfile(page, 'P001');
     // the spouse row is gone; a child's line may still name her as mother (parent links are separate records)
     const spouseRows = await page.locator('.relrows a.calm', { hasText: 'Giả Ngọc Giao' }).count();

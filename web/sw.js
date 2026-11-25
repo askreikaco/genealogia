@@ -19,6 +19,7 @@ const SHELL = [
   '/vendor/reika-ds/js/html.js',
   '/vendor/reika-ds/js/components.js',
   '/vendor/reika-ds/js/menu-controller.js',
+  '/vendor/reika-ds/js/confirm.js',
   '/app.css',
   '/listui.css',
   '/book.css',
