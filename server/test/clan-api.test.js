@@ -13,7 +13,7 @@ const skip = URL_ ? false : 'set GP_TEST_DATABASE_URL (scratch DB) to run';
 const TAG = crypto.randomBytes(3).toString('hex');
 const SUR = `Khê${TAG}`; const SLUG = `khe${TAG}`; // a surname no other test uses
 const SUR2 = `Ngàn${TAG}`; const SLUG2 = `ngan${TAG}`;
-const F = { a: `cla-${TAG}`, b: `clb-${TAG}`, c: `clc-${TAG}`, p: `clp-${TAG}`, x: `clx-${TAG}` };
+const F = { a: `cla-${TAG}`, b: `clb-${TAG}`, c: `clc-${TAG}`, p: `clp-${TAG}`, x: `clx-${TAG}`, j: `clj-${TAG}` };
 const MEMBER_P = `mp.${TAG}@example.test`; const MEMBER_X = `mx.${TAG}@example.test`;
 let base, pool, close; const ck = {}; const P = []; const pageFams = [];
 const nid = () => 'N' + crypto.randomUUID().slice(0, 13);
@@ -33,6 +33,9 @@ test.before(async () => {
   const fam = (id, name, vis) => pool.query('insert into families (id, slug, name, visibility) values ($1,$1,$2,$3)', [id, name, vis]);
   await fam(F.a, `Họ ${SUR} Bến`, 'public'); await fam(F.b, `Họ ${SUR} Sông`, 'public'); await fam(F.c, `Họ ${SUR} Gò`, 'public');
   await fam(F.p, `Họ ${SUR} Kín`, 'private'); await fam(F.x, 'Họ Khác Thử', 'public');
+  // a reference tree of Japan named with the surname text but without "Họ ": not in the Vietnamese clan
+  await pool.query("insert into families (id, slug, name, visibility, country) values ($1,$1,$2,'public','JP')", [F.j, `${SUR} Nhật Bản`]);
+  await pool.query("insert into persons (id, data, updated_by, family_id) values ($1,$2,'test',$3)", [nid(), { name: `${SUR} Văn Ngoại`, gen: 1, born: '1600', died: '1650' }, F.j]);
   const ins = async (fam, data) => { const id = nid(); P.push(id); await pool.query("insert into persons (id, data, updated_by, family_id) values ($1,$2,'test',$3)", [id, data, fam]); return id; };
   const a1 = await ins(F.a, { name: `${SUR} Văn Cụ`, gen: 1, born: '1820', died: '1890' });
   const a2 = await ins(F.a, { name: `${SUR} Thị Chung`, gen: 3, born: '1900', died: '1970' });
@@ -71,7 +74,9 @@ test('guest: public trees grouped by links, oldest founder first; private tree o
   assert.deepEqual(j.unlinked.map((t) => t.id), [F.c]);
   assert.equal(j.unlinked[0].founder, null, 'living founder not shown to a guest'); assert.equal(j.unlinked[0].year, null);
   assert.equal(j.groups[0].trees[0].founder.name, `${SUR} Văn Tổ`); assert.equal(j.groups[0].trees[0].founder.born, 1760);
-  assert.deepEqual(j.kpis, { groups: 1, trees: 3, people: 5 });
+  assert.deepEqual(j.kpis, { groups: 1, trees: 3, people: 5 }, 'the JP tree is not in the clan');
+  assert.ok(!JSON.stringify(j).includes(F.j), 'JP tree not listed');
+  assert.ok(!JSON.stringify(j).includes('Ngoại'), 'JP tree people not counted');
   assert.ok(!JSON.stringify(j).includes('Kín'), 'nothing of the private tree by name');
   assert.ok(!JSON.stringify(j).includes(F.x), 'other surnames are not listed');
 });

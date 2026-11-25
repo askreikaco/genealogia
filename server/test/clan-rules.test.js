@@ -51,3 +51,27 @@ test('pages: groups first, then unlinked trees; page clamped', async () => {
   assert.equal(C.pageOf({ groups, unlinked }, 99, 5).page, 2);
   assert.equal(C.pageOf({ groups, unlinked }, 'x', 5).page, 1);
 });
+
+test('clan membership: "Họ X" stays in clan X whatever its country (diaspora); VN or unset stays in; a non-"Họ" family of another country does not', async () => {
+  const C = await load();
+  // a diaspora branch named "Họ Dương" with country US is in clan duong, and its clan link is shown
+  assert.equal(C.inClan('Họ Dương', 'US'), true);
+  assert.equal(C.clanHref('Họ Dương', 'US'), '#ho/duong');
+  assert.equal(C.clanHref('Họ Dương', 'us'), '#ho/duong');
+  assert.equal(C.clanHref('Họ Dương', 'JP'), '#ho/duong');
+  // a reference tree of Japan named after an imperial house is not in clan hoang
+  assert.equal(C.clanSlug(C.familySurname('Hoàng tộc Nhật Bản (tham khảo)')), 'hoang');
+  assert.equal(C.inClan('Hoàng tộc Nhật Bản (tham khảo)', 'JP'), false);
+  assert.equal(C.clanHref('Hoàng tộc Nhật Bản (tham khảo)', 'JP'), '');
+  assert.equal(C.clanHref('Hoàng tộc Nhật Bản (tham khảo)', 'jp'), '');
+  // a Vietnamese family is in its clan
+  assert.equal(C.inClan('Hoàng tộc Nhật Bản', 'VN'), true);
+  assert.equal(C.inClan('Họ Hoàng', 'vn'), true);
+  assert.equal(C.clanHref('Họ Hoàng', 'VN'), '#ho/hoang');
+  // a family with no country set stays in (null, empty, undefined)
+  assert.equal(C.inClan('Hoàng tộc Nhật Bản', null), true);
+  assert.equal(C.inClan('Hoàng tộc Nhật Bản', ''), true);
+  assert.equal(C.inClan('Hoàng tộc Nhật Bản'), true);
+  assert.equal(C.clanHref('Họ Hoàng', null), '#ho/hoang');
+  assert.equal(C.clanHref('Họ Hoàng'), '#ho/hoang');
+});

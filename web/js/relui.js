@@ -6,6 +6,7 @@ import { index, siblingsOf, descendantLevels, pedigreeRows, ancestorChain, coupl
 import { kinPath, lineDesc, term as kinTerm, resolveRegion, KIN_REGION_KEY } from './kin/index.js';
 import { calmRow, calmAct, popMenu, cic, surnameTile, surnameOf, ghostRow, moreFold, lbar, ltags, fpanel, addBtn, setUntag } from './ui.js';
 import { relPrefill, nextOrder } from './prefill.js';
+import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger, undoToast, restoreTrash } from './danger.js';
 
 const cache = new WeakMap();
 // The partners of a person (ids, in order) as the viewer sees them.
@@ -358,32 +359,33 @@ function showDone(d, notes) {
 function openEdit(M, rowKeyStr, opts = {}) {
   const r = keyMap.get(rowKeyStr); if (!r) return;
   const isPc = !!r.parent_id; const kinds = isPc ? PC_KINDS : CP_KINDS;
-  const st = { kind: r.kind, confirm: !!opts.confirm }; // confirm: open straight on the remove confirm (row ⋯ Xóa quan hệ)
+  const st = { kind: r.kind };
   const label = isPc ? `${roleTo(M.byId.get(r.parent_id)?.data.sex)} ${pname(M, r.parent_id)} → ${pname(M, r.child_id)}` : `${pname(M, r.a_id)} và ${pname(M, r.b_id)}`;
+  const fam = r.fam || 'duong';
+  // remove: the shared destructive confirm (row ⋯ Xóa quan hệ opens it straight away, the sheet from its danger zone)
+  const removeAsk = () => confirmDanger({ title: 'Gỡ quan hệ này?', lose: label, restore: 'Không thể hoàn tác. Lịch sử thay đổi vẫn ghi lại việc gỡ.', confirm: 'Gỡ quan hệ', onConfirm: async () => {
+    const rm = { op_id: opId(), action: 'remove', kind: isPc ? 'parent_child' : 'couple', id: r.id, person_id: isPc ? r.child_id : r.a_id };
+    if (canEdit(fam)) { const j = await postRel(fam, rm); await S.sync(); if (j?.trash_id) undoToast('Đã gỡ quan hệ · trong Thùng rác', async () => { await restoreTrash(fam, j.trash_id); await S.sync(); }); } else await postSuggest(fam, isPc ? r.child_id : r.a_id, { action: 'remove', kind: rm.kind, id: r.id }, '');
+    closeSheet();
+  } });
+  if (opts.confirm) return removeAsk();
   const draw = (d) => {
     const b = d.querySelector('.rel-body');
-    if (st.confirm) { b.innerHTML = `<div class="rel-head"><div><h2>Gỡ quan hệ này?</h2><p class="sub">${esc(label)}</p></div></div><p class="sub">Lịch sử thay đổi vẫn được giữ.</p><div class="rel-foot"><button class="btn ter" type="button" data-back>Huỷ</button><button class="btn dng" type="button" data-remove>Gỡ quan hệ</button></div>`; return; }
     b.innerHTML = `<div class="rel-head"><div><h2>${isPc ? 'Cha / mẹ' : 'Vợ / chồng'}</h2><p class="sub">${esc(label)}</p></div><button class="ib" type="button" data-x aria-label="Đóng">${relIcon('close')}</button></div>
       <div class="seg" role="radiogroup">${kinds.map((k) => `<button type="button" role="radio" aria-checked="${st.kind === k}" data-kind="${k}" class="${st.kind === k ? 'on' : ''}">${esc(isPc ? PC_LABEL[k] : CP_LABEL[k])}</button>`).join('')}</div>
       ${isPc ? `<label class="fld">Thứ tự tính<input id="ord" inputmode="numeric" value="${r.birth_order ?? ''}"></label>` : `<div class="row"><label class="fld">Năm bắt đầu<input id="ys" inputmode="numeric" value="${r.start_year ?? ''}"></label><label class="fld">Năm kết thúc<input id="ye" inputmode="numeric" value="${r.end_year ?? ''}"></label></div>
         <label class="fld">Thứ tự (vợ/chồng thứ mấy)<input id="ord" inputmode="numeric" value="${r.order_a ?? ''}"></label>`}
       <label class="rel-tog"><input id="priv" type="checkbox" ${r.private ? 'checked' : ''}> Riêng tư (chỉ thành viên thấy)</label>
-      <div class="rel-foot"><button class="btn dng" type="button" data-askremove>Gỡ quan hệ</button><button class="btn" type="button" data-save>Lưu</button></div>`;
+      ${dangerZone([dangerButton('Gỡ quan hệ', 'data-askremove')], { note: 'Lịch sử thay đổi vẫn được giữ.' })}
+      <div class="rel-foot"><button class="btn" type="button" data-save>Lưu</button></div>`;
     b.querySelectorAll('[data-kind]').forEach((x) => x.addEventListener('click', () => { st.kind = x.dataset.kind; draw(d); }));
   };
   const d = openSheet(''); draw(d);
-  const fam = r.fam || 'duong';
   d.addEventListener('click', async (e) => {
     const t = e.target.closest('button'); if (!t) return;
     try {
       if (t.matches('[data-x]')) return closeSheet();
-      if (t.matches('[data-askremove]')) { st.confirm = true; return draw(d); }
-      if (t.matches('[data-back]')) { st.confirm = false; return draw(d); }
-      if (t.matches('[data-remove]')) {
-        const rm = { op_id: opId(), action: 'remove', kind: isPc ? 'parent_child' : 'couple', id: r.id, person_id: isPc ? r.child_id : r.a_id };
-        if (canEdit(fam)) { await postRel(fam, rm); await S.sync(); return closeSheet(); }
-        await postSuggest(fam, isPc ? r.child_id : r.a_id, { action: 'remove', kind: rm.kind, id: r.id }, ''); return closeSheet();
-      }
+      if (t.matches('[data-askremove]')) return removeAsk();
       if (t.matches('[data-save]')) {
         const ord = parseInt(d.querySelector('#ord').value, 10) || null;
         const body = isPc ? { op_id: opId(), action: 'edit', kind: 'parent_child', id: r.id, pc_kind: st.kind, birth_order: ord, private: d.querySelector('#priv').checked, person_id: r.child_id }
@@ -409,7 +411,7 @@ export function relWire(root, getM) {
       const k = mo.dataset.relMore; const other = mo.dataset.other; const M = getM();
       const items = [['Sửa quan hệ', () => openEdit(getM(), k)],
         ...(RLAST?.ctx?.treeOf ? [['Xem trên cây', () => { location.hash = RLAST.ctx.treeOf(other).replace(/^#/, ''); }]] : []),
-        ['Xóa quan hệ', () => openEdit(getM(), k, { confirm: true }), true]];
+        dangerItem('Xóa quan hệ', () => openEdit(getM(), k, { confirm: true }))];
       return popMenu(mo, items, '', { title: pname(M, other) });
     }
   });

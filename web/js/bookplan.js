@@ -242,6 +242,7 @@ export function entryPieces(M, p) {
   const d = p.data; const ks = M.kids(p.id); const W = GEO.COLS3.w; const cap = ITEM_CAP();
   const hasPhoto = !!d.photo; const out = [];
   let h = Math.max(hasPhoto ? 6.476 * BODY : 0, 18, wrapH(textPx((d.name || '').length + rank(d).length + 2, BODY) + (M.preg?.get(p.id) ? textPx(String(M.preg.get(p.id)).length + 10, 0.85 * BODY) : 0), W - (hasPhoto ? 5.143 * BODY : 0), BODY));
+  if (d.sid) h += wrapH(textPx(String(d.sid).length + 4, 0.85 * BODY), W - (hasPhoto ? 5.143 * BODY : 0), 0.85 * BODY); // the code line under the name (book.js .eh .sid)
   let parts = 1;
   const died = [d.died, d.death_lunar ? d.death_lunar + ' ÂL' : ''].filter(Boolean).join(' · ');
   const facts = [['Sinh', d.born], ['Mất', died], ['Giỗ', d.gio_lunar && d.gio_lunar !== d.death_lunar ? d.gio_lunar + ' ÂL' : ''], ['Sống ở', d.place], ['Tên khác', d.alias], ['Nghề', d.job], ['Đạo', d.religion], ['An táng', d.burial]].filter((f) => f[1]);
@@ -404,7 +405,7 @@ export function planBook(M, opts = '') {
     const L = q.data.name.split(' ').pop()[0].toUpperCase();
     if (L !== cur) { cur = L; it.push({ t: 'il', L, h: 21 }); }
     // a spouse's row shows the partner's entry number, linked to the partner's entry
-    it.push({ t: 'ie', id: q.id, reg: M.reg.get(target || q.id) || null, target, h: ieH(q.data.name.length + 4, GEO.COLS4.w, COLS4_FS) });
+    it.push({ t: 'ie', id: q.id, reg: M.reg.get(target || q.id) || null, target, h: ieH(q.data.name.length + 4 + (q.data.sid ? 8 : 0), GEO.COLS4.w, COLS4_FS) }); // 8: the code (.pcode) after the name
   }
   blocks.push({ fixed: false, items: it, head: { type: 'index', parts: [HEAD_H, NOTE_H] }, run: 'Phụ lục', toc: 'Tra tên theo vần', cls: 'idx3', ncols: GEO.COLS4.n });
 

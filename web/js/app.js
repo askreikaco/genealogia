@@ -1,5 +1,12 @@
 import * as S from './store.js';
+import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger, undoToast, restoreTrash } from './danger.js';
+import * as TR from './trash-ui.js';
+import * as CN from './council.js';
+import * as NW from './news.js';
+import { icsCalendar } from './ics.js';
+import { canonicalView, mergeLich, dayMs } from './lich-merge.js';
 import { build, rank, years, yearsHtml, relation, isDead, gioOf, branchOf, lineage, esc, spousesOf, baseOf, genOf, inChi } from './model.js';
+import { factGroups, factCardHtml, bornHintShown } from './facts.js';
 import { branchesOf, branchInfo, founderOf } from './branches.js';
 import { bareName } from './famlabel.js';
 import { nextAnniversary } from './lunar.js';
@@ -13,20 +20,25 @@ import { nameHit, listPrefill, gioPrefill, eventPrefill } from './prefill.js';
 import { codeOf, codeQuery, matchCode, CODE_HELP } from './codes.js';
 import { formatSid, normalizeSid, SID_HELP } from './shortid.js';
 import { relSection, pedigreeHtml, relWire, setNewPersonHandler, relTable, addNewRelated } from './relui.js';
-import { parseSmartDate, fullDate, yearOf as yrOf, smartText, cmpDate, lunarOf, yearOfData, inferThuBase, suggestGen, suggestThu } from './formrules.js';
+import { parseSmartDate, fullDate, yearOf as yrOf, smartText, cmpDate, lunarOf, yearOfData, inferThuBase, suggestGen, suggestThu, hanNameError } from './formrules.js';
 import * as SUC from './succession.js';
+import * as CLM from './claim.js';
 import * as elder from './elder.js';
 import * as LK from './links.js';
+import { openContactImport } from './contacts-import.js';
 import * as CL from './clan.js';
+import { COUNTRIES, countryName, countryCode } from './countries.js';
 import * as PL from './places.js';
 import { accountPage } from './account.js';
+import { twoStepPage } from './twostep.js';
 import * as MT from './match.js';
+import * as DP from './dupes.js';
 import * as VR from './variants.js';
 import { KIN_REGION_KEY, resolveRegion } from './kin/index.js';
 import { EVENT_TYPES, SOURCE_QUALITY, formatEventDate, sortEvents, birthIso, autoSummary, canSeeEventsOf, parseEventDate } from './events.js';
 import { deriveLifeEvents, historyRows, relAccess, legacyAccess, estimatedLifeRows } from './events-life.js';
 import { estimateFamilyCached, ageAtDeathOf } from './estimate-graph.js';
-import { HISTORY_VI } from './events-history.js';
+import { HISTORY_ALL } from './events-history.js';
 import { index as relIndex } from './relgraph.js';
 import { evIcon, typeIcon, headline, tlLoad, tlSave, tlTags, tlApplyUntag, tlToolbar, tlSheetDialog, tlEntries, tlMatch, tlList, tlCount, lifeStoriesHtml, approxHtml,
   evEditorHtml, readEvx, wireEvx, storyEditorHtml, readStx } from './events-ui.js';
@@ -35,13 +47,14 @@ const fold = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,
 const $ = (s, el = document) => el.querySelector(s);
 const main = $('#main');
 // Views that are not about one family: no family prefix in the hash, no follow bar, no family in the preferences.
-const NO_FAM = ['tai-khoan', 'offer', 'trusted', 'lap-gia-pha', 'cach-goi', 'ho'];
+const NO_FAM = ['tai-khoan', 'dang-nhap-2fa', 'offer', 'trusted', 'lap-gia-pha', 'cach-goi', 'ho', 'nhan-quan-ly'];
 let M = build();
 const open = new Set(JSON.parse(localStorageGet('gp_open') || '[]'));
 function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
 
 const IC = {
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/>',
   tree: '<path d="M12 3v6M6 15v-3h12v3M9 3h6v6H9zM3 15h6v6H3zM15 15h6v6h-6z"/>', search: '<circle cx="10" cy="10" r="6"/><path d="M15 15l6 6"/>',
   book: '<path d="M4 4h7a2 2 0 012 2v14a2 2 0 00-2-2H4zM20 4h-7a2 2 0 00-2 2v14a2 2 0 012-2h7z"/>', map: '<path d="M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
@@ -60,8 +73,8 @@ const IC = {
   invite: '<circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 12 0v1M19 8v6M16 11h6"/>',
 };
 // Carbon icons 11.90 (32 grid, filled) for the shell: switcher, nav, toggle.
-const NAV_GROUPS = [['tree', 'list', 'book', 'map', 'gio', 'stats'], ['gop-y', 'members', 'verify', 'export', 'settings']];
-const NAV_CI = { 'gop-y': 'sheet', mine: 'sheet', tree: 'tree', list: 'search', book: 'book', map: 'map', gio: 'gio', stats: 'chart', review: 'pencil', members: 'user', verify: 'flag', export: 'dl', settings: 'gear' };
+const NAV_GROUPS = [['tree', 'list', 'book', 'map', 'lich', 'stats'], ['gop-y', 'members', 'verify', 'export', 'settings']];
+const NAV_CI = { 'gop-y': 'sheet', mine: 'sheet', tree: 'tree', list: 'search', book: 'book', map: 'map', lich: 'gio', stats: 'chart', review: 'pencil', members: 'user', verify: 'flag', export: 'dl', settings: 'gear' };
 // Switcher = switch family (one family today; more families become more rows). Subtitle: size and your role, like an organisation list.
 // ---------- families: one row component for the switcher, the settings list and the "Mở khi vào" sheet ----------
 // Hash: #/<family>/<page> for every family; old #page links are the default family (duong). Family id = slug.
@@ -156,16 +169,18 @@ const themePref = () => S.getPrefs().theme || '';
 const isDark = () => (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
 function setTheme(t) { S.setPrefs({ theme: t }); if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; document.querySelector('meta[name=theme-color]')?.setAttribute('content', '#161616'); render(); }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!themePref()) render(); });
-const railPref = () => localStorageGet('gp_rail') === '1';
+// Side nav: rail (icons) or expanded. A stored choice wins ('1' rail, '0' expanded); with none, desktop (>= 66rem) starts
+// expanded and tablet (42-65.98rem) starts as rail. Same rule as reika-app (app/src/shell.tsx).
+const railPref = () => { const v = localStorageGet('gp_rail'); return v === '1' || (v !== '0' && !matchMedia('(min-width:1056px)').matches); };
 function applyRail() { document.body.classList.toggle('rail', railPref()); }
 const icon = (n) => { if (!IC[n]) console.warn('giapha: no icon for key', n); return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n] || ''}</svg>`; };
 // [route, long label, short label, icon, group]
 const NAV = [
-  ['list', 'Tìm / Danh sách', 'Tìm', 'search', 'Xem'], ['tree', 'Cây gia phả', 'Cây', 'tree', 'Xem'], ['gio', 'Ngày giỗ', 'Giỗ', 'gio', 'Xem'],
+  ['list', 'Tìm / Danh sách', 'Tìm', 'search', 'Xem'], ['tree', 'Cây gia phả', 'Cây', 'tree', 'Xem'], ['lich', 'Lịch', 'Lịch', 'gio', 'Xem'],
   ['book', 'Sách gia phả', 'Sách', 'book', 'Xem'], ['map', 'Bản đồ', 'Bản đồ', 'map', 'Xem'], ['stats', 'Thống kê', 'Thống kê', 'chart', 'Xem'],
   ['gop-y', 'Góp ý', 'Góp ý', 'note', 'Dữ liệu'], ['mine', 'Góp ý của tôi', 'Góp ý', 'note', 'Dữ liệu'], ['review', 'Duyệt đóng góp', 'Duyệt', 'pencil', 'Dữ liệu'], ['members', 'Thành viên & quyền', 'Thành viên', 'user', 'Dữ liệu'], ['verify', 'Cần bổ sung', 'Bổ sung', 'flag', 'Dữ liệu'], ['export', 'Tải về', 'Tải về', 'dl', 'Dữ liệu'], ['settings', 'Cài đặt', 'Cài đặt', 'gear', 'Dữ liệu'],
 ];
-const MOBILE_TABS = ['list', 'tree', 'gio', 'book', 'more'];
+const MOBILE_TABS = ['list', 'tree', 'lich', 'book', 'more'];
 // Suggestions waiting for an editor (badge on Duyệt đóng góp). Refreshed by render(), throttled.
 let sugCount = 0; let sugFetchedAt = 0; let joinCount = 0; // joinCount: join requests waiting (members page badge)
 // Admin pages: the family on screen, or in "Tất cả" every family the viewer may review (admin or owner).
@@ -189,15 +204,22 @@ function refreshSugCount(force) {
   Promise.all(memFams.map((f) => S.listMembers(f).then((j) => j.counts?.pending || 0, () => 0))).then((a) => { const n = a.reduce((x, y) => x + y, 0); if (n !== joinCount) { joinCount = n; chrome(); } });
 }
 
+// Lịch tab badge: unread Tin họ posts plus gatherings within 7 days (device-local seen time). Members only.
+let lichN = 0;
+function refreshLichBadge() {
+  const fam = S.curFamily();
+  if (fam === S.ALL_FAMS || !S.isMember()) { if (lichN) { lichN = 0; chrome(); } return; }
+  NW.loadPosts(fam).then(() => { const n = NW.badgeFor(fam, S.getPrefs); if (n !== lichN) { lichN = n; chrome(); } }, () => {});
+}
 function chrome() {
   const r = route().view;
   const cur = r === 'person' ? 'list' : (r === 'mine' || r === 'review') ? 'gop-y' : r;
   const tl = railPref() ? 'Mở rộng menu' : 'Thu gọn menu';
   const nav = $('#nav'); nav.className = isWide() ? 'side' : 'tabs';
   nav.innerHTML = isWide() ? `<div class="sn-items">${NAV_GROUPS.map((grp) => grp.filter((k) => !['review', 'members'].includes(k) || canAdminHere()).map((k) => { const n = NAV.find((x) => x[0] === k);
-      return `<a href="${hf(`${k}`)}" class="sn-link${cur === k ? ' on' : ''}" ${cur === k ? 'aria-current="page"' : ''} title="${n[1]}">${cic(NAV_CI[k])}<span class="sn-tx">${n[1]}</span>${(k === 'review' || k === 'gop-y') && sugCount ? ` <b class="badge">${sugCount}</b>` : ''}${k === 'members' && joinCount ? ` <b class="badge">${joinCount}</b>` : ''}</a>`; }).join('')).join('<hr class="sn-div">')}</div>
-    <div class="sn-foot"><button type="button" class="sn-toggle" data-acct="${S.signedIn() ? 'sheet' : 'in'}" title="${S.signedIn() ? 'Tài khoản' : 'Đăng nhập'}">${cic('user')}<span class="sn-tx">${S.signedIn() ? esc(accName()) + ' · Tài khoản' : 'Đăng nhập'}</span></button><button type="button" class="sn-toggle" id="sntoggle" aria-label="${tl}" aria-expanded="${!railPref()}">${cic(railPref() ? 'chevR' : 'chevL')}<span class="sn-tx">${tl}</span></button></div>` : MOBILE_TABS.map((k) => { if (k === 'more') { const on = ['map', 'stats', 'gop-y', 'mine', 'review', 'members', 'join', 'verify', 'export', 'more'].includes(navLevel().tab); return `<a href="${hf(`more`)}" class="${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''}>${cic('more', 20)}<span>Thêm</span></a>`; }
-    const n = NAV.find((x) => x[0] === k); return `<a href="${hf(`${k}`)}" class="${navLevel().tab === k ? 'on' : ''}" ${navLevel().tab === k ? 'aria-current="page"' : ''}>${cic(NAV_CI[k], 20)}<span>${n[2]}</span></a>`; }).join('');
+      return `<a href="${hf(`${k}`)}" class="sn-link${cur === k ? ' on' : ''}" ${cur === k ? 'aria-current="page"' : ''} title="${n[1]}">${cic(NAV_CI[k])}<span class="sn-tx">${n[1]}</span>${(k === 'review' || k === 'gop-y') && sugCount ? ` <b class="badge">${sugCount}</b>` : ''}${k === 'lich' && lichN ? ` <b class="badge">${lichN}</b>` : ''}${k === 'members' && joinCount ? ` <b class="badge">${joinCount}</b>` : ''}</a>`; }).join('')).join('<hr class="sn-div">')}</div>
+    <div class="sn-foot"><button type="button" class="sn-toggle" data-acct="${S.signedIn() ? 'sheet' : 'in'}" title="${S.signedIn() ? 'Tài khoản' : 'Đăng nhập'}">${cic('user')}<span class="sn-tx">${S.signedIn() ? esc(accName()) + ' · Tài khoản' : 'Đăng nhập'}</span></button><button type="button" class="sn-toggle" id="sntoggle" aria-controls="nav" aria-label="${tl}" aria-expanded="${!railPref()}">${cic(railPref() ? 'chevR' : 'chevL')}<span class="sn-tx">${tl}</span></button></div>` : MOBILE_TABS.map((k) => { if (k === 'more') { const on = ['map', 'stats', 'gop-y', 'mine', 'review', 'members', 'join', 'verify', 'export', 'more'].includes(navLevel().tab); return `<a href="${hf(`more`)}" class="${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''}>${cic('more', 20)}<span>Thêm</span></a>`; }
+    const n = NAV.find((x) => x[0] === k); return `<a href="${hf(`${k}`)}" class="${navLevel().tab === k ? 'on' : ''}" ${navLevel().tab === k ? 'aria-current="page"' : ''}>${cic(NAV_CI[k], 20)}<span>${n[2]}</span>${k === 'lich' && lichN ? ` <b class="badge">${lichN}</b>` : ''}</a>`; }).join('');
   const root = navLevel(route()).root;
   $('.cbar').classList.toggle('inner', !root);
   $('#cbl').innerHTML = (root ? '' : '<button class="cbar-back" id="cbback" type="button" aria-label="Quay lại" title="Quay lại">‹</button>') + (root || isWide() ? '<button class="cbar-sw" id="swbtn" type="button" aria-label="Chọn dòng họ" aria-haspopup="dialog" title="Chọn dòng họ">' + cic('switcher', 20) + '</button>' : '');
@@ -235,6 +257,11 @@ function navLevel(r = route()) {
   const { view, arg } = r;
   if (view === 'person') return { root: false, parent: hf('list'), tab: 'list' };
   if (view === 'sua') return { root: false, parent: hf(`person/${arg}`), tab: 'list' };
+  if (view === 'su-kien') return { root: false, parent: hf(`person/${arg}`), tab: 'list' };
+  if (view === 'tin') return { root: false, parent: hf('lich'), tab: 'lich' };
+  if (view === 'tin-sua') return { root: false, parent: hf('tin'), tab: 'lich' };
+  if (view === 'thung-rac') return { root: false, parent: hf('more'), tab: 'more' };
+  if (view === 'bieu-quyet') return { root: false, parent: hf('more'), tab: 'more' };
   if (view === 'place') return { root: false, parent: hf('list'), tab: 'list' };
   if (view === 'ho') return { root: false, parent: '#/' + S.ALL_FAMS + '/tree', tab: 'more' };
   if (view === 'them') { const pid = formSt?.prefill?.parent; return { root: false, parent: pid ? hf(`person/${pid}`) : hf('list'), tab: 'list' }; }
@@ -243,6 +270,7 @@ function navLevel(r = route()) {
   if (view === 'vai-tro') return { root: false, parent: hf('members'), tab: 'more' };
   if (view === 'doi-chi') return { root: false, parent: hf('stats'), tab: 'more' };
   if (view === 'tai-khoan' && arg) return { root: false, parent: '#tai-khoan', tab: 'more' }; // Tài khoản subpages back to the page
+  if (view === 'dang-nhap-2fa') return { root: false, parent: '#tree', tab: 'tree' }; // sign-in step 2 (twostep.js)
   if (MORE_KIDS.includes(view)) return { root: false, parent: hf('more'), tab: 'more' };
   return { root: true, tab: view || 'tree' };
 }
@@ -281,11 +309,12 @@ function render() {
   const keepY = scrollY;
   if (formGuard()) return;
   const { view, arg, fam } = route();
+  if (canonicalView(view) !== view) { location.replace('#' + (fam === 'duong' ? '' : '/' + fam + '/') + canonicalView(view)); return; } // #gio goes to Lịch
   if ((location.hash === '' || location.hash === '#') && S.defaultFamily() !== 'duong') { location.hash = `/${S.defaultFamily()}/tree`; return; }
   if (fam === S.ALL_FAMS && (view === 'person' || view === 'sua')) { const pp = S.get(arg); if (pp?.fam) { location.replace(`#/${pp.fam}/${view}/${arg}`); return; } } // a person lives in one family
   if (fam !== S.ALL_FAMS && !NO_FAM.includes(view) && (S.getPrefs().fam_used || [])[0] !== fam) S.setPrefs({ fam_used: [fam, ...(S.getPrefs().fam_used || []).filter((x) => x !== fam)].slice(0, 8) });
   S.setFamily(fam);
-  M = build(); chrome(); refreshSugCount(); refreshFams();
+  M = build(); chrome(); refreshSugCount(); refreshFams(); refreshLichBadge();
   const key = mountKey(view, arg, fam);
   const kept = !!key && key === mounted && keptNode(view);
   // same page drawn again (a sync, families arriving): the focused text field gets its focus and caret back after
@@ -298,14 +327,21 @@ function render() {
   if (view === 'tim-dong-ho') { location.replace('#/' + S.ALL_FAMS + '/tree'); return; } // old find-page link: the all-families tree
   if (!famGate(view)) return;
   const loadingNow = !S.isAll() && DATA_VIEWS.includes(view) && !S.hasData(fam) && S.loading(fam);
-  const v = loadingNow ? skeleton : { tree, list: listView, person, gio, verify, map, stats, settings, export: exportView, more, book: bookLink, review, members, join, mine, 'gop-y': gopyOpen, 'cai-dat-dong-ho': famSettings, 'nguoi-ke-nhiem': successionPage, 'vai-tro': rolesPage, 'doi-chi': statsGenPage, 'cach-goi': kinRegionView, 'tai-khoan': () => accountPage(main, { qs: route().qs, sub: route().arg, icon }), place: (a) => PL.placePage(main, a, { fam: S.curFamily(), personOf: (x) => M.byId.get(x), personHref: (x) => hf(`person/${x}`), nameOf: (pp) => `${rank(pp.data)} ${pp.data.name}`.trim() }), ho: (a) => CL.clanPage(main, a, { page: Number(route().qs.get('trang')) || 1 }), sua: formPage, them: formPage, offer: (a) => SUC.offerView(a), trusted: (a) => SUC.trustedView(a), 'lap-gia-pha': () => SUC.createView() }[view] || tree;
+  const v = loadingNow ? skeleton : { tree, list: listView, person, lich: gio, verify, tin: (a) => (a ? NW.detailPage(main, { fam: S.curFamily(), hf, id: a, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() }) : NW.feedPage(main, { fam: S.curFamily(), hf, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() })), 'tin-sua': (a) => NW.editorPage(main, { fam: S.curFamily(), hf, id: a, kind: route().qs.get('kind') === 'gathering' ? 'gathering' : 'notice' }), map, stats, settings, export: exportView, more, book: bookLink, review, members, join, mine, 'gop-y': gopyOpen, 'cai-dat-dong-ho': famSettings, 'su-kien': eventPage, 'bieu-quyet': () => CN.decisionsPage(main, { fam: S.curFamily() }), 'thung-rac': () => TR.trashPage(main, { fam: S.curFamily(), isAdmin: S.isAdmin() }), 'nguoi-ke-nhiem': successionPage, 'vai-tro': rolesPage, 'doi-chi': statsGenPage, 'cach-goi': kinRegionView, 'tai-khoan': () => accountPage(main, { qs: route().qs, sub: route().arg, icon }), 'dang-nhap-2fa': () => twoStepPage(main), place: (a) => PL.placePage(main, a, { fam: S.curFamily(), personOf: (x) => M.byId.get(x), personHref: (x) => hf(`person/${x}`), nameOf: (pp) => `${rank(pp.data)} ${pp.data.name}`.trim() }), ho: (a) => CL.clanPage(main, a, { page: Number(route().qs.get('trang')) || 1, country: route().qs.get('qg') || '' }), sua: formPage, them: formPage, offer: (a) => SUC.offerView(a), trusted: (a) => SUC.trustedView(a), 'lap-gia-pha': () => SUC.createView(), 'nhan-quan-ly': () => CLM.reviewPage(main) }[view] || tree;
+  // all-families tree (the family list): a same-route re-render (a sync) keeps the list on screen until the new one is painted
+  const cayHere = S.isAll() && view === 'tree' && !!main.querySelector('#flist') && !!main.querySelector('#fq');
   if (kept) { if (view === 'map') { mapFilterOpts(); paintMap(); } } // the book iframe and the map stay as they are
   else {
-    setUntag(null); main.innerHTML = ''; main.classList.remove('bookm'); main.classList.toggle('wide', view === 'tree' && isDesk() && (localStorageGet('gp_tmode') || 'chart') === 'chart' || view === 'map');
+    setUntag(null); if (!cayHere) main.innerHTML = ''; main.classList.remove('bookm'); main.classList.toggle('wide', view === 'tree' && isDesk() && (localStorageGet('gp_tmode') || 'chart') === 'chart' || view === 'map');
     treeKeep = treePos; v(arg); treeKeep = null;
   }
   mounted = key;
   if (view === 'book') bookBar();
+  if ((view === 'more' || view === 'review') && S.isEditor() && !S.isAll()) TR.decorate(view, main, { fam: S.curFamily(), hf });
+  // Guests have no decisions (the API needs a member): no request from a guest's person or Thùng rác page (cold-load 401).
+  if (S.isMember() && !S.isAll()) CN.decorate(view, main, { fam: S.curFamily(), hf, personId: route().arg });
+  if (view === 'cai-dat-dong-ho') NW.decorateSettings(main, S.curFamily());
+  if (view === 'tree' && !S.isAll()) CLM.decorate(main, { fam: S.curFamily() }); // Nhận quản lý banner (claim.js)
   { const h = main.querySelector(':scope > h1, :scope > .row > h1'); const n = NAV.find((x) => x[0] === (view === 'person' ? 'list' : view)); const pp = view === 'person' && M.byId.get(arg); $('#cbtitle').textContent = pp ? 'Hồ sơ' : h ? h.textContent : n ? n[1] : view === 'more' ? 'Thêm' : ''; }
   famBar();
   SUC.succBar();
@@ -328,9 +364,14 @@ const nmOf = (p) => `${rank(p.data)} ${p.data.name}`.trim();
 function upperCards() {
   const f = S.curFamily(); LK.ensure(f); const name = S.familyName(f); const surname = CL.familySurname(name);
   if (!surname) return { html: '', any: false };
-  const meta = CL.clanMeta(name, renderSoon) || { trees: 0, han: '' };
+  const country = S.familyMeta(f)?.country || ''; const clanOk = CL.inClan(name, country); // a non-VN tree has no clan: no TOÀN CẦU / QUỐC GIA rows
+  const meta = (clanOk && CL.clanMeta(name, renderSoon, country)) || { trees: 0, han: '' };
   const up = LK.upLinkOf(f, treeRootIds()); const upP = up && M.byId.get(up.person);
-  const head = [{ kind: 'Toàn cầu', title: `Họ ${surname}`, sub: meta.trees ? `${meta.trees} cây` : '', href: CL.clanHref(name), style: 'dot', why: '', tile: surnameTileOf(surname) }];
+  const head = clanOk ? [{ kind: 'Toàn cầu', title: `Họ ${surname}`, sub: meta.trees ? `${meta.trees} cây` : '', href: CL.clanHref(name, country), style: 'dot', why: '', tile: surnameTileOf(surname) }] : [];
+  // QUỐC GIA: this tree's country (Cài đặt dòng họ), else the clan's most common one; shown whenever any tree has one
+  const qgs = (meta.countries || []).filter((c) => c.code !== 'NONE');
+  const mine = country; const qg = clanOk && ((mine && qgs.find((c) => c.code === mine)) || (mine ? { code: mine, trees: 1 } : qgs[0]));
+  if (qg) head.push({ kind: 'Quốc gia', title: `Họ ${surname} · ${countryName(qg.code)}`, han: meta.han, sub: `${qg.trees} cây`, href: `${CL.clanHref(name, country)}?qg=${qg.code}`, style: 'dot', why: 'nhóm theo họ' });
   const middle = []; // levels between the nation and the nearest upper tree (none known yet: one link is followed)
   const near = up && upP ? [{ kind: 'Cây trên', title: up.other_label, sub: [up.other_name, up.other_years].filter(Boolean).join(' · '), href: LK.treeHref(up.other_family, up.other_person), style: 'dot', why: 'nhóm theo họ', tile: surnameTileOf(surname) }] : [];
   const toRoot = near.length ? { style: 'solid', why: `${up.other_parents.map((x) => x.name).join(' và ')} là ${up.other_parents.length > 1 ? 'cha mẹ' : 'cha/mẹ'} của ${nmOf(upP)}` } : { style: 'dot', why: 'cùng họ, chưa nối người' };
@@ -399,7 +440,7 @@ function tree(arg) {
     const ks = M.kids(p.id); const isOpen = hits && !jump ? true : open.has(p.id) || depth < 2 && !open.has('!' + p.id);
     const d = p.data;
     out.push(`<div class="tn ${sexClass(d.sex)} ${hits?.has(p.id) ? 'hit' : ''}" style="--d:${depth}">
-      <a href="${hf(`person/${p.id}`)}" class="tnm"><b>${esc(rank(d))} · ${esc(d.name)}${sexMark(d.sex)}</b><span class="sub">${[depth ? '' : 'Đời ' + (d.gen || '?'), yearsHtml(d), d.gio_lunar || d.death_lunar ? 'Giỗ ' + esc(d.gio_lunar || d.death_lunar) + ' ÂL' : ''].filter(Boolean).join(' · ')}</span></a>
+      <a href="${hf(`person/${p.id}`)}" class="tnm"><b>${esc(rank(d))} · ${esc(d.name)}${sexMark(d.sex)}</b>${d.name_han ? ` <span class="nhan" lang="zh-Hant">${esc(d.name_han)}</span>` : ''}<span class="sub">${[depth ? '' : 'Đời ' + (d.gen || '?'), yearsHtml(d), d.gio_lunar || d.death_lunar ? 'Giỗ ' + esc(d.gio_lunar || d.death_lunar) + ' ÂL' : ''].filter(Boolean).join(' · ')}</span></a>
       ${ks.length ? `<button class="tg ${isOpen ? 'op' : ''}" data-tg="${p.id}" aria-expanded="${isOpen}" aria-label="${isOpen ? 'Đóng' : 'Mở'} nhánh">${isOpen ? '−' : '+' + ks.length}</button>` : ''}</div>`);
     for (const s of (M.inlaws(p.id).length ? M.inlaws(p.id).map((q) => ({ n: q.data.spouse_n, name: q.data.name, note: years(q.data), id: q.id })) : spousesOf(d))) out.push(`<${s.id ? 'a href="' + hf('person/' + s.id) + '"' : 'div'} class="tsp${s.id && s.id === inlawJump ? ' hit' : ''} ${d.sex === 'f' ? 'm' : 'f'}" style="--d:${depth}"><span class="tsl">${d.sex === 'f' ? 'Chồng' : 'Vợ'}${spousesOf(d).length > 1 ? ' ' + s.n : ''}</span><b>${esc(s.name)}</b>${s.note ? `<span class="sub">${esc(s.note)}</span>` : ''}</${s.id ? 'a' : 'div'}>` + (plain ? spouseTree(s, depth) : ''));
     if (plain) out.push(lowerCards(p, depth));
@@ -422,6 +463,8 @@ const saveOpen = () => localStorageSet('gp_open', JSON.stringify([...open]));
 main.addEventListener('click', (e) => {
   const t = e.target.closest('[data-tg]'); if (t) { const id = t.dataset.tg; const wasOpen = t.classList.contains('op') || t.getAttribute('aria-expanded') === 'true'; if (wasOpen) { open.delete(id); open.add('!' + id); } else { open.add(id); open.delete('!' + id); } saveOpen(); render(); return; }
   const a = e.target.closest('[data-act]'); if (a) { act(a.dataset.act, a.dataset.id); return; }
+  const ci = e.target.closest('[data-contact-import]'); if (ci) { const p = S.get(ci.dataset.contactImport); openContactImport({ fam: ci.dataset.fam || S.curFamily(), person: p ? { id: p.id, name: p.data?.name || '' } : null, done: render }); return; }
+  if (e.target.closest('[data-contact-import-fam]')) { openContactImport({ fam: S.curFamily(), done: render }); return; }
   const add = e.target.closest('[data-add]'); if (add) { addFromBar(add.dataset.add); return; }
   const mn = e.target.closest('[data-menu]'); if (mn) { rowMenu(mn.dataset.menu, mn, mn.dataset.menuCtx); }
 });
@@ -476,9 +519,9 @@ function rowMenu(id, anchor, ctx = '') {
   const p = M.byId.get(id); const ed = S.isEditor(); const prof = ctx === 'prof';
   const items = [...(prof ? [] : [['view', 'Xem hồ sơ']]), ['treeview', 'Xem trên cây'], ...(gioOf(p.data) ? [['ics', 'Thêm vào lịch']] : []), ['history', 'Lịch sử sửa'],
     ...(S.signedIn() ? elder.MENU_ITEMS : []),
-    ...(ed ? [...(prof ? [] : [['edit', 'Sửa thông tin'], ['parent', 'Thêm cha / mẹ'], ['child', 'Thêm con'], ['spouse', 'Thêm vợ / chồng'], ['sibling', 'Thêm anh chị em']]), ['xlink', 'Liên kết với người ở cây khác'], ['xvar', 'Thêm giá trị từ nguồn khác'], ['flag', 'Đánh dấu cần xác minh'], ['delete', 'Xóa người này']]
+    ...(ed ? [...(prof ? [] : [['edit', 'Sửa thông tin'], ['parent', 'Thêm cha / mẹ'], ['child', 'Thêm con'], ['spouse', 'Thêm vợ / chồng'], ['sibling', 'Thêm anh chị em']]), ['xlink', 'Liên kết với người ở cây khác'], ['xvar', 'Thêm giá trị từ nguồn khác'], ['flag', 'Đánh dấu cần xác minh'], ['delete', dangerLabel('Gỡ khỏi gia phả…')]]
       : [...(prof ? [] : [['suggest', 'Sửa']]), ['login', 'Đăng nhập để sửa']])];
-  popMenu(anchor, items.map(([k, l]) => [l, () => act(k, id), k === 'delete', `data-act="${k}" data-id="${id}"`]), '', { title: `${rank(p.data)} ${p.data.name}` });
+  popMenu(anchor, items.map(([k, l]) => [l, () => act(k, id), k === 'delete', `data-act="${k}" data-id="${id}"${k === 'delete' ? ' data-danger' : ''}`]), '', { title: `${rank(p.data)} ${p.data.name}` });
 }
 addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMenu({ focus: true }); closeDialog(); } });
 
@@ -502,7 +545,7 @@ function act(k, id) {
   else if (k === 'xlink') { const fam = p.fam || S.curFamily(); LK.openSheet({ fam, personId: id, personName: p.data.name, families: S.scopeFams().filter((f) => f !== fam).map((f) => ({ id: f, label: S.familyLabel(f) })), done: render }); }
   else if (k === 'xvar') VR.openAdd({ fam: p.fam || S.curFamily(), personId: id, personName: p.data.name, done: () => { S.sync(); renderSoon(); } });
   else if (k === 'flag') { const why = prompt2('Cần xác minh điều gì?', p.data.verify || '', (v) => S.edit(id, { verify: v })); }
-  else if (k === 'delete') confirmDialog(`Xóa ${p.data.name}?`, M.kids(id).length ? `Người này có ${M.kids(id).length} con. Các con sẽ không còn cha/mẹ trong cây.` : 'Có thể khôi phục từ Lịch sử sửa.', 'Xóa', () => S.edit(id, { _deleted: true }));
+  else if (k === 'delete') CN.openRemoval({ p, fam: famOfP(p), onDone: async () => { await S.sync(); render(); } });
 }
 
 // ---------- person ----------
@@ -510,17 +553,27 @@ function person(id) {
   const p = M.byId.get(id); if (!p) { main.innerHTML = '<p>Không tìm thấy người này.</p>'; return; }
   if (profFor !== id) { profFor = id; profTab = 'info'; }
   const d = p.data; const sp = d.spouse_of && M.byId.get(d.spouse_of); const ks = sp ? (M.kidsOf2(id).length || M.inlaws(sp.id).length > 1 ? M.kidsOf2(id) : M.kids(sp.id)) : M.kids(id); const br = branchOf(M, sp || p);
-  const f = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : '';
+  const row = (k, v) => (v ? [k, v] : null); // one fact: [label, value html], or null when empty
   const loc = locate(d);
   const plo = { editable: S.isEditor(), placeHref: (x) => hf(`place/${x}`) }; PL.ensure(p.fam || S.curFamily(), id); // place links (shared gazetteer)
   VR.ensure(p.fam || S.curFamily(), id); const vt = (k) => VR.tag(id, k); // "N nguồn khác nhau" (conflicting data)
-  // Facts in four labelled groups, matching the edit form's sections (Sinh, Mất, Nơi sống & nghề, Ghi chú & nguồn). Empty groups are dropped.
-  const groups = { sinh: `${f('Sinh', esc([d.birth_date || d.born, d.birth_lunar && d.birth_lunar + ' ÂL'].filter(Boolean).join(' · ')) + (!S.isMember() && d.born ? ' <span class="sub">(ngày sinh chỉ hiện khi đăng nhập)</span>' : '') + (d.born || d.birth_date ? vt('born') : ''))}${f('Nơi sinh', d.birth_place ? PL.fieldHtml(id, 'birth_place', d.birth_place, plo) + vt('birth_place') : '')}`,
-    mat: `${f('Mất', d.died || d.death_lunar ? esc([d.died, d.death_lunar && d.death_lunar + ' ÂL'].filter(Boolean).join(' · ')) + vt('died') : '')}${f('Giỗ', d.gio_lunar ? esc(d.gio_lunar) + ' ÂL' : '')}${f('An táng', d.burial ? PL.fieldHtml(id, 'burial', d.burial, plo) + vt('burial') : '')}`,
-    noi: `${f('Nơi sống', d.place ? PL.fieldHtml(id, 'place', d.place, { ...plo, extra: loc ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lon}" target="_blank" rel="noopener">Google Maps</a>` : '' }) + vt('place') : '')}${f('Nghề', esc(d.job))}${f('Tôn giáo', esc(d.religion))}`,
-    ghi: `${f('Ghi chú', esc(d.note))}${f('Nguồn', esc(d.source))}` };
+  // Facts: one card (facts.js). Life basics (Sinh, Mất) sit under "Tóm tắt"; the other groups keep their own labels.
+  const bornHint = bornHintShown({ born: d.born, dead: isDead(d), member: S.isMember() }, new Date().getFullYear());
+  const groups = [
+    { title: 'Sinh', basic: true, rows: [
+      row('Sinh', esc([d.birth_date || d.born, d.birth_lunar && d.birth_lunar + ' ÂL'].filter(Boolean).join(' · ')) + (bornHint ? ' <span class="sub">(ngày sinh chỉ hiện khi đăng nhập)</span>' : '') + (d.born || d.birth_date ? vt('born') : '')),
+      row('Nơi sinh', d.birth_place ? PL.fieldHtml(id, 'birth_place', d.birth_place, plo) + vt('birth_place') : '')] },
+    { title: 'Mất', basic: true, rows: [
+      row('Mất', d.died || d.death_lunar ? esc([d.died, d.death_lunar && d.death_lunar + ' ÂL'].filter(Boolean).join(' · ')) + vt('died') : ''),
+      row('Giỗ', d.gio_lunar ? esc(d.gio_lunar) + ' ÂL' : ''),
+      row('An táng', d.burial ? PL.fieldHtml(id, 'burial', d.burial, plo) + vt('burial') : '')] },
+    { title: 'Nơi sống & nghề', rows: [
+      row('Nơi sống', d.place ? PL.fieldHtml(id, 'place', d.place, { ...plo, extra: loc ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lon}" target="_blank" rel="noopener">Google Maps</a>` : '' }) + vt('place') : ''),
+      row('Nghề', esc(d.job)),
+      row('Tôn giáo', esc(d.religion))] },
+    { title: 'Ghi chú & nguồn', rows: [row('Ghi chú', esc(d.note)), row('Nguồn', esc(d.source))] }];
   main.innerHTML = `<div class="prof">${d.photo ? `<img src="${esc(d.photo)}" alt="" class="photo">` : ''}<div><div class="row wrap">${sp ? `<span class="tag purple">${esc(inLaw(p))}</span>` : `<span class="tag blue">Đời ${d.gen || '?'}</span>`}${SEX_LABEL[d.sex] ? `<span class="tag gray sxtag">${sexMark(d.sex)}${SEX_LABEL[d.sex]}</span>` : ''}${d.sid ? `<button type="button" class="tag gray pcode" data-copy-code="${esc(formatSid(d.sid))}" title="${esc(SID_HELP)} Bấm để chép." aria-label="Mã người ${esc(formatSid(d.sid))}. Bấm để chép.">${esc(formatSid(d.sid))}</button>` : ''}${br ? `<span class="tag gray">Chi ${esc(rank(br.data))} ${esc(br.data.name)}</span>` : ''}${S.myPersonId() === id ? '<span class="tag green">Đây là bạn</span>' : ''}</div>
-   <h1 class="big keep">${esc(rank(d))} ${esc(d.name)}</h1>${vt('name') ? `<div class="var-name">${vt('name')}</div>` : ''}<div class="sub">${esc(sp ? (d.sex === 'm' ? 'chồng ' : 'vợ ') + rank(sp.data).toLowerCase() + ' ' + sp.data.name : relation(M, p))}${d.alias ? ' · ' + esc(d.alias) : ''}</div></div></div>
+   <h1 class="big keep">${esc(rank(d))} ${esc(d.name)}</h1>${d.name_han ? `<div class="nhan nhan-h" lang="zh-Hant">${esc(d.name_han)}</div>` : ''}${vt('name') ? `<div class="var-name">${vt('name')}</div>` : ''}<div class="sub">${esc(sp ? (d.sex === 'm' ? 'chồng ' : 'vợ ') + rank(sp.data).toLowerCase() + ' ' + sp.data.name : relation(M, p))}${d.alias ? ' · ' + esc(d.alias) : ''}</div></div></div>
    <div class="kpis">${[['Mất', d.died || (d.death_lunar ? d.death_lunar + ' ÂL' : '—'), 'c2'], ['Giỗ (ÂL)', d.gio_lunar || d.death_lunar || '—', 'c3'], ['Con', ks.length, 'c5'], ['Cháu chắt', M.desc(sp ? sp.id : id) - ks.length, 'c1']].filter(([, v]) => v && v !== '—').map(([l, v]) => `<div class="kpi"><span class="sub">${l}</span><b>${esc(v)}</b></div>`).join('')}</div>
    <div class="row acts2"><div class="acts2-go">${gioOf(d) ? followBar(p) : ''}<button class="btn sm" data-act="${S.isEditor() ? 'edit' : 'suggest'}" data-id="${id}">${icon('pencil')}Sửa</button></div><button class="ib" data-menu="${id}" data-menu-ctx="prof" aria-label="Thêm thao tác">⋯</button></div>
    ${profTabsHtml()}
@@ -573,12 +626,13 @@ function lifeModel(p) {
   const dataOf = new Map(personsOf(fam).map((x) => [x.id, x.data]));
   const r = S.relOf(fam); const eventsOf = (id) => (EVD.get(evKey(fam, id))?.items || []);
   const rel = r.source === 'table' ? relAccess(relIndex(r.parent_child, r.couple)) : null;
+  // One estimate for the whole family (memoized): read for this person only; relatives' undated years give no row.
+  const fest = estimateFamilyCached(fam, dataOf, rel || legacyAccess(dataOf), { eventsOf, today: new Date().toISOString().slice(0, 10) });
   const derived = deriveLifeEvents(p.id, dataOf, { rel, visible, eventsOf });
   // No birth year (or a dead person without a death year): an estimated life window from the evidence. One estimate
   // for the whole family (memoized), read for this person.
   const d0 = p.data; const dead = !!(d0.died || d0.living === 'dead' || d0.gio_lunar || d0.death_lunar || ageAtDeathOf(d0.note));
   const known = birthIso(d0);
-  const fest = estimateFamilyCached(fam, dataOf, rel || legacyAccess(dataOf), { eventsOf, today: new Date().toISOString().slice(0, 10) });
   const e0 = fest.get(p.id);
   const deadish = dead || !!(e0 && e0.ruleDead); // deceased by rule: born more than 110 years ago, no death
   const need = !known || (deadish && !d0.died);
@@ -587,7 +641,7 @@ function lifeModel(p) {
   const window = okEst ? { from: known || okEst.from, to: deadish ? (d0.died ? String(okEst.died[0]) : okEst.to) : new Date().toISOString().slice(0, 10) } : null;
   // auto rows Sinh / Mất (ước tính): shown in Dòng đời, never written to born or died
   const estRows = estimatedLifeRows(p.id, est, eventsOf(p.id));
-  const hist = historyRows(d0, HISTORY_VI, { events: [...eventsOf(p.id), ...derived, ...estRows], window });
+  const hist = historyRows(d0, HISTORY_ALL, { country: S.familyMeta(fam)?.country || 'VN', events: [...eventsOf(p.id), ...derived, ...estRows], window });
   const birth = known || (okEst ? okEst.from : null); // estimated birth: ages read "khoảng N tuổi"
   // with an estimated life, family rows outside it (e.g. a grandchild born after the estimated death) are left out
   const yOf = (r) => Number(String(r.date_from || '').slice(0, 4)) || null;
@@ -641,12 +695,45 @@ function srcHtml(p) {
   return `${items.length ? `<h3 class="tl-lbl">Nguồn</h3><ul class="srcl">${items.map((e) => e.sources.map((s) => `<li><b>${esc(headline(e))}</b> · ${esc(s.title)}${s.url ? ` · <a href="${esc(s.url)}" target="_blank" rel="noopener">Mở</a>` : ''}${s.quality ? ` <span class="sub">${esc(SOURCE_QUALITY[s.quality] || '')}</span>` : ''}</li>`).join('')).join('')}</ul>` : ''}`
     + `${photos.length ? `<h3 class="tl-lbl">Ảnh</h3><div class="stry-ph">${photos.map((x) => `<img src="${esc(x.u)}" alt="${esc(x.title)}" loading="lazy">`).join('')}</div>` : ''}`;
 }
+// Event editor page (owner 2026-11-24: a big form is a page, not a sheet): #/<fam>/su-kien/<personId>[?id=<eventId>].
+// Back and Hủy return; the sticky bar holds Hủy · Lưu; delete sits apart in "Vùng nguy hiểm" and always confirms.
+function eventPage(pid) {
+  const p = M.byId.get(pid);
+  if (!p) { main.innerHTML = '<h1>Sự kiện</h1><p class="sub">Không tìm thấy người này.</p>'; return; }
+  const id = route().qs.get('id') || null;
+  const fam = famOfP(p); const direct = evDirect(fam); const persons = evPickList(fam);
+  const ev = EVD.get(evKey(fam, p.id));
+  if (!ev?.loaded) {
+    main.innerHTML = '<h1>Sự kiện</h1><p class="sub">Đang tải…</p>';
+    evLoad(fam, p.id).then(() => { if (route().view === 'su-kien') render(); }, (e) => { main.innerHTML = `<h1>Sự kiện</h1><p class="err">${esc(e.message)}</p>`; });
+    return;
+  }
+  const it = id ? (ev.items || []).find((x) => x.id === id) : null;
+  if (id && !it) { main.innerHTML = '<h1>Sự kiện</h1><p class="sub">Không tìm thấy sự kiện này.</p>'; return; }
+  const f = tlLoad();
+  const item = it || eventPrefill({ types: f.types, q: f.q });
+  const h = !id ? 'Thêm sự kiện' : direct ? 'Sửa sự kiện' : 'Góp ý sửa sự kiện';
+  main.innerHTML = `<h1>${esc(h)}</h1><div class="form-stack fp-form evpage"><p class="sub">${esc(p.data.name)}${direct ? '' : ' · Quản trị sẽ duyệt trước khi hiển thị.'}</p>`
+    + evEditorHtml(item, { people: item.people || [], persons, id: id || '', page: true })
+    + (id && direct ? dangerZone([dangerButton('Xóa sự kiện', 'data-evp-del')], { note: 'Xóa sự kiện khỏi dòng đời. Không thể hoàn tác.' }) : '')
+    + '</div>';
+  const root = main.querySelector('[data-evx]'); wireEvx(root, persons);
+  const fail = (m) => { const e = root.querySelector('[data-evx-err]'); e.hidden = false; e.textContent = m; };
+  const done = async (msg) => { if (msg) toast(msg); if (direct) { evInvalidate(fam, p.id); await evLoad(fam, p.id, true).catch(() => {}); } profTab = 'life'; location.hash = hf(`person/${p.id}`); };
+  root.querySelector('[data-evx-cancel]').onclick = () => goBack();
+  root.querySelector('[data-evx-save]').onclick = async (e) => {
+    const r = readEvx(root); if (r.error) return fail(r.error);
+    const b = e.currentTarget; b.disabled = true;
+    try { await evApiSave({ fam, p, kind: 'event', id, item: r.item, direct }); await done(direct ? 'Đã lưu' : 'Đã gửi góp ý. Quản trị sẽ duyệt.'); } catch (x) { b.disabled = false; fail(x.message); }
+  };
+  main.querySelector('[data-evp-del]')?.addEventListener('click', () => confirmDanger({ title: 'Xóa sự kiện này?', lose: `Sự kiện “${headline(it)}” bị xóa khỏi dòng đời của ${p.data.name}.`, restore: 'Không thể hoàn tác. Lịch sử sửa vẫn ghi lại việc xóa.', confirm: 'Xóa vĩnh viễn', onConfirm: async () => { const j = await evApi('POST', `/api/events/${id}/delete?family=${encodeURIComponent(fam)}`, { op_id: evOpId() }); await done(''); undoToast('Đã xóa sự kiện · trong Thùng rác', async () => { await restoreTrash(fam, j.trash_id); evInvalidate(fam, p.id); await evLoad(fam, p.id, true).catch(() => {}); render(); }); } }));
+}
 // Event / story editor dialog (timeline). Editors save at once; others send a suggestion.
 function evDialog({ kind, p, id = null, item = {}, title }) {
   const fam = famOfP(p); const direct = evDirect(fam);
   const persons = evPickList(fam);
   const d = document.createElement('dialog'); d.className = 'dlg evdlg';
-  const body = kind === 'event' ? evEditorHtml(item, { people: item.people || [], persons, canDelete: direct && !!id, id: id || '' })
+  const body = kind === 'event' ? evEditorHtml(item, { people: item.people || [], persons, id: id || '' })
     : storyEditorHtml(item, { summary: item.kind === 'tom_tat' });
   d.innerHTML = `<div class="form-stack"><h2>${esc(title)}</h2>${direct ? '' : '<p class="sub">Quản trị sẽ duyệt trước khi hiển thị.</p>'}${body}</div>`;
   document.body.append(d); d.showModal();
@@ -662,9 +749,6 @@ function evDialog({ kind, p, id = null, item = {}, title }) {
   };
   const evSave = d.querySelector('[data-evx-save]'); if (evSave) evSave.onclick = () => { const r = readEvx(d.querySelector('[data-evx]')); if (r.error) return fail(r.error); save(r.item); };
   const stSave = d.querySelector('[data-stx-save]'); if (stSave) stSave.onclick = () => { const r = readStx(d.querySelector('[data-stx]')); if (!r.body) return fail('Cần có nội dung.'); save(r); };
-  if (id && direct) d.querySelector('[data-evx-del]')?.addEventListener('click', () => confirmDialog('Xóa sự kiện này?', 'Sự kiện sẽ bị xóa khỏi dòng đời. Lịch sử sửa vẫn được giữ.', 'Xóa', async () => {
-    try { await evApi('POST', `/api/events/${id}/delete?family=${encodeURIComponent(fam)}`, { op_id: evOpId() }); evInvalidate(fam, p.id); await evLoad(fam, p.id, true); toast('Đã xóa'); render(); } catch (e) { toast(e.message); }
-  }));
   d.addEventListener('close', () => d.remove());
   return d;
 }
@@ -702,7 +786,7 @@ async function evApiSave({ fam, p, kind, id, item, direct, action }) {
 // Hồ sơ: one tab's content. The Thông tin tab keeps the facts; Quan hệ keeps the relations and the ancestors.
 // Liên hệ: its own group card on the profile. Values when the viewer may see them (members, or the person made them
 // public); otherwise, when the server says there are some (has_contact), a sign-in prompt. No card when nothing to show.
-function contactCard(d) {
+function contactCard(d, id, fam) {
   const f = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : '';
   const fb = d.facebook && (d.facebook.startsWith('http') ? d.facebook : 'https://' + d.facebook);
   const rows = `${f('Điện thoại', d.phone && `<a href="tel:${esc(d.phone)}">${esc(d.phone)}</a>`)}${f('Email', d.email && `<a href="mailto:${esc(d.email)}">${esc(d.email)}</a>`)}${f('Zalo', esc(d.zalo))}${f('Facebook', fb && `<a href="${esc(fb)}" target="_blank" rel="noopener">${esc(d.facebook.replace(/^https?:\/\/(www\.)?/, ''))}</a>`)}${f('Mạng xã hội', esc(d.social))}${f('Địa chỉ', esc(d.address))}`;
@@ -710,7 +794,8 @@ function contactCard(d) {
     : !d.has_contact ? ''
     : !S.signedIn() ? '<p class="sub">Thông tin liên hệ chỉ hiện cho người trong họ đã đăng nhập.</p><p><button type="button" class="btn sm" data-acct="in">Đăng nhập</button></p>'
     : '<p class="sub">Bạn cần được thêm vào dòng họ để xem liên hệ.</p>';
-  return body ? `<section class="grpsec consec" aria-label="Liên hệ"><div class="relhead"><h2>Liên hệ</h2></div>${body}</section>` : '';
+  const imp = S.isEditor() && id ? `<p><button type="button" class="btn ter sm" data-contact-import="${esc(id)}" data-fam="${esc(fam || '')}">Nhập từ danh bạ</button></p>` : '';
+  return body || imp ? `<section class="grpsec consec" aria-label="Liên hệ"><div class="relhead"><h2>Liên hệ</h2></div>${body}${imp}</section>` : '';
 }
 // Câu chuyện đời on Thông tin (after the facts and contact, before Quan hệ): the events are loaded for this tab too.
 function storiesOnInfo(p) {
@@ -722,10 +807,9 @@ function profBody(p, { groups, id, d }) {
   if (profTab === 'life') return lifePanelHtml(p);
   if (profTab === 'src') return srcHtml(p);
   LIFE = { p }; // the Câu chuyện đời actions (add, edit, Đọc tiếp, Xem tất cả) read the person from LIFE
-  const labelled = [['Sinh', groups.sinh], ['Mất', groups.mat], ['Nơi sống & nghề', groups.noi], ['Ghi chú & nguồn', groups.ghi]].filter(([, rows]) => rows.trim());
-  const facts = labelled.length ? `<div class="cd factcard">${labelled.map(([t, rows]) => `<div class="fgrp"><div class="tgen" style="--d:0">${t}</div><dl class="facts">${rows}</dl></div>`).join('')}</div>` : '';
-  return `${d.verify ? `<div class="ntc warn"><b>Cần xác minh</b><span class="sub">${esc(d.verify)}</span></div>` : ''}${facts}${codeOf(M, id) ? `<p class="sub">Vị trí trong cây <span class="ppos" title="${esc(CODE_HELP)}">${esc(codeOf(M, id))}</span></p>` : ''}${contactCard(d)}${storiesOnInfo(p)}`
-    + `${(LK.ensure(p.fam || S.curFamily()), '')}${relSection(M, p, { editable: S.isEditor(), treeHref: hf(`tree/@${id}`), treeOf: (x) => hf(`tree/@${x}`), personHref: (x) => hf(`person/${x}`), links: LK.linesHtml(p.fam || S.curFamily(), id, { clan: CL.clanLinkHtml(S.familyName(p.fam || S.curFamily())) }) })}${pedigreeHtml(M, id, 4, { personHref: (x) => hf(`person/${x}`) })}`;
+  const facts = factCardHtml(factGroups(groups));
+  return `${d.verify ? `<div class="ntc warn"><b>Cần xác minh</b><span class="sub">${esc(d.verify)}</span></div>` : ''}${facts}${codeOf(M, id) ? `<p class="sub">Vị trí trong cây <span class="ppos" title="${esc(CODE_HELP)}">${esc(codeOf(M, id))}</span></p>` : ''}${contactCard(d, id, p.fam || S.curFamily())}${storiesOnInfo(p)}`
+    + `${(LK.ensure(p.fam || S.curFamily()), '')}${relSection(M, p, { editable: S.isEditor(), treeHref: hf(`tree/@${id}`), treeOf: (x) => hf(`tree/@${x}`), personHref: (x) => hf(`person/${x}`), links: LK.linesHtml(p.fam || S.curFamily(), id, { clan: CL.clanLinkHtml(S.familyName(p.fam || S.curFamily()), 'clan-in', S.familyMeta(p.fam || S.curFamily())?.country) }) })}${pedigreeHtml(M, id, 4, { personHref: (x) => hf(`person/${x}`) })}`;
 }
 // Delegated clicks for the profile tabs, the timeline and the event/story dialogs.
 document.addEventListener('click', (e) => {
@@ -734,7 +818,7 @@ document.addEventListener('click', (e) => {
   if (!LIFE || !main.contains(e.target)) return;
   const p = LIFE.p;
   const add = e.target.closest('[data-ev-add]');
-  if (add) { const f = tlLoad(); evDialog({ kind: 'event', p, item: eventPrefill({ types: f.types, q: f.q }), title: 'Thêm sự kiện' }); return; }
+  if (add) { location.hash = hf(`su-kien/${p.id}`); return; }
   const es = e.target.closest('[data-est-save]');
   if (es) {
     const row = lifeModel(p).derived.find((r) => r.id === es.dataset.estSave);
@@ -744,7 +828,7 @@ document.addEventListener('click', (e) => {
   const ed = e.target.closest('[data-ev-edit]');
   if (ed) {
     const { ev, fam } = lifeModel(p); const it = (ev?.items || []).find((x) => x.id === ed.dataset.evEdit);
-    if (it) evDialog({ kind: 'event', p, id: it.id, item: it, title: evDirect(fam) ? 'Sửa sự kiện' : 'Góp ý sửa sự kiện' });
+    if (it) location.hash = hf(`su-kien/${p.id}?id=${encodeURIComponent(it.id)}`); void fam;
     return;
   }
   if (e.target.closest('[data-sum-edit]')) {
@@ -835,14 +919,14 @@ function evFormList(st) {
   return `<ol class="evlist">${items.map((e) => `<li class="evrow ${STATE_CLS[e._st] || ''}">
     <span class="evrow-i">${typeIcon(e.type, 18)}</span>
     <span class="evrow-t"><b>${esc(headline(e))}</b><span class="sub">${esc(formatEventDate(e) || 'chưa rõ năm')}${STATE_TXT[e._st] || ''}</span></span>
-    ${e._st === 'del' ? '' : `<span class="evrow-a"><button type="button" class="linkbtn" data-fev-edit="${esc(e.id)}">Sửa</button><button type="button" class="linkbtn" data-fev-del="${esc(e.id)}">Xóa</button></span>`}
+    ${e._st === 'del' ? '' : `<span class="evrow-a"><button type="button" class="linkbtn" data-fev-edit="${esc(e.id)}">Sửa</button>${dangerButton('Xóa', `data-fev-del="${esc(e.id)}"`, { size: 'sm' })}</span>`}
   </li>`).join('')}</ol>`;
 }
 function evStoryList(st) {
   const list = evMergedStories(st);
   if (!list.length) return '<p class="sub">Chưa có câu chuyện nào.</p>';
   return list.map((s) => `<div class="evrow ${STATE_CLS[s._st] || ''}"><span class="evrow-t"><b>${esc(s.title || 'Câu chuyện')}</b><span class="sub">${esc((s.body || '').slice(0, 80))}${STATE_TXT[s._st] || ''}</span></span>
-    ${s._st === 'del' ? '' : `<span class="evrow-a"><button type="button" class="linkbtn" data-fst-edit="${esc(s.id)}">Sửa</button><button type="button" class="linkbtn" data-fst-del="${esc(s.id)}">Xóa</button></span>`}</div>`).join('');
+    ${s._st === 'del' ? '' : `<span class="evrow-a"><button type="button" class="linkbtn" data-fst-edit="${esc(s.id)}">Sửa</button>${dangerButton('Xóa', `data-fst-del="${esc(s.id)}"`, { size: 'sm' })}</span>`}</div>`).join('');
 }
 function evFormBody(st) {
   const ev = EVD.get(evKey(st.fam, st.p.id));
@@ -885,12 +969,12 @@ function evFormClick(form, st, e) {
   const fe = t.closest('[data-fev-edit]');
   if (fe) { const it = evMergedEvents(st).find((x) => x.id === fe.dataset.fevEdit); if (it) st.evEd = { kind: 'event', id: it.id, item: { ...it, _st: undefined } }; evPaintEd(st); return true; }
   const fd = t.closest('[data-fev-del]');
-  if (fd) { evqDel(st, 'event', fd.dataset.fevDel); evAfterChange(st); return true; }
+  if (fd) { const k = fd.dataset.fevDel; confirmDanger({ title: 'Xóa sự kiện này?', lose: 'Sự kiện bị xóa khỏi dòng đời khi bạn lưu.', restore: 'Trước khi lưu, có thể bỏ thay đổi để giữ lại.', confirm: 'Xóa sự kiện', onConfirm: () => { evqDel(st, 'event', k); evAfterChange(st); } }); return true; }
   if (t.closest('[data-fst-add]')) { st.evEd = { kind: 'story', id: null, item: {} }; evPaintEd(st); return true; }
   const fse = t.closest('[data-fst-edit]');
   if (fse) { const s = evMergedStories(st).find((x) => x.id === fse.dataset.fstEdit); if (s) st.evEd = { kind: 'story', id: s.id, item: { title: s.title, body: s.body, photos: s.photos } }; evPaintEd(st); return true; }
   const fsd = t.closest('[data-fst-del]');
-  if (fsd) { evqDel(st, 'story', fsd.dataset.fstDel); evAfterChange(st); return true; }
+  if (fsd) { const k = fsd.dataset.fstDel; confirmDanger({ title: 'Xóa câu chuyện này?', lose: 'Câu chuyện bị xóa khi bạn lưu.', restore: 'Trước khi lưu, có thể bỏ thay đổi để giữ lại.', confirm: 'Xóa câu chuyện', onConfirm: () => { evqDel(st, 'story', k); evAfterChange(st); } }); return true; }
   if (t.closest('#fev-ed [data-evx-cancel], #fst-ed [data-evx-cancel]')) { st.evEd = null; evPaintEd(st); return true; }
   if (t.closest('#fev-ed [data-evx-save]')) {
     const root = document.querySelector('#fev-ed [data-evx]'); const r = readEvx(root);
@@ -922,8 +1006,6 @@ const setChi = (v) => S.setPrefs({ filters: { ...S.getPrefs().filters, chi: v } 
 const isFollow = (id) => follows().includes(id);
 function toggleFollow(id) { const f = [...follows()]; const i = f.indexOf(id); if (i < 0) f.push(id); else f.splice(i, 1); S.setPrefs({ follows: f }); render(); }
 const calUrl = (ids) => `${location.origin}/lich.ics${ids && ids.length ? '?ids=' + ids.join(',') : ''}`;
-const webcal = (ids) => calUrl(ids).replace(/^https?:/, 'webcal:');
-const gcal = (ids) => 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(webcal(ids));
 function followBar(p) {
   const on = isFollow(p.id);
   return `<button type="button" class="btn ${on ? '' : 'ter'} sm" data-follow="${p.id}" aria-pressed="${on}">${on ? '★ Đang theo dõi' : '☆ Theo dõi'}</button>`;
@@ -941,21 +1023,32 @@ document.addEventListener('click', (e) => { const b = e.target.closest('[data-fo
 function gio() {
   const now = new Date();
   const f = follows(); const mine = f.length && S.getPrefs().filters?.gio_all !== '1';
-  const items = M.all.map((p) => { const g = gioOf(p.data); if (!g) return null; const at = nextAnniversary(g.d, g.m, now); return at ? { p, g, at } : null; })
-    .filter(Boolean).filter((x) => !mine || f.includes(x.p.id)).sort((a, b) => a.at - b.at);
-  const days = (t) => Math.round((t - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5);
+  const fam = S.curFamily(); const feed = !S.isAll() && S.isMember();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const items = M.all.map((p) => { const g = gioOf(p.data); if (!g) return null; const at = nextAnniversary(g.d, g.m, now); return at ? { id: p.id, p, g, at: at.getTime(), day: at } : null; })
+    .filter(Boolean).filter((x) => !mine || f.includes(x.p.id));
+  const posts = feed ? (NW.cached(fam)?.posts || []) : [];
+  const gath = posts.filter((p) => p.kind === 'gathering' && p.starts_at && dayMs(p.starts_at) >= today).map((p) => ({ id: p.id, at: dayMs(p.starts_at), p }));
+  const rows = mergeLich(items, gath, 'all');
+  const kind = NW.kindNow();
+  const days = (t) => Math.round((t - today) / 864e5);
   const fmt = (t) => t.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric' });
   setUntag(() => setGioAll('1'));
-  main.innerHTML = `<h1>Ngày giỗ</h1>${soonBanner()}
+  main.innerHTML = `<h1>Lịch</h1>${soonBanner()}
+  ${feed ? NW.topCardsHtml(fam, hf, S.getPrefs) : ''}
   ${lbar('gq', 'Tìm tên hoặc ngày (ví dụ 3/8)', '', mine ? 1 : 0, `<select id="gallq" aria-label="Hiển thị"><option value="0" ${mine ? 'selected' : ''} ${f.length ? '' : 'disabled'}>★ Người tôi theo dõi (${f.length})</option><option value="1" ${mine ? '' : 'selected'}>Cả họ</option></select>`, addBtn('data-add="gio"', 'Thêm người đã mất'))}
+  ${NW.chipsHtml()}
   ${ltags(mine ? [['mine', '★ Người tôi theo dõi (' + f.length + ')']] : [])}
   ${fpanel(`<fieldset class="fset"><legend>Hiển thị</legend><label class="radio"><input type="radio" name="gall" data-gioall="0" ${mine ? 'checked' : ''} ${f.length ? '' : 'disabled'}> ★ Người tôi theo dõi (${f.length})</label><label class="radio"><input type="radio" name="gall" data-gioall="1" ${mine ? '' : 'checked'}> Cả họ</label></fieldset>`)}
-  <p class="sub">${mine ? 'Ngày giỗ của những người bạn theo dõi (lưu trên máy này).' : 'Bấm ☆ Theo dõi người nhà mình để nhận nhắc giỗ và đồng bộ vào lịch.'} Ngày âm lịch đổi sang dương lịch theo từng năm.</p>
+  <p class="sub">☆ Theo dõi để nhận nhắc giỗ. Ngày âm lịch tự đổi theo từng năm.</p>
   ${S.signedIn() ? '' : deviceNote(S.myAccount().google)}
-  ${f.length ? `<div class="cd"><b>Đồng bộ với lịch của bạn (${f.length} người)</b><span class="sub">Đăng ký một lần: lịch trên điện thoại tự cập nhật ngày giỗ các năm sau, nhắc trước 1 ngày và sáng hôm giỗ.</span><div class="row wrap"><a class="btn sm" href="${webcal(f)}">Đăng ký lịch (iPhone, Outlook)</a><a class="btn ter sm" href="${gcal(f)}" target="_blank" rel="noopener">Google Calendar</a></div></div>` : ''}
-  ${items[0] ? `<div class="cd hl"><div class="sub">Gần nhất · còn ${days(items[0].at)} ngày</div><h2><a class="plink" href="${ph(items[0].p, `person/${items[0].p.id}`)}">Giỗ ${esc(rank(items[0].p.data))} ${esc(items[0].p.data.name)}</a></h2><div class="sub">${items[0].g.label} âm lịch · ${fmt(items[0].at)}</div><div class="row wrap"><button class="btn sm" id="ics">Thêm vào lịch</button><button class="btn ter sm" id="share">Gửi cả họ</button></div></div>` : ''}
-  <div class="cd">${items.map(({ p, g, at }) => `<div class="gior" data-q="${esc(fold(rank(p.data) + ' ' + p.data.name + ' ' + g.label + ' ' + (p.data.spouse_of ? 'dau re' : '')))}"><a class="li gio" href="${ph(p, `person/${p.id}`)}"><span class="date"><b>${g.label}</b><span>ÂL</span></span><span class="grow"><b>${esc(rank(p.data))} ${esc(p.data.name)}</b>${famChipIf(p)}<span class="sub">${p.data.spouse_of ? esc(inLaw(p)) : 'Đời ' + p.data.gen} · ${fmt(at)} · còn ${days(at)} ngày</span></span></a><button type="button" class="star" data-follow="${p.id}" aria-pressed="${isFollow(p.id)}" aria-label="${isFollow(p.id) ? 'Bỏ theo dõi' : 'Theo dõi'} giỗ ${esc(p.data.name)}">${isFollow(p.id) ? '★' : '☆'}</button></div>`).join('')}</div>`;
+  ${feed ? '<div id="calcard"></div>' : ''}
+  ${items[0] ? `<div class="cd hl"><div class="sub">Gần nhất · còn ${days(items[0].at)} ngày</div><h2><a class="plink" href="${ph(items[0].p, `person/${items[0].p.id}`)}">Giỗ ${esc(rank(items[0].p.data))} ${esc(items[0].p.data.name)}</a></h2><div class="sub">${items[0].g.label} âm lịch · ${fmt(items[0].day)}</div><div class="row wrap"><button class="btn sm" id="ics">Thêm vào lịch</button><button class="btn ter sm" id="share">Gửi cả họ</button></div></div>` : ''}
+  <div class="cd">${rows.map((r) => (r.k === 'gath' ? NW.gatheringRow(r.p, hf, today, kind !== 'all' && kind !== 'gath')
+    : `<div class="gior" data-k="gio"${kind !== 'all' && kind !== 'gio' ? ' hidden' : ''} data-q="${esc(fold(rank(r.p.data) + ' ' + r.p.data.name + ' ' + r.g.label + ' ' + (r.p.data.spouse_of ? 'dau re' : '')))}"><a class="li gio" href="${ph(r.p, `person/${r.p.id}`)}"><span class="date"><b>${r.g.label}</b><span>ÂL</span></span><span class="grow"><b>${esc(rank(r.p.data))} ${esc(r.p.data.name)}</b> <span class="tag sm">Giỗ</span>${famChipIf(r.p)}<span class="sub">${r.p.data.spouse_of ? esc(inLaw(r.p)) : 'Đời ' + r.p.data.gen} · ${fmt(r.day)} · còn ${days(r.at)} ngày</span></span></a><button type="button" class="star" data-follow="${r.p.id}" aria-pressed="${isFollow(r.p.id)}" aria-label="${isFollow(r.p.id) ? 'Bỏ theo dõi' : 'Theo dõi'} giỗ ${esc(r.p.data.name)}">${isFollow(r.p.id) ? '★' : '☆'}</button></div>`)).join('')}</div>`;
   $('#gallq')?.addEventListener('change', (e) => setGioAll(e.target.value));
+  if (feed) NW.fillCalCard(main, fam, f);
+  if (feed && !NW.cached(fam)) NW.loadPosts(fam).then(() => { if (route().view === 'lich') render(); }, () => {});
 }
 
 // ---------- needs info ----------
@@ -1195,6 +1288,7 @@ function review(arg) {
   main.insertBefore(xl, $('#rlist')); for (const f of famsHere()) LK.wirePending(xl, f);
   PL.reviewSection(main, $('#rlist'));
   MT.reviewSection(main, $('#rlist'), famsHere(), (f, pid) => `#/${f}/person/${pid}`);
+  DP.reviewSection(main, $('#rlist'), famsHere());
 }
 // The inbox of every family in scope (one family: that family). Rows keep their family; each card shows its chip in "Tất cả".
 async function loadReview() {
@@ -1420,7 +1514,7 @@ document.addEventListener('change', (e) => {
 main.addEventListener('click', async (e) => {
   if (e.target.closest('#minv')) return inviteDialog();
   const mm = e.target.closest('[data-mmenu]');
-  if (mm) { const m = memberById(mm.dataset.mmenu); if (m) popMenu(mm, [['Đổi vai trò', () => roleDialog(m)], ['Gỡ khỏi họ', () => confirmDialog(`Gỡ ${m.name || m.email} khỏi họ?`, 'Người này sẽ không còn đăng nhập được với quyền thành viên. Có thể mời lại sau.', 'Gỡ', async () => { await S.removeMember(m.id, m.fam); loadMembers(); })]]); return; }
+  if (mm) { const m = memberById(mm.dataset.mmenu); if (m) popMenu(mm, [['Đổi vai trò', () => roleDialog(m)], dangerItem('Gỡ khỏi họ', () => confirmDanger({ title: `Gỡ ${m.name || m.email} khỏi họ?`, lose: 'Người này không còn đăng nhập được với quyền thành viên.', restore: 'Có thể mời lại sau.', confirm: 'Gỡ khỏi họ', onConfirm: async () => { await S.removeMember(m.id, m.fam); loadMembers(); } }))]); return; }
   const b = e.target.closest('[data-mact]'); if (!b) return;
   const id = b.dataset.id; const fam = b.dataset.fam;
   if (b.dataset.mact === 'reject') return confirmDialog('Từ chối yêu cầu?', 'Người này có thể gửi yêu cầu lại sau.', 'Từ chối', async () => { await S.rejectMember(id, fam); loadMembers(); });
@@ -1568,7 +1662,8 @@ function settings() {
   refreshFams();
   aiSection();
 }
-// Ứng dụng AI đã kết nối (calm rows; revoke from the ⋯ menu, with a confirm) and AI requests waiting for an admin.
+// Ứng dụng AI đã kết nối: signed out, a line on what it is and a sign-in button; signed in, the apps (revoke with a confirm),
+// a "Kết nối ứng dụng AI" row that opens the connect sheet, and AI requests waiting for an admin.
 const AI_ROLE = { admin: 'quản trị', editor: 'biên tập', member: 'thành viên' };
 const aiTitle = (r) => { const t = AI_ACT(r.payload, r.action); return t.charAt(0).toUpperCase() + t.slice(1); };
 const AI_ACT = (p, a) => ({ invite_member: `mời ${p.email} làm ${AI_ROLE[p.role] || p.role}`, change_role: `đổi ${p.name} thành ${AI_ROLE[p.role] || p.role}`, remove_member: `gỡ ${p.name}` })[a] || a;
@@ -1577,20 +1672,27 @@ async function aiSection() {
   main.append(host);
   const draw = async () => {
     const [c, q] = await Promise.all([fetch('/api/ai/connections', { cache: 'no-store' }), fetch('/api/ai/requests', { cache: 'no-store' })]);
-    if (c.status === 401) { host.innerHTML = '<h3>Ứng dụng AI đã kết nối</h3><p class="sub">Đăng nhập để xem.</p>'; return; }
+    if (c.status === 401) {
+      host.innerHTML = '<h3>Ứng dụng AI đã kết nối</h3><p class="sub">Cho phép Claude, ChatGPT… đọc/ghi gia phả của bạn, theo quyền của bạn.</p>'
+        + '<button type="button" class="btn" data-login>Đăng nhập</button>';
+      host.querySelector('[data-login]').onclick = () => loginDialog(); // the app's sign-in; Google returns to this page
+      return;
+    }
     if (!c.ok) { host.remove(); return; } // the section is optional: no list, no card
     const cj = await c.json(); const qj = q.ok ? await q.json().catch(() => ({})) : {};
     if (!Array.isArray(cj.items)) { host.remove(); return; }
     const reqItems = Array.isArray(qj.items) ? qj.items : [];
     const conn = cj.items.length ? cj.items.map((i) => `<div class="calm dense ai-row" data-id="${i.id}"><span class="calm-t"><b class="calm-n">${esc(i.client_name)}</b><span class="calm-s">${esc(i.family.name)}${i.last_used_at ? ' · dùng ' + fmtDate(i.last_used_at) : ''}</span></span>
-      <details class="ai-menu"><summary aria-label="Tùy chọn">⋯</summary><button type="button" class="btn gh" data-revoke>Thu hồi</button></details></div>`).join('') : '<p class="sub">Chưa có ứng dụng AI nào.</p>';
+      ${dangerButton('Gỡ kết nối', 'data-revoke', { size: 'sm' })}</div>`).join('') : '<p class="sub">Chưa có ứng dụng AI nào.</p>';
+    const connect = `<button type="button" class="calm dense ai-connect" data-connect><span class="calm-t"><b class="calm-n">Kết nối ứng dụng AI</b><span class="calm-s">Claude, ChatGPT: lấy địa chỉ để dán vào ứng dụng</span></span></button>`;
     // Each request is a calm row; tapping it opens a sheet with the two decisions (one primary action).
     const reqs = reqItems.map((r) => `<button type="button" class="calm dense ai-req" data-req="${r.id}"><span class="calm-t"><b class="calm-n">${esc(aiTitle(r))}</b><span class="calm-s">${esc(r.client_name)} · ${esc(r.family.name)}</span></span></button>`).join('');
-    host.innerHTML = `<h3>Ứng dụng AI đã kết nối</h3>${conn}${reqs ? '<h3>Yêu cầu từ AI</h3>' + reqs : ''}`;
+    host.innerHTML = `<h3>Ứng dụng AI đã kết nối</h3>${conn}${connect}${reqs ? '<h3>Yêu cầu từ AI</h3>' + reqs : ''}`;
+    host.querySelector('[data-connect]').onclick = () => connectSheet();
     host.querySelectorAll('[data-revoke]').forEach((b) => b.onclick = () => {
       const id = b.closest('[data-id]').dataset.id;
-      confirmModal({ title: 'Thu hồi kết nối này?', body: 'Ứng dụng AI sẽ không truy cập được gia phả nữa.', ok: 'Thu hồi', danger: true,
-        onOk: async () => { await fetch(`/api/ai/connections/${id}/revoke`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); draw(); } });
+      confirmDanger({ title: 'Gỡ kết nối này?', lose: 'Ứng dụng AI sẽ không truy cập được gia phả nữa.', restore: 'Có thể kết nối lại sau.', confirm: 'Gỡ kết nối',
+        onConfirm: async () => { const r = await fetch(`/api/ai/connections/${id}/revoke`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); if (!r.ok) throw new Error('Không gỡ được. Thử lại sau.'); draw(); } });
     });
     host.querySelectorAll('[data-req]').forEach((btn) => btn.onclick = () => {
       const r = reqItems.find((x) => String(x.id) === btn.dataset.req);
@@ -1608,6 +1710,26 @@ async function aiSection() {
   };
   await draw();
 }
+// The connect sheet: the MCP address (same origin as this page) to paste into the AI app, and short steps for each.
+function connectSheet() {
+  const url = `${location.origin}/mcp`;
+  const d = document.createElement('dialog'); d.className = 'dlg cfm ai-sheet';
+  d.innerHTML = `<div class="cfm-body"><h2>Kết nối ứng dụng AI</h2>
+    <p class="sub">Sao chép địa chỉ này. Lần đầu, ứng dụng AI sẽ mở trang để bạn đăng nhập và cho phép.</p>
+    <div class="ai-url"><code>${esc(url)}</code><button type="button" class="btn sm" data-copy>Chép</button></div>
+    <h3>Claude</h3>
+    <ol class="ai-steps"><li>Mở Settings → Connectors.</li><li>Chọn Add custom connector.</li><li>Dán địa chỉ trên rồi nhấn Add.</li></ol>
+    <h3>ChatGPT</h3>
+    <ol class="ai-steps"><li>Mở Settings → Apps, bật Developer mode (Advanced).</li><li>Chọn Create app và dán địa chỉ trên.</li><li>Đăng nhập và cho phép.</li></ol>
+    <div class="row end cfm-acts"><button type="button" class="btn gh" data-close>Đóng</button></div></div>`;
+  document.body.append(d);
+  d.addEventListener('close', () => d.remove());
+  d.querySelector('[data-close]').onclick = () => d.close();
+  d.querySelector('[data-copy]').onclick = () => {
+    (navigator.clipboard?.writeText(url) || Promise.reject()).then(() => toast('Đã chép địa chỉ.'), () => toast(`Địa chỉ: ${url}`));
+  };
+  d.showModal();
+}
 
 
 
@@ -1620,7 +1742,7 @@ function more() {
   const grp = (title, rows) => (rows.filter(Boolean).length ? `<section class="mg"><h2 class="mg-h">${title}</h2><div class="mg-g">${rows.filter(Boolean).join('')}</div></section>` : '');
   const view = grp('Xem', [row('map', 'Bản đồ'), row('stats', 'Thống kê'), row('verify', 'Cần bổ sung'), row('export', 'Tải về')]);
   const joinRow = signed && !S.isMember() ? calmRow({ href: hf('join'), icon: tile(icon('user')), title: acct.status === 'pending' ? 'Yêu cầu tham gia đang chờ duyệt' : 'Tham gia dòng họ', dense: true }) : '';
-  const fam = grp('Dòng họ', [calmRow({ href: `#/${S.ALL_FAMS}/tree`, icon: tile(icon('search')), title: 'Tìm / lập dòng họ', dense: true }), row('gop-y', 'Góp ý', canAdminHere() ? bdg(sugCount) : ''), canAdminHere() ? row('members', 'Thành viên & quyền', bdg(joinCount)) : '', joinRow]);
+  const fam = grp('Dòng họ', [calmRow({ href: `#/${S.ALL_FAMS}/tree`, icon: tile(icon('search')), title: 'Tìm / lập dòng họ', dense: true }), S.isEditor() && !S.isAll() ? calmRow({ attrs: 'data-contact-import-fam', icon: tile(icon('user')), title: 'Nhập danh bạ', subtitle: 'vCard (.vcf) hoặc CSV, khớp với người trong họ', dense: true }) : '', row('gop-y', 'Góp ý', canAdminHere() ? bdg(sugCount) : ''), canAdminHere() ? row('members', 'Thành viên & quyền', bdg(joinCount)) : '', joinRow, S.isMember() && !S.isAll() ? row('bieu-quyet', 'Biểu quyết', '', 'user') : '', S.isEditor() && !S.isAll() ? row('thung-rac', 'Thùng rác', '<span data-trash-badge></span>', 'trash') : '']);
   // Ứng dụng: settings and the build in use; the check asks the server now (same unsaved-changes guard as the notice)
   const verRow = calmRow({ attrs: 'id="chkupd"', icon: tile(icon('info')), title: 'Phiên bản', subtitle: buildLabel(BUILD), trailing: '<span class="mo-act">Kiểm tra cập nhật</span>', dense: true });
   const app = grp('Ứng dụng', [row('settings', 'Cài đặt'), verRow]);
@@ -1712,7 +1834,7 @@ function paintMine() {
 }
 // "Bản nháp" (drafts of this family: Tiếp tục | Bỏ) and "Đang chờ gửi" (queued while offline) above the list.
 function fpGroups() {
-  const dr = (MINE.drafts || []).map((x) => `<div class="cd rv mcard" data-dkey="${esc(x.key)}"><div class="row btw"><b>${esc(fpDraftName(x))}</b><span class="tag sm">Bản nháp</span></div><span class="sub">Lưu lúc ${fmtTime(x.saved)} · ${Object.keys(x.changed || {}).length} mục</span><div class="row end"><button class="btn gh sm" type="button" data-dr-drop="${esc(x.key)}">Bỏ</button><button class="btn sm" type="button" data-dr-go="${esc(x.key)}">Tiếp tục</button></div></div>`).join('');
+  const dr = (MINE.drafts || []).map((x) => `<div class="cd rv mcard" data-dkey="${esc(x.key)}"><div class="row btw"><b>${esc(fpDraftName(x))}</b><span class="tag sm">Bản nháp</span></div><span class="sub">Lưu lúc ${fmtTime(x.saved)} · ${Object.keys(x.changed || {}).length} mục</span><div class="row end">${dangerButton('Bỏ nháp', `data-dr-drop="${esc(x.key)}"`, { size: 'sm' })}<button class="btn sm" type="button" data-dr-go="${esc(x.key)}">Tiếp tục</button></div></div>`).join('');
   const qu = (MINE.queue || []).map((x) => `<div class="cd rv mcard"><div class="row btw"><b>${esc(x.label || 'Góp ý')}</b><span class="tag sm">Đang chờ mạng</span></div><span class="sub">Sẽ gửi khi có mạng · ${fmtTime(x.created)}</span></div>`).join('');
   return (dr ? `<h2 class="fp-h">Bản nháp</h2>${dr}` : '') + (qu ? `<h2 class="fp-h">Đang chờ gửi</h2>${qu}` : '');
 }
@@ -1724,7 +1846,7 @@ function fpGroupClick(e) {
     if (x.mode === 'patch') { const s = (MINE.rows || []).find((r) => r.id === x.patchId); if (s) mineEdit(s, true); else toast('Góp ý này không còn trên máy chủ.'); return; }
     const p = x.personId !== 'new' ? M.byId.get(x.personId) : null;
     goForm(p ? { kind: 'sua', p, autoDraft: true } : { kind: 'them', autoDraft: true });
-  } else if (drop) S.draftDelete(drop.dataset.drDrop).then(() => { toast('Đã bỏ bản nháp'); loadMine(); });
+  } else if (drop) { const k = drop.dataset.drDrop; confirmDanger({ title: 'Bỏ bản nháp này?', lose: 'Các thay đổi chưa gửi trong bản nháp sẽ mất.', confirm: 'Bỏ nháp', onConfirm: async () => { await S.draftDelete(k); toast('Đã bỏ bản nháp'); loadMine(); } }); }
 }
 function mineCard(s) {
   const [, label, tone] = mineStat(s.status); const pend = s.status === 'pending';
@@ -1737,7 +1859,7 @@ function mineCard(s) {
     ${s.note ? (s.note.length > NOTE_LONG ? `<p class="rv-note rv-clamp">“${esc(s.note)}”</p><button type="button" class="btn gh sm" data-note-more>Xem thêm</button>` : `<p class="rv-note">“${esc(s.note)}”</p>`) : ''}
     ${s.status === 'rejected' && s.reason ? `<p class="sub"><b>Lý do:</b> ${esc(s.reason)}</p>` : ''}
     <span class="sub">Gửi ${fmtTime(s.created_at)}</span>
-    ${pend ? `<div class="row end"><button class="btn ter sm" type="button" data-mine-act="withdraw" data-id="${s.id}">Rút lại</button><button class="btn sm" type="button" data-mine-act="edit" data-id="${s.id}">Sửa</button></div>` : ''}
+    ${pend ? `<div class="row end">${dangerButton('Rút lại', `data-mine-act="withdraw" data-id="${s.id}"`, { size: 'sm' })}<button class="btn sm" type="button" data-mine-act="edit" data-id="${s.id}">Sửa</button></div>` : ''}
   </div>`;
 }
 function mineEdit(s, auto = false) {
@@ -1747,7 +1869,7 @@ function mineEdit(s, auto = false) {
   if (p) goForm({ kind: 'sua', p, patch, title, autoDraft: auto }); else goForm({ kind: 'them', patch, title, autoDraft: auto });
 }
 function mineWithdraw(s) {
-  confirmDialog('Rút góp ý này?', 'Quản trị sẽ không xem góp ý này nữa. Bạn có thể gửi lại sau.', 'Rút lại', async () => { await S.withdrawSuggestion(s.id); await loadMine(); });
+  confirmDanger({ title: 'Rút góp ý này?', lose: 'Quản trị sẽ không xem góp ý này nữa.', restore: 'Bạn có thể gửi lại sau.', confirm: 'Rút lại', onConfirm: async () => { await S.withdrawSuggestion(s.id); await loadMine(); } });
 }
 function mineRecovery() {
   const url = `${location.origin}/#mine?r=${S.encodeRecovery(S.receipts())}`;
@@ -1785,12 +1907,13 @@ function loginDialog() {
   const dl = dialog(`<h2>Đăng nhập để sửa</h2><p class="sub">Xem thì không cần đăng nhập. Mã sửa do người quản lý gia phả cấp.</p>
    <label class="fld">Mã sửa<input name="code" type="password" autocomplete="current-password" required id="code"></label>
    <div class="row end"><button type="button" class="btn gh" data-cancel>Hủy</button><button class="btn">Đăng nhập</button></div>
+   <div class="pk-login" hidden><button type="button" class="btn" data-pk-login>Đăng nhập bằng passkey</button><p class="sub">Đăng nhập bằng vân tay / khuôn mặt trên điện thoại, không cần mật khẩu.</p><p class="err" role="alert"></p></div>
    <p><button type="button" class="btn ter" data-elder>Cách khác</button></p>
    <p class="gsep" hidden><a class="btn ter" href="${googleUrl(hashNext())}">Đăng nhập bằng Google</a></p>`, async (f) => { await S.login(f.get('code')); });
   elder.wireLogin(dl);
   fetch('/api/me').then((r) => r.json()).then((j) => { if (j.google) document.querySelectorAll('.gsep').forEach((e) => { e.hidden = false; }); }).catch(() => {});
 }
-const F = [['name', 'Họ tên'], ['thu', 'Thứ (2, 3… hoặc Út)'], ['sex', 'Giới tính', [['m', 'Nam'], ['f', 'Nữ']]], ['gen', 'Đời'], ['spouse', 'Vợ / chồng'], ['other_parent', 'Mẹ / cha (vợ hoặc chồng của cha mẹ)'], ['married', 'Năm cưới'],
+const F = [['name', 'Họ tên'], ['name_han', 'Tên chữ Hán'], ['thu', 'Thứ (2, 3… hoặc Út)'], ['sex', 'Giới tính', [['m', 'Nam'], ['f', 'Nữ']]], ['gen', 'Đời'], ['spouse', 'Vợ / chồng'], ['other_parent', 'Mẹ / cha (vợ hoặc chồng của cha mẹ)'], ['married', 'Năm cưới'],
   ['born', 'Năm sinh'], ['birth_date', 'Ngày sinh (dd/mm/yyyy)'], ['birth_lunar', 'Ngày sinh âm lịch (dd/mm)'], ['died', 'Năm mất'], ['death_lunar', 'Ngày mất (ÂL, ví dụ 2/8)'], ['gio_lunar', 'Ngày giỗ (ÂL, nếu khác ngày mất)'], ['living', 'Tình trạng', [['', 'Chưa rõ'], ['living', 'Còn sống'], ['dead', 'Đã mất']]],
   ['place', 'Nơi sống'], ['alias', 'Tên khác'], ['title_name', 'Tên húy / tự / hiệu'], ['job', 'Nghề'], ['religion', 'Tôn giáo'], ['burial', 'An táng'], ['photo', 'Ảnh'],
   ['phone', 'Điện thoại'], ['email', 'Email'], ['zalo', 'Zalo'], ['facebook', 'Facebook'], ['address', 'Địa chỉ'], ['contact_public', 'Liên hệ công khai?', [['', 'Không'], ['yes', 'Có']]],
@@ -1855,7 +1978,7 @@ function openAccountSheet() {
     ${act?.kind === 'google' ? `<a class="acc-add acc-manage" href="${hf('tai-khoan')}">${cic('user', 20)}<span>Quản lý tài khoản</span><span class="acc-go" aria-hidden="true">›</span></a>` : ''}
     ${items.length < max ? `<a class="acc-add" href="${googleUrl(hashNext())}">${icon('plus')}<span>Thêm tài khoản</span></a>` : `<p class="sub acc-max">Đã có ${max} tài khoản trên thiết bị này. Đăng xuất bớt để thêm.</p>`}
     ${act ? '<button type="button" class="acc-out" data-out="one">Đăng xuất tài khoản này</button>' : ''}
-    ${items.length ? '<button type="button" class="acc-out dng" data-out="all">Đăng xuất tất cả</button>' : ''}</div>`;
+    ${items.length ? '<button type="button" class="acc-out dng" data-danger data-out="all">Đăng xuất tất cả</button>' : ''}</div>`;
   document.body.append(d);
   const close = () => { d.close(); d.remove(); };
   d.querySelector('.csw-x').addEventListener('click', close);
@@ -1910,9 +2033,7 @@ async function askSignOutAll() {
   const items = S.myAccounts().items || [];
   const ps = await Promise.all(items.map((a) => S.pendingFor(a.key)));
   const sum = ps.reduce((t, p) => ({ outbox: t.outbox + p.outbox, queued: t.queued + p.queued, drafts: t.drafts + p.drafts }), { outbox: 0, queued: 0, drafts: 0 });
-  confirmModal({ title: 'Đăng xuất tất cả tài khoản?', body: `Bạn sẽ đăng xuất khỏi ${items.length} tài khoản trên thiết bị này. Bạn sẽ cần đăng nhập lại để sửa và xem thông tin riêng tư.`,
-    warn: pendingWarn(sum), ok: 'Đăng xuất tất cả', danger: true,
-    onOk: async () => { try { await flushDraft(); await S.signOutAccounts({ all: true }); location.reload(); } catch (e) { alert(e.message); } } });
+  confirmDanger({ title: 'Đăng xuất tất cả tài khoản?', lose: [`Bạn sẽ đăng xuất khỏi ${items.length} tài khoản trên thiết bị này. Bạn sẽ cần đăng nhập lại để sửa và xem thông tin riêng tư.`, pendingWarn(sum)].filter(Boolean).join(' '), restore: 'Đăng nhập lại bất cứ lúc nào.', confirm: 'Đăng xuất tất cả', onConfirm: async () => { await flushDraft(); await S.signOutAccounts({ all: true }); location.reload(); } });
 }
 // queued suggestions reach the server on reconnect: say so
 S.hooks.queueFlushed = (r) => { if (r.sent) toast(`Đã gửi ${r.sent} góp ý đang chờ`); if (r.refused) toast(`${r.refused} góp ý bị máy chủ từ chối và không được gửi lại`); if (location.hash.includes('mine')) loadMine(); };
@@ -1926,7 +2047,7 @@ S.hooks.queueFlushed = (r) => { if (r.sent) toast(`Đã gửi ${r.sent} góp ý 
 const FP_WIDE = ['note', 'verify', 'source', 'spouse', 'address', 'birth_place', 'burial', 'contact_public'];
 const FP_AU = { gen: 'Đời', thu: 'Thứ', birth_lunar: 'Âm lịch', death_lunar: 'Âm lịch' };
 const FP_AU_INPUT = { gen: 'Đời (số)', thu: 'Thứ', birth_lunar: 'Âm lịch (ngày/tháng)', death_lunar: 'Âm lịch (ngày/tháng)' };
-const FP_SIMPLE = ['name', 'alias', 'title_name', 'place', 'job', 'religion', 'spouse', 'married', 'birth_place', 'address', 'phone', 'email', 'zalo', 'facebook', 'photo', 'note', 'verify', 'source', 'contact_public'];
+const FP_SIMPLE = ['name', 'name_han', 'alias', 'title_name', 'place', 'job', 'religion', 'spouse', 'married', 'birth_place', 'address', 'phone', 'email', 'zalo', 'facebook', 'photo', 'note', 'verify', 'source', 'contact_public'];
 let formSt = null;        // {kind: 'sua'|'them', p, prefill, title, only, patch, note}
 let formDirty = false;    // unsaved changes on the form page
 let formDraftSaved = false; // a draft of this form is on the device (leaving loses nothing)
@@ -1994,6 +2115,7 @@ function fpBody(st, id) {
   if (id === 'ten') {
     const names = !!(v.alias || v.title_name);
     return fpIn('name', 'Họ tên', v, true, 'required')
+      + fpIn('name_han', 'Tên chữ Hán (tùy chọn)', v, true, 'lang="zh-Hant" placeholder="Nhập chữ Hán"')
       + `<div class="fp-more wide">${names ? `<div class="fp-2col">${fpIn('alias', 'Tên khác', v)}${fpIn('title_name', 'Tên húy / tự / hiệu', v)}</div>`
         : '<button type="button" class="linkbtn fp-expand" data-expand>＋ Tên khác, tên húy</button>'}</div>`
       + `<fieldset class="fp-field wide"><legend>Giới tính</legend><div class="fp-seg2" role="radiogroup">
@@ -2101,6 +2223,7 @@ function fpResolve(form, st) {
   const eff = {};
   const dead = !only && sv('dead') === 'on';
   for (const k of FP_SIMPLE) if (has(k)) put(k, sv(k));
+  if (has('name_han')) { const he = hanNameError(sv('name_han')); if (he) err('name_han', he); }
   if (only) { st.eff = eff; return { vals, errs, dead, eff }; }
   put('sex', sv('sex'));
   if (has('contact_public')) put('contact_public', sv('contact_public'));
@@ -2263,7 +2386,7 @@ function fpLive(form, st) {
   return r;
 }
 // One-line summary in each accordion header; "Chưa có" in grey when the section is empty.
-const FP_SEC_OF = { name: 'ten', alias: 'ten', title_name: 'ten', parent: 'gd', other_parent: 'gd', spouse: 'gd', married: 'gd', gen: 'gd', thu: 'gd',
+const FP_SEC_OF = { name: 'ten', name_han: 'ten', alias: 'ten', title_name: 'ten', parent: 'gd', other_parent: 'gd', spouse: 'gd', married: 'gd', gen: 'gd', thu: 'gd',
   birth_smart: 'sinh', birth_lunar: 'sinh', birth_place: 'sinh', death_smart: 'mat', death_lunar: 'mat', gio_lunar: 'mat', burial: 'mat' };
 function fpSummaries(form, st, r) {
   const v = r.vals; const par = v.parent ? M.byId.get(v.parent) : null;
@@ -2331,10 +2454,10 @@ async function fpCheckDraft(form, st) {
   const dr = await S.draftGet(st.draftKey).catch(() => null);
   if (!dr || !form.isConnected) { st.draftHold = false; return; }
   if (st.autoDraft) { fpRestore(form, st, dr); return; }
-  form.insertAdjacentHTML('beforebegin', `<div class="fp-draft" role="status"><p>Có bản nháp chưa gửi lúc ${fmtTime(dr.saved)} — </p><span class="fp-draft-acts"><button type="button" class="btn gh sm" data-dr-drop>Bỏ nháp</button> <button type="button" class="btn sm" data-dr-go>Tiếp tục</button></span></div>`);
+  form.insertAdjacentHTML('beforebegin', `<div class="fp-draft" role="status"><p>Có bản nháp chưa gửi lúc ${fmtTime(dr.saved)} — </p><span class="fp-draft-acts">${dangerButton('Bỏ nháp', 'data-dr-drop', { size: 'sm' })} <button type="button" class="btn sm" data-dr-go>Tiếp tục</button></span></div>`);
   const bar = form.parentElement.querySelector('.fp-draft');
   bar.querySelector('[data-dr-go]').onclick = () => { bar.remove(); fpRestore(form, st, dr); };
-  bar.querySelector('[data-dr-drop]').onclick = async () => { bar.remove(); await S.draftDelete(st.draftKey); st.draftHold = false; fpStatus(''); };
+  bar.querySelector('[data-dr-drop]').onclick = () => confirmDanger({ title: 'Bỏ bản nháp này?', lose: 'Các thay đổi chưa gửi trong bản nháp sẽ mất.', confirm: 'Bỏ nháp', onConfirm: async () => { bar.remove(); await S.draftDelete(st.draftKey); st.draftHold = false; fpStatus(''); } });
 }
 function fpRestore(form, st, dr) {
   const changed = dr.changed || {};
@@ -2523,7 +2646,7 @@ addEventListener('keydown', (e) => {
   if (typing || e.metaKey || e.altKey) { if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); focusTimSearch(); } return; }
   if (e.key === '/' || (e.ctrlKey && e.key === 'k')) { e.preventDefault(); focusTimSearch(); return; }
   if (e.key === 'g') { gKey = Date.now(); return; }
-  if (Date.now() - gKey < 1200) { const to = { c: 'tree', t: 'list', s: 'book', g: 'gio', b: 'map', k: 'stats' }[e.key]; gKey = 0; if (to) location.hash = hf(to); }
+  if (Date.now() - gKey < 1200) { const to = { c: 'tree', t: 'list', s: 'book', g: 'lich', b: 'map', k: 'stats' }[e.key]; gKey = 0; if (to) location.hash = hf(to); }
 });
 document.addEventListener('click', (e) => {
   const b = e.target.closest('#ics,#share'); if (!b) return;
@@ -2532,7 +2655,7 @@ document.addEventListener('click', (e) => {
   if (b.id === 'ics') {
     const ymd = (t) => `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}`;
     const ev = list.map(({ p, g, at }) => `BEGIN:VEVENT\r\nUID:${p.id}-${ymd(at)}@${location.host}\r\nDTSTAMP:${ymd(now)}T000000Z\r\nDTSTART;VALUE=DATE:${ymd(at)}\r\nSUMMARY:Giỗ ${rank(p.data)} ${p.data.name} (${g.label} ÂL)\r\nDESCRIPTION:${location.origin}/#person/${p.id}\r\nBEGIN:VALARM\r\nTRIGGER:-P2D\r\nACTION:DISPLAY\r\nDESCRIPTION:Sắp đến ngày giỗ\r\nEND:VALARM\r\nEND:VEVENT`).join('\r\n');
-    download('ngay-gio.ics', `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//genealogia//VI\r\n${ev}\r\nEND:VCALENDAR\r\n`, 'text/calendar');
+    download('ngay-gio.ics', icsCalendar(ev), 'text/calendar');
   } else {
     const { p, g, at } = list[0];
     const text = `Giỗ ${rank(p.data)} ${p.data.name}: ${g.label} âm lịch, ${at.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric' })}. ${location.origin}/#person/${p.id}`;
@@ -2589,11 +2712,11 @@ main.addEventListener('click', (e) => {
 });
 main.addEventListener('keydown', (e) => { const g = e.target.closest?.('.cbx[data-sel]'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); g.dispatchEvent(new MouseEvent('click', { bubbles: true })); } });
 addEventListener('resize', () => { clearTimeout(window.__rz); window.__rz = setTimeout(() => route().view === 'tree' && render(), 200); });
-addEventListener('hashchange', () => { trailUpdate(); render(); });
+addEventListener('hashchange', () => { trailUpdate(); render(); UPD.decide('nav'); });
 S.subscribe(() => { const a = document.activeElement; if (a && main.contains(a) && a.tagName === 'INPUT') { M = build(); chrome(); } else renderSoon(); });
 // ---------- app update: a new deploy while the app is open (web/js/update.js) ----------
-// Found while open: "Có bản mới · Tải lại". Applied by itself when idle (next open, coming back, a manual check, or
-// a day after it was found). Never while a form has unsaved changes or a dialog is open.
+// Busy (a form with unsaved changes or a dialog open): "Có bản mới · Tải lại". Idle: applied by itself on start, when
+// the app comes back, on a manual check, on the next navigation or when the app is hidden (a day at the latest).
 let updReg = null, updApplying = false;
 function applyUpdate() { // Tải lại: the waiting worker takes over (skip-waiting), then the page reloads
   if (updApplying) return; updApplying = true;
@@ -2611,12 +2734,15 @@ const UPD = createUpdater({
   now: () => Date.now(),
 });
 navigator.serviceWorker?.addEventListener('controllerchange', () => { if (updApplying) location.reload(); });
-// Checks: at start, every 5 min while visible, and when the app comes back to the foreground.
+// Checks: at start and when the app comes back to the foreground, at most once a day (UPD.check); the browser's own
+// worker check runs with each of them. Going to the background applies a pending update when idle.
 function updChecks(reg) {
-  const check = (why) => { reg.update().catch(() => {}); return UPD.check(why).then(() => UPD.decide(why)); };
+  const check = (why) => UPD.check(why).then((r) => { if (!r.skipped) return reg.update().catch(() => {}); })
+    .then(() => UPD.decide(why));
   check('open');
-  setInterval(() => { if (document.visibilityState === 'visible') check('detect'); }, 5 * 60 * 1000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check('visible'); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check('visible'); else UPD.decide('hide');
+  });
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').then((reg) => {
   updReg = reg;
@@ -2628,13 +2754,14 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').the
   updChecks(reg);
 }).catch(() => {});
 else UPD.check('open');
-document.addEventListener('click', (e) => { if (e.target.closest('#chkupd')) UPD.check('manual').then((r) => { if (r.ok && !r.newer) toast('Đang dùng bản mới nhất'); else if (!r.ok) toast('Chưa kiểm tra được. Thử lại khi có mạng.'); }); });
+document.addEventListener('click', (e) => { if (e.target.closest('#chkupd')) UPD.check('manual').then((r) => { if (r.ok && !r.newer) toast('Đã là bản mới nhất'); else if (!r.ok) toast('Chưa kiểm tra được. Thử lại khi có mạng.'); }); });
 // A person page on a cold device fetches that person and their relatives first (store.init focus).
 S.init({ focus: () => { const r = route(); return (r.view === 'person' || r.view === 'sua') && r.arg && r.fam !== S.ALL_FAMS ? { fam: r.fam, id: r.arg } : null; } })
   .then(() => { const r = S.lastAccountSync(); if (r?.first && r.matched) toast(`Đã đồng bộ ${r.matched} góp ý`); });
 
 // shell: switcher + nav toggle (W12)
 document.addEventListener('click', (e) => {
+  if (e.target.closest('#nav a')) document.activeElement?.blur?.();
   if (e.target.closest('#swbtn')) openSwitcher();
   else if (e.target.closest('[data-acct="in"]')) loginDialog();
   else if (e.target.closest('[data-acct="sheet"]')) openAccountSheet();
@@ -2685,6 +2812,8 @@ document.addEventListener('mousedown', (e) => {
   const r = d.getBoundingClientRect();
   if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { d.close(); d.remove(); if (d.classList.contains('csw')) $('#swbtn')?.focus(); }
 });
+// The rail (tablet and up) opens over the page while focus is in it: Esc or a nav item tap gives the focus back to the page.
+addEventListener('keydown', (e) => { const a = document.activeElement; if (e.key === 'Escape' && a?.closest?.('#nav')) a.blur(); });
 addEventListener('hashchange', acHide); addEventListener('resize', () => acShow());
 for (const q of ['(min-width:672px)', '(min-width:1024px)']) matchMedia(q).addEventListener('change', () => render()); addEventListener('scroll', () => { if (ac.box && !ac.box.hidden) acShow(); }, true);
 
@@ -2692,7 +2821,7 @@ for (const q of ['(min-width:672px)', '(min-width:1024px)']) matchMedia(q).addEv
 document.addEventListener('input', (e) => {
   if (e.target.id !== 'gq') return;
   const q = fold(e.target.value).trim(); let n = 0;
-  for (const r of main.querySelectorAll('.gior')) { const hit = !q || r.dataset.q.includes(q); r.hidden = !hit; if (hit) n++; }
+  for (const r of main.querySelectorAll('.gior')) { const hit = (!q || r.dataset.q.includes(q)) && NW.kindHit(r); r.hidden = !hit; if (hit) n++; }
   let em = main.querySelector('#gqnone'); if (!n && !em) main.querySelector('.gior')?.parentElement.insertAdjacentHTML('beforeend', '<p class="sub pad" id="gqnone">Không thấy ngày giỗ nào.</p>'); else if (n && em) em.remove();
 });
 
@@ -2702,6 +2831,8 @@ document.addEventListener('input', (e) => {
 // "Theo dõi" follows it. "Xem cả họ X ›" sits under a row only when that surname has more than one family.
 let cayQ = ''; let cayT = null;
 function cayPage() {
+  // a same-route re-render keeps the page (render() leaves it in place): repaint the list when the new data is in
+  if ($('#flist') && $('#fq')) return paintCay(cayQ);
   // the shared list toolbar (.lbar: search + icon buttons, no visible label); no filter button on this page
   main.innerHTML = `<div class="lbar"><div class="srch"><input id="fq" type="search" placeholder="Tìm họ, chữ Hán, quê quán" aria-label="Tìm họ, chữ Hán, quê quán" autocomplete="off" value="${esc(cayQ)}"></div><a class="fbtn" href="#lap-gia-pha" aria-label="Lập gia phả mới" title="Lập gia phả mới">${cic('plus', 20)}</a></div>
     <div id="flist" class="cay"><p class="sub">Đang tìm…</p></div>`;
@@ -2712,7 +2843,7 @@ const cayRow = (f, counts, mine, showClan) => {
     : [f.people != null ? `${f.people} người` : '', f.place].filter(Boolean).join(' · ');
   const row = calmRow({ href: `#/${f.slug}/tree`, tile: familyCrest(f, 'md'), title: f.short_name || f.name, subtitle: esc(facts), dense: true,
     action: mine ? '' : `<button type="button" class="btn sm cay-follow" data-fam-follow="${esc(f.id)}" aria-pressed="false">Theo dõi</button>` });
-  const h = CL.clanHref(f.name); const n = counts.get(CL.familySurname(f.name)) || 1;
+  const h = CL.clanHref(f.name, f.country); const n = counts.get(CL.familySurname(f.name)) || 1;
   const clan = showClan && h && n > 1 ? `<a class="cay-clan" href="${esc(h)}">Xem cả họ ${esc(CL.familySurname(f.name))} ›</a>` : '';
   return `<div class="cay-item">${row}${clan}</div>`;
 };
@@ -2722,7 +2853,7 @@ async function paintCay(q) {
     const [items, all] = await Promise.all([S.searchFamilies(q), q ? S.searchFamilies('') : null]);
     if (!$('#flist')) return;
     const counts = new Map();
-    for (const f of all || items) { const k = CL.familySurname(f.name); counts.set(k, (counts.get(k) || 0) + 1); }
+    for (const f of all || items) { if (!CL.inClan(f.name, f.country)) continue; const k = CL.familySurname(f.name); counts.set(k, (counts.get(k) || 0) + 1); }
     const mine = items.filter((f) => f.my_role || S.isFollowing(f.id));
     const disc = items.filter((f) => !mine.includes(f) && f.visibility === 'public');
     // "Xem cả họ X ›" once per surname: under the first row of that surname, top to bottom
@@ -2776,13 +2907,15 @@ function clanCard(f, admin) {
   const list = branchInfo(M, c, f.id, { all: true }).founders;
   const manualOn = !!(f.short_name || f.founder_person_id || f.branch_gen || f.branch_order);
   const view = `<div id="clan-view">${clanView(f, c)}</div><ol class="clan-list" id="clan-order">${clanOrderRows(list, admin && manualOn)}</ol>`;
-  if (!admin) return `<div class="cd" id="clan"><h3>Chi và thủy tổ</h3>${view}${famRowsHtml([['Quê gốc', f.origin_place]])}</div>`;
+  if (!admin) return `<div class="cd" id="clan"><h3>Chi và thủy tổ</h3>${view}${famRowsHtml([['Quê gốc', f.origin_place], ['Quốc gia', f.country ? countryName(f.country) : '']])}</div>`;
   const people = M.ps.filter((p) => !p.fam || p.fam === f.id).filter((p) => !p.data.parent || !M.byId.get(p.data.parent) || (p.data.gen || 99) <= 3)
     .sort((x, y) => (x.data.gen || 99) - (y.data.gen || 99) || String(x.data.name).localeCompare(String(y.data.name), 'vi'));
   return `<div class="cd" id="clan"><h3>Chi và thủy tổ</h3>
     <form id="fclan" class="form-stack">
       ${view}
       <label class="fld">Quê gốc<input name="origin_place" value="${esc(f.origin_place || '')}" maxlength="120"></label>
+      <label class="fld">Quốc gia<input name="country" list="qg-list" value="${esc(f.country ? countryName(f.country) : '')}" placeholder="Gõ để tìm, ví dụ Việt Nam" autocomplete="off"></label>
+      <datalist id="qg-list">${COUNTRIES.map(([, n]) => `<option value="${esc(n)}">`).join('')}</datalist>
       <label class="swt"><input type="checkbox" name="manual"${manualOn ? ' checked' : ''}> <span>Sửa tay <span class="sub">(chỉ khi tự động chưa đúng)</span></span></label>
       <fieldset id="clan-man" class="form-stack"${manualOn ? '' : ' hidden'}>
         <label class="fld">Tên ngắn<input name="short_name" value="${esc(f.short_name || '')}" maxlength="60" placeholder="${esc(clanDefault(f))}"></label>
@@ -2822,7 +2955,8 @@ function bindClan(f, slug) {
   form.onsubmit = async (e) => {
     e.preventDefault(); const err = form.querySelector('.err'); err.hidden = true;
     try {
-      await S.patchFamily(slug, { ...cfg(), origin_place: form.origin_place.value });
+      const qg = countryCode(form.country.value); if (qg === null) throw new Error('Chọn quốc gia trong danh sách (hoặc để trống).');
+      await S.patchFamily(slug, { ...cfg(), origin_place: form.origin_place.value, country: qg });
       toast('Đã lưu chi và thủy tổ'); render();
     } catch (x) { err.hidden = false; err.textContent = x.message; }
   };
@@ -2852,20 +2986,19 @@ function famSettings() {
       ${VIS_OPTS.map(([v, l, d]) => `<label class="radio fvis"><input type="radio" name="vis" value="${v}" ${f.visibility === v ? 'checked' : ''}${disabled}> <span><b>${l}</b><span class="sub">${d}</span></span></label>`).join('')}
       ${admin ? '' : '<p class="sub">Chỉ Chủ họ và Quản trị đổi được.</p>'}
     </div>
+    ${CN.voteRuleCard(own)}
+    ${NW.postersCard(S.isOwner())}
     ${gxCard}
     <div class="cd">${calmRow({ attrs: 'id="setdef"', title: 'Mở khi vào ứng dụng', subtitle: defLabel, dense: true })}</div>
     ${admin ? `<div class="cd">${calmRow({ href: hf('nguoi-ke-nhiem'), title: 'Người kế nhiệm', subtitle: 'Ủy thác · thời hạn · chuyển quyền', dense: true })}</div>` : ''}
     ${admin ? `<div class="cd"><h3>Thành viên</h3>${calmRow({ href: `#/${f.slug}/members`, title: 'Thành viên & quyền', dense: true })}</div>` : ''}
     <div class="cd"><h3>Theo dõi</h3>
       ${own ? '<p class="sub">Chủ họ cần giao quyền Chủ họ cho người khác trước khi rời dòng họ.</p>'
-        : mem ? calmRow({ attrs: 'id="leave"', title: 'Rời dòng họ', dense: true, danger: true })
+        : mem ? calmRow({ attrs: 'id="leave" data-danger', title: 'Rời dòng họ', dense: true, danger: true })
           : following ? calmRow({ attrs: 'id="unfollow"', title: 'Bỏ theo dõi', dense: true })
             : calmRow({ attrs: 'id="follow"', title: 'Theo dõi dòng họ này', dense: true })}
     </div>
-    <div class="cd"><h3>Vùng nguy hiểm</h3>
-      <button type="button" class="btn ter sm" disabled>Chuyển quyền Chủ họ (Sắp có)</button>
-      <button type="button" class="btn ter sm dng-t" disabled>Xóa dòng họ (Sắp có)</button>
-    </div>`;
+    ${dangerZone(['<button type="button" class="btn ter sm" disabled>Chuyển quyền Chủ họ (Sắp có)</button>', dangerButton('Xóa dòng họ (Sắp có)', 'disabled', { size: 'sm' })])}`;
   if (admin) {
     $('#finfo').onsubmit = async (e) => {
       e.preventDefault(); const fd = new FormData(e.target); const err = e.target.querySelector('.err');
@@ -2884,9 +3017,7 @@ function famSettings() {
   $('#setdef')?.addEventListener('click', openDefaultSheet);
   $('#unfollow')?.addEventListener('click', () => { S.unfollowFamily(f.id); render(); });
   $('#follow')?.addEventListener('click', () => { S.followFamily(f.id); render(); });
-  $('#leave')?.addEventListener('click', () => confirmDialog('Rời dòng họ?', 'Bạn sẽ không còn là thành viên của dòng họ này. Muốn tham gia lại, xin tham gia lần nữa.', 'Rời dòng họ', async () => {
-    await S.leaveFamily(slug); S.unfollowFamily(f.id); render();
-  }));
+  $('#leave')?.addEventListener('click', () => confirmDanger({ title: 'Rời dòng họ?', lose: 'Bạn sẽ không còn là thành viên của dòng họ này.', restore: 'Muốn tham gia lại, xin tham gia lần nữa.', confirm: 'Rời dòng họ', onConfirm: async () => { await S.leaveFamily(slug); S.unfollowFamily(f.id); render(); } }));
   $('#gx-export')?.addEventListener('click', () => gedExport(slug));
   $('#gx-import')?.addEventListener('click', () => gedChoose(slug));
 }
@@ -2931,11 +3062,11 @@ async function gedPick(slug, file) {
 }
 function gedSheet(slug, content, pv) {
   const c = pv.counts;
-  const nothing = !c.new && !c.conflicts && !c.events_new && !c.relations_new && !c.fields_fill;
+  const nothing = !c.new && !c.conflicts && !c.events_new && !c.relations_new && !c.fields_fill && !c.stories_new;
   const rows = [['Người mới', c.new], ['Khớp người đã có', c.matched], ['Khác giá trị (vào Duyệt đóng góp)', c.conflicts],
-    ['Thông tin còn thiếu sẽ thêm', c.fields_fill], ['Sự kiện mới', c.events_new], ['Quan hệ mới', c.relations_new]];
+    ['Thông tin còn thiếu sẽ thêm', c.fields_fill], ['Sự kiện mới', c.events_new], ['Câu chuyện mới', c.stories_new], ['Quan hệ mới', c.relations_new]];
   if (c.relations_pending) rows.push(['Quan hệ chờ chuyển dữ liệu (chưa nhập)', c.relations_pending]);
-  if (c.stories_in_file) rows.push(['Câu chuyện trong file (chưa nhập)', c.stories_in_file]);
+  if (c.stories_skipped) rows.push(['Câu chuyện đời khác đã có (giữ bản hiện tại)', c.stories_skipped]);
   const label = { new: 'Người mới', matched: 'Khớp', conflict: 'Khác giá trị, chờ duyệt' };
   const list = pv.items.slice(0, 50).map((it) => calmRow({ title: it.name, subtitle: `${label[it.action]}${it.events ? ` · ${it.events} sự kiện` : ''}`, dense: true, trailing: 'none' })).join('');
   const more = pv.items.length > 50 ? `<p class="sub">Và ${pv.items.length - 50} người khác.</p>` : '';
@@ -2990,7 +3121,7 @@ function famGate(view) {
   return false;
 }
 // Views that read the family's people: until the device has some (or the first pull ends), they draw a loading skeleton.
-const DATA_VIEWS = ['tree', 'list', 'gio', 'verify', 'map', 'stats', 'doi-chi', 'person', 'sua', 'them', 'export', 'place'];
+const DATA_VIEWS = ['tree', 'list', 'lich', 'tin', 'tin-sua', 'verify', 'map', 'stats', 'doi-chi', 'person', 'sua', 'su-kien', 'them', 'export', 'place'];
 const skeleton = () => { main.innerHTML = '<div class="skel" role="status" aria-live="polite"><p class="sub">Đang tải dữ liệu…</p><span class="skel-l"></span><span class="skel-l w2"></span><span class="skel-l w3"></span></div>'; };
 // Delegated follow buttons (follow bar, find page).
 document.addEventListener('click', (e) => {
@@ -3000,3 +3131,4 @@ document.addEventListener('click', (e) => {
 });
 
 SUC.init({ render, S, dialog, confirm: confirmDialog, googleUrl, hashNext, visOpts: VIS_OPTS });
+CLM.init({ render, S, dialog }); CLM.wire();

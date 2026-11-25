@@ -22,7 +22,7 @@ const PERSONS = [
   P('R', { name: 'Dương Văn Tổ', sex: 'm', gen: 1, born: '1850', died: '1910' }),
   P('A', { name: 'Vương Văn Lyh', sex: 'm', gen: 2, parent: 'R', order: 2, born: '1880', died: '1950' }),
   P('B', { name: 'Dương Văn Bình', sex: 'm', gen: 2, parent: 'R', order: 1, born: '1878', died: '1940' }),
-  P('A1', { name: 'Dương Văn Cường', sex: 'm', gen: 3, parent: 'A', order: 1, born: '1905', died: '1970' }),
+  P('A1', { name: 'Giả Văn An', sex: 'm', gen: 3, parent: 'A', order: 1, born: '1905', died: '1970' }),
   P('A2', { name: 'Vương Thị Lan', sex: 'f', gen: 3, parent: 'A', order: 2, born: '1908', died: '1990' }),
   P('A3', { name: 'Dương Chưa Rõ', gen: 3, parent: 'A', order: 3, born: '1910', died: '1960' }),
   P('W', { name: 'Lê Thị Vợ', sex: 'f', gen: 1, spouse_of: 'R', spouse_n: 1, died: '1915' }),
@@ -86,7 +86,7 @@ test('Tìm list: labelled shapes replace the colour-only dots; unknown sex has n
       await page.waitForSelector('.cards .card', { timeout: 8000 });
       assert.equal(await page.locator('.cards .dot').count(), 0, 'no colour-only dot');
       const card = (name) => page.locator('.cards .card', { hasText: name });
-      assert.equal(await card('Dương Văn Cường').locator('.sx.m[aria-label="Nam"]').count(), 1);
+      assert.equal(await card('Giả Văn An').locator('.sx.m[aria-label="Nam"]').count(), 1);
       assert.equal(await card('Vương Thị Lan').locator('.sx.f[aria-label="Nữ"]').count(), 1);
       assert.equal(await card('Dương Chưa Rõ').locator('.sx').count(), 0, 'unknown sex: no shape');
       // the two shapes differ by form, not only colour

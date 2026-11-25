@@ -140,6 +140,64 @@ test('no living people in the reference tree', { skip }, async () => {
   }
 });
 
+test('a grown spec adds only the new person and link: matched persons keep their rows and versions', { skip }, async () => {
+  // the seeded tree gains one legendary person (F) under A: F is created, A..D and the old links are skipped
+  const F = qid(7);
+  const grown = JSON.parse(JSON.stringify(spec(true)));
+  grown.trees[0].persons.push({ ref: F, name: 'Thần F', note: 'Truyền thuyết. Không có ngày chính xác.' });
+  grown.trees[0].links.push({ parent: A, child: F });
+  const growFile = path.join(dir, 'spec-grow.json');
+  fs.writeFileSync(growFile, JSON.stringify(grown));
+  const versions = async () => Object.fromEntries((await pool.query('select data->\'ext\'->>\'wikidata\' as q, version from persons where family_id = $1', [SLUG1])).rows.map((r) => [r.q, Number(r.version)]));
+  const beforeV = await versions();
+  const beforeLinks = await count('select count(*)::int n from parent_child where family_id = $1', [SLUG1]);
+  const dry = await run(['scripts/seed-reference.js', growFile]);
+  assert.strictEqual(dry.code, 0, dry.out);
+  assert.match(dry.out, new RegExp(`\\[${SLUG1}\\][\\s\\S]*persons {7}create 1 \\| update 0 \\| skip 4 \\| conflict 0`));
+  assert.match(dry.out, /parent_child  create 1 \| skip 1/);
+  assert.match(dry.out, /couple        create 0 \| skip 1/);
+  assert.deepStrictEqual(total(dry.out), [2, 0, 7, 0]); // create: person + parent_child; skip: 4 persons, 1 link, 1 couple, the family
+  const r = await run(['scripts/seed-reference.js', growFile, '--apply']);
+  assert.strictEqual(r.code, 0, r.out);
+  const afterV = await versions();
+  assert.strictEqual(Object.keys(afterV).length, Object.keys(beforeV).length + 1);
+  for (const q of [A, B, C, D]) assert.strictEqual(afterV[q], beforeV[q], `${q} row version must not change`);
+  assert.strictEqual(await count('select count(*)::int n from parent_child where family_id = $1', [SLUG1]), beforeLinks + 1);
+  // a second run of the grown spec is a no-op
+  const again = await run(['scripts/seed-reference.js', growFile, '--apply']);
+  assert.deepStrictEqual(total(again.out), [0, 0, 9, 0]);
+});
+
+test('an emblem PNG is stored once (create, then skip) and replaced when the file changes; a non-PNG is refused', { skip }, async () => {
+  const png1 = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('emblem-one')]);
+  const png2 = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('emblem-two')]);
+  fs.writeFileSync(path.join(dir, 'e1.png'), png1);
+  fs.writeFileSync(path.join(dir, 'e2.png'), png2);
+  fs.writeFileSync(path.join(dir, 'bad.png'), Buffer.from('<svg></svg>'));
+  const withEmblem = (file) => { const sp = JSON.parse(JSON.stringify(spec(true))); sp.trees[0].emblem = file; const f = path.join(dir, `emb-${file}.json`); fs.writeFileSync(f, JSON.stringify(sp)); return f; };
+  const row = async () => (await pool.query("select mime, length(data) n, encode(sha256(data), 'hex') h from family_emblems where family_id = $1", [SLUG1])).rows[0];
+  const e1 = withEmblem('e1.png');
+  const dry = await run(['scripts/seed-reference.js', e1]);
+  assert.strictEqual(dry.code, 0, dry.out);
+  assert.match(dry.out, new RegExp(`\\[${SLUG1}\\][\\s\\S]*emblem        create`));
+  assert.strictEqual(await row(), undefined, 'dry run writes nothing');
+  const r1 = await run(['scripts/seed-reference.js', e1, '--apply']);
+  assert.strictEqual(r1.code, 0, r1.out);
+  let got = await row();
+  assert.deepStrictEqual([got.mime, Number(got.n)], ['image/png', png1.length]);
+  const again = await run(['scripts/seed-reference.js', e1, '--apply']);
+  assert.match(again.out, /emblem        skip/);
+  const e2 = withEmblem('e2.png');
+  const r2 = await run(['scripts/seed-reference.js', e2, '--apply']);
+  assert.match(r2.out, /emblem        update/);
+  got = await row();
+  assert.strictEqual(Number(got.n), png2.length);
+  const bad = withEmblem('bad.png');
+  const rb = await run(['scripts/seed-reference.js', bad]);
+  assert.notStrictEqual(rb.code, 0, 'a non-PNG emblem is refused');
+  assert.match(rb.out, /emblem must be a PNG/);
+});
+
 test('builder: one Vietnam family, groups ordered by year, undated last, no cross-group links, living excluded', { skip }, async () => {
   const src = fs.mkdtempSync(path.join(os.tmpdir(), 'refseed-src-'));
   const raw = fs.mkdtempSync(path.join(os.tmpdir(), 'refseed-raw-'));
@@ -221,4 +279,40 @@ test('builder: one Vietnam family, groups ordered by year, undated last, no cros
   fs.rmSync(src, { recursive: true, force: true });
   fs.rmSync(raw, { recursive: true, force: true });
   fs.rmSync(vi, { recursive: true, force: true });
+});
+
+test('builder --myth adds dateless legendary people, their edges and source; without it the tree is unchanged', { skip }, async () => {
+  const src = fs.mkdtempSync(path.join(os.tmpdir(), 'refmyth-src-'));
+  const out1 = fs.mkdtempSync(path.join(os.tmpdir(), 'refmyth-out1-'));
+  const out2 = fs.mkdtempSync(path.join(os.tmpdir(), 'refmyth-out2-'));
+  const dt = (y) => ({ time: `${y < 0 ? '-' : '+'}${String(Math.abs(y)).padStart(4, '0')}-00-00T00:00:00Z`, precision: 9 });
+  const p = (qid_, extra) => ({ qid: qid_, label: { vi: `Người ${qid_}` }, description: {}, wikidata_url: `https://www.wikidata.org/wiki/${qid_}`, ...extra });
+  fs.writeFileSync(path.join(src, 'duong-vn.json'), JSON.stringify({ people: [], edges: [] }));
+  fs.writeFileSync(path.join(src, 'hwasan-ly.json'), JSON.stringify({ people: [], edges: [] }));
+  fs.writeFileSync(path.join(src, 'japan-imperial.json'), JSON.stringify({ emperors: [
+    p('J1', { ordinal: 1, birth: dt(-711), death: dt(-585) }), p('J2', { ordinal: 40, birth: dt(1675), death: dt(1710) }),
+  ], edges: [{ from: 'J1', rel: 'children', to: 'J2' }, { from: 'J2', rel: 'father', to: 'J1' }] }));
+  const myth = path.join(src, 'japan-myth.json');
+  fs.writeFileSync(myth, JSON.stringify({
+    persons: [
+      { qid: 'M1', label: { vi: 'Thần M', en: 'God M' }, description: { vi: 'thần thoại' }, source_url: 'https://en.wikipedia.org/wiki/M', sex: 'f' },
+      { qid: 'M2', label: { vi: 'Thần N' }, description: {}, source_url: 'https://en.wikipedia.org/wiki/N', sex: 'm' },
+    ],
+    edges: [{ from: 'M1', rel: 'children', to: 'J1' }],
+  }));
+  const r1 = await run(['scripts/build-reference-specs.js', src, out1, '--myth', myth]);
+  assert.strictEqual(r1.code, 0, r1.out);
+  assert.match(r1.out, /japan: kept 2 of 2, myth 2, legendary 3/);
+  const jp = JSON.parse(fs.readFileSync(path.join(out1, 'ref-jp-imperial.json'), 'utf8')).trees[0];
+  const m1 = jp.persons.find((x) => x.ref === 'M1');
+  assert.match(m1.note, /^Truyền thuyết\. thần thoại$/);
+  assert.ok(!('born' in m1) && !('died' in m1), 'myth people: no dates');
+  assert.deepStrictEqual([m1.sex, m1.source_url], ['f', 'https://en.wikipedia.org/wiki/M']);
+  assert.deepStrictEqual(jp.links.filter((l) => l.parent === 'M1'), [{ parent: 'M1', child: 'J1' }]);
+  assert.strictEqual(jp.persons.length, 4);
+  const r2 = await run(['scripts/build-reference-specs.js', src, out2]);
+  assert.strictEqual(r2.code, 0, r2.out);
+  const plain = JSON.parse(fs.readFileSync(path.join(out2, 'ref-jp-imperial.json'), 'utf8')).trees[0];
+  assert.deepStrictEqual(plain.persons.map((x) => x.ref), ['J1', 'J2']);
+  for (const d of [src, out1, out2]) fs.rmSync(d, { recursive: true, force: true });
 });

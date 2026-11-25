@@ -13,7 +13,7 @@ const ROLES = ['owner', 'admin', 'editor', 'member'];
 const LIST_MAX = 25;
 const BATCH_TTL_MS = 24 * 3600e3;
 const DIFF_MAX = 200;
-const SUMMARY_KEYS = ['name', 'alias', 'thu', 'sex', 'gen', 'order', 'parent', 'spouse_of', 'spouse_n', 'living', 'born', 'died',
+const SUMMARY_KEYS = ['name', 'name_han', 'alias', 'thu', 'sex', 'gen', 'order', 'parent', 'spouse_of', 'spouse_n', 'living', 'born', 'died',
   'birth_place', 'place', 'job', 'title_name'];
 const HIDDEN_KEYS = ['photo', 'lat', 'lon', 'geo_precision'];
 

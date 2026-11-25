@@ -1,0 +1,24 @@
+feat(giapha): release train 2 (#58 #61 #63 #69 #72 #73 #74 #75) (#76)
+
+* feat: sample feature group
+- Adds a sort-by-year option to the list view and keeps the chosen order after reload.
+- Adds an expand control for nested branches; the state is kept per session.
+- Moves the sample export helper into a shared module and adds a unit test for it.
+- The export format changes in one place: BREAKING CHANGE notes are written as bullets here, not as a footer.
+
+* fix: sample fixes
+- Fixes an off-by-one in the sample pager when a page is exactly full.
+- Stops the sample tooltip from covering the first row on narrow screens.
+
+- Sample data: names, places and dates in the demo tree are invented for tests.
+- Test helpers now create a fresh sample database for each run (see the test README).
+
+* docs: sample notes
+Short notes for maintainers about how the sample set is generated and how to refresh it.
+The generator is seeded, so the same command gives the same output on every machine.
+
+* chore: sample dependencies
+- Bumps two test-only packages to their latest patch releases.
+- No runtime dependency changes in this train.
+
+Refs: sample-issue-1 (documentation only, no behaviour change)

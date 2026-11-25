@@ -6,7 +6,7 @@
 // _ORD_B, _PRIVATE; FAMC _KIND (child kind ke|khac), _ORDER, _PRIVATE; contacts _FB, _ZALO, _SOCIAL.
 // Lunar dates: NOTE "Âm lịch: ..."; giỗ lunar date under DEAT: NOTE "Giỗ (âm lịch): ...".
 'use strict';
-const { isDead } = require('./core');
+const { isDead, hanNameError } = require('./core');
 
 const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const LUNAR_PREFIX = 'Âm lịch: ';
@@ -19,9 +19,11 @@ const VALUE_TAGS = ['EDUC', 'OCCU', 'RELI']; // event tags whose value is the de
 const CP_KINDS = ['cuoi', 'vo_le', 'ban_doi', 'ly_hon', 'goa', 'khac'];
 // Files in these languages write the family name first (vi, zh, ja, ko); the rest write the given name first.
 const FAMILY_FIRST_LANGS = ['vi', 'zh', 'ja', 'ko'];
-// Story notes on the person (export only; the import does not write stories back yet).
+// Story notes on the person: NOTE "Câu chuyện: <title>" (kind chuyen) or NOTE "Câu chuyện đời: <title>" (kind tom_tat),
+// the body on the following CONT lines. Import reads both, and the pointer form (1 NOTE @N1@ with a NOTE record,
+// CONC/CONT joined) that other programs write. Same key on import and export: the stories table, see planImport.
 const STORY_PREFIX = { chuyen: 'Câu chuyện: ', tom_tat: 'Câu chuyện đời: ' };
-const STORY_NOTE = /^(Câu chuyện: |Câu chuyện đời: )/;
+const STORY_NOTE = /^Câu chuyện( đời)?:/;
 const PC_KINDS = ['ruot', 'nuoi', 'ke', 'khac'];
 const CHUNK = 180; // characters per line piece (5.5.1 allows 255)
 const NUM = /^-?\d+(\.\d+)?$/;
@@ -145,9 +147,17 @@ const dateYearOf = (R, n) => {
   return g.kind ? { kind: g.kind, from: g.from, to: g.to } : null;
 };
 
+// A story note's text -> { kind, title, body }, or null when the text is not a story note (its first line is the title).
+function storyOf(text) {
+  const m = STORY_NOTE.exec(text); if (!m) return null;
+  const rest = text.slice(m[0].length).replace(/^[ \t]/, '');
+  const nl = rest.indexOf('\n');
+  return { kind: m[1] ? 'tom_tat' : 'chuyen', title: (nl < 0 ? rest : rest.slice(0, nl)).trim(), body: nl < 0 ? '' : rest.slice(nl + 1).trim() };
+}
+
 // readGedcom(R, text) -> { version, persons, families, warnings, unknownTags }
 // persons: { xref, name, alias, sex, attrs{phone,email,address,facebook,zalo,social}, note[], sources[{title,url?,quality?}],
-//            famc[{fam,kind,order,private}], facts[{tag,value,date,dateRaw,place,type,lunar,gio,notes[],sources[]}] }
+//            stories (count), storyList[{kind,title,body}], famc[{fam,kind,order,private}], facts[{tag,value,date,dateRaw,place,type,lunar,gio,notes[],sources[]}] }
 // families: { xref, husb, wife, chil[], marr, div, kind, ordA, ordB, private, noteText[] }
 function readGedcom(R, text) {
   const { roots, warnings } = parseTree(text);
@@ -191,10 +201,12 @@ function readGedcom(R, text) {
   const persons = []; const families = [];
   for (const r of roots) {
     if (r.tag === 'INDI' && r.xref) {
-      const p = { xref: ptr(r.xref), name: '', surname: '', given: '', nameOrder: '', alias: '', sex: '', attrs: {}, note: [], sources: [], famc: [], facts: [], stories: 0 };
+      const p = { xref: ptr(r.xref), name: '', surname: '', given: '', nameOrder: '', alias: '', han: '', sex: '', attrs: {}, note: [], sources: [], famc: [], facts: [], stories: 0, storyList: [] };
       for (const c of r.children) {
         if (c.tag === 'NAME') {
-          if (subsOf(c, 'TYPE').some((t) => textOf(t).toLowerCase() === 'aka')) p.alias = String(c.value || '').trim();
+          // A second NAME with TYPE han carries the Hán name (tên chữ Hán); TYPE aka the alias; the first other NAME is the name.
+          if (subsOf(c, 'TYPE').some((t) => textOf(t).toLowerCase() === 'han')) { const h = String(c.value || '').trim(); if (!hanNameError(h)) p.han = h; }
+          else if (subsOf(c, 'TYPE').some((t) => textOf(t).toLowerCase() === 'aka')) p.alias = String(c.value || '').trim();
           else if (!p.name) Object.assign(p, personName(c, lang));
         } else if (c.tag === 'SEX') p.sex = { M: 'm', F: 'f' }[String(c.value || '').trim().toUpperCase()] || '';
         else if (c.tag === 'FAMC') {
@@ -203,7 +215,10 @@ function readGedcom(R, text) {
           p.famc.push({ fam: ptr(c.value), kind: PC_KINDS.includes(k) ? k : (pedi === 'adopted' || pedi === 'foster') ? 'nuoi' : 'ruot',
             order: textOf(subOf(c, '_ORDER')) !== '' && Number.isInteger(o) ? o : null, private: textOf(subOf(c, '_PRIVATE')).toLowerCase() === 'yes' });
         } else if (['BIRT', 'DEAT', 'BURI', 'RESI', 'OCCU', 'RELI', 'EDUC', 'MARR', 'DIV', 'EVEN'].includes(c.tag)) p.facts.push(factOf(c));
-        else if (c.tag === 'NOTE') { const t = noteText(c).trim(); if (STORY_NOTE.test(t)) p.stories++; else if (t) p.note.push(t); }
+        else if (c.tag === 'NOTE') {
+          const t = noteText(c).trim(); const st = storyOf(t);
+          if (st) { p.stories++; p.storyList.push(st); } else if (t) p.note.push(t);
+        }
         else if (c.tag === 'SOUR') { const s = citation(c); if (s.title || s.url) p.sources.push(s); }
         else if (c.tag === 'TITL') p.attrs.title_name = textOf(c);
         else if (c.tag === '_THU') p.attrs.thu = textOf(c);
@@ -353,6 +368,7 @@ function buildExport({ R, family, persons, events = [], pc = [], cp = [], storie
     lines.push(`0 @${p.id}@ INDI`);
     nameLines(lines, d);
     if (d.alias) { tagLine(lines, 1, 'NAME', String(d.alias).replace(/\n/g, ' ')); lines.push('2 TYPE aka'); }
+    if (d.name_han) { tagLine(lines, 1, 'NAME', String(d.name_han).replace(/\s+/g, ' ').trim()); lines.push('2 TYPE han'); }
     lines.push(`1 SEX ${d.sex === 'f' ? 'F' : d.sex === 'm' ? 'M' : 'U'}`);
     const evs = R.sortEvents(evBy.get(p.id) || []);
     const has = (t) => evs.some((e) => e.type === t);
@@ -459,19 +475,26 @@ function writeEvent(lines, R, e, srcRef) {
 // ---------- import plan ----------
 // Description of an event fact: the tag value when it has one ('Y' is the empty value), else its NOTE lines.
 const descOf = (f) => (f.value && f.value !== 'Y' ? f.value : f.notes.join('\n'));
+// Stories: a story note is planned as a new story unless the person already has the same one (kind, title and body,
+// whitespace squashed: a file written from this app matches on a second import). A second "Câu chuyện đời" with other
+// text is not written (one per person) and is counted as skipped.
 // planImport(doc, ctx) -> { counts, items, persons, relations, warnings, idOf }. Pure: nothing is written.
-// doc: readGedcom result. ctx: { R, F (fuzzy.js), persons: [{id, data}], events, pc, cp (relation rows as stored),
-//   relMode: 'table' | 'legacy', newId(xref) -> id }.
+// doc: readGedcom result. ctx: { R, F (fuzzy.js), persons: [{id, data}], events, stories (rows as stored), pc, cp (relation rows
+//   as stored), relMode: 'table' | 'legacy', newId(xref) -> id }.
 // Matching: same id (a file exported from this family), else fuzzy name (fuzzy.js, every token) with the birth year
 // not more than a year apart when both are known. Ties are ambiguous and become new people.
 // Per person: fields that are empty here are filled; a field with a different value is a conflict (the apply step
 // sends it to the review queue); events are added when not already there. Nothing is overwritten.
 function planImport(doc, ctx) {
-  const { R, F, persons = [], events = [], pc = [], cp = [], relMode = 'table', newId } = ctx;
+  const { R, F, persons = [], events = [], stories = [], pc = [], cp = [], relMode = 'table', newId } = ctx;
   const warnings = [...(doc.warnings || [])];
   const byId = new Map(persons.map((p) => [p.id, { id: p.id, data: p.data || {} }]));
   const evBy = new Map();
   for (const e of events) { if (!evBy.has(e.person_id)) evBy.set(e.person_id, []); evBy.get(e.person_id).push(e); }
+  const stBy = new Map();
+  for (const s of stories) { if (!stBy.has(s.person_id)) stBy.set(s.person_id, []); stBy.get(s.person_id).push(s); }
+  const squash = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
+  const storyKey = (s) => `${s.kind}|${squash(`${s.title || ''} ${s.body || ''}`)}`;
   const yearOfData = (d) => {
     if (/^\d{4}$/.test(String(d.born || '').trim())) return Number(d.born);
     const p = R.parseEventDate(d.birth_date || ''); return p.kind && p.from ? Number(String(p.from).slice(0, 4)) : null;
@@ -506,7 +529,8 @@ function planImport(doc, ctx) {
   for (const m of matches) if (!m.skip) { m.id = m.target || newId(m.x.xref); idOf.set(m.x.xref, m.id); }
 
   const counts = { persons: doc.persons.length, new: 0, matched: 0, conflicts: 0, events_new: 0, fields_fill: 0, fields_conflict: 0,
-    ambiguous: 0, skipped: 0, relations_new: 0, relations_same: 0, relations_pending: 0, sources: 0, unknown_tags: doc.unknownTags || 0, families: doc.families.length };
+    ambiguous: 0, skipped: 0, stories_new: 0, stories_same: 0, stories_skipped: 0, relations_new: 0, relations_same: 0, relations_pending: 0,
+    sources: 0, unknown_tags: doc.unknownTags || 0, families: doc.families.length };
   const out = { counts, items: [], persons: [], relations: [], warnings, idOf };
 
   for (const m of matches) {
@@ -551,13 +575,27 @@ function planImport(doc, ctx) {
         && String(e.place || '').trim() === String(f.place || '').trim());
     };
 
-    put('name', x.name); put('alias', x.alias); put('sex', x.sex);
+    put('name', x.name); put('alias', x.alias); put('name_han', x.han); put('sex', x.sex);
     // Name parts follow a new name only: an existing name (equal or conflicting) keeps its parts.
     if (!cur.name) { put('surname', x.surname); put('given', x.given); put('name_order', x.nameOrder); }
     for (const k of ['phone', 'email', 'address', 'facebook', 'zalo', 'social', 'title_name', 'thu', 'photo', 'lat', 'lon']) put(k, x.attrs[k]);
     put('order', /^\d+$/.test(x.attrs.order || '') ? x.attrs.order : '');
     if (x.note.length) put('note', x.note.join('\n'));
     if (x.sources.length) put('source', x.sources.map((s) => s.title || s.url).filter(Boolean).join('; '));
+    const haveSt = m.target ? (stBy.get(m.target) || []) : [];
+    const stKeys = new Set(haveSt.map(storyKey));
+    const hasSummary = haveSt.some((s) => s.kind === 'tom_tat');
+    const newStories = [];
+    for (const st of x.storyList) {
+      if (!squash(st.title) && !squash(st.body)) continue;
+      const key = storyKey(st);
+      if (stKeys.has(key)) { counts.stories_same++; continue; }
+      if (st.kind === 'tom_tat' && (hasSummary || newStories.some((s) => s.kind === 'tom_tat'))) {
+        counts.stories_skipped++; warnings.push(`${x.name}: đã có câu chuyện đời, giữ bản hiện tại.`); continue;
+      }
+      stKeys.add(key); newStories.push(st);
+    }
+    counts.stories_new += newStories.length;
     for (const f of x.facts) {
       const date = dateOf(f); // a DATE this app can store
       const raw = !!f.dateRaw; // any DATE line (a text this app cannot store is kept on the event as typed)
@@ -602,10 +640,10 @@ function planImport(doc, ctx) {
     counts.events_new += newEvents.length;
     counts.fields_fill += fields.length;
     counts.fields_conflict += conflicts.length;
-    out.persons.push({ xref: x.xref, id: m.id, target: m.target || null, isNew: !m.target, fill, conflicts, events: newEvents, how: m.how });
+    out.persons.push({ xref: x.xref, id: m.id, target: m.target || null, isNew: !m.target, fill, conflicts, events: newEvents, stories: newStories, how: m.how });
     if (out.items.length < 300) {
       out.items.push({ xref: x.xref, id: m.id, name: x.name, action: !m.target ? 'new' : conflicts.length ? 'conflict' : 'matched', how: m.how,
-        fields, conflicts: conflicts.map((c) => ({ field: c.field, current: c.current, incoming: c.incoming })), events: newEvents.length });
+        fields, conflicts: conflicts.map((c) => ({ field: c.field, current: c.current, incoming: c.incoming })), events: newEvents.length, stories: newStories.length });
     }
   }
 
@@ -658,4 +696,4 @@ function planImport(doc, ctx) {
 }
 
 module.exports = { parseGedDate, gedDateOut, readGedcom, buildExport, planImport, partsOf, personName, parseTree, dateFromText, dmyOut, yearOfIso,
-  LUNAR_PREFIX, GIO_PREFIX, EVEN_LABEL, CP_KINDS, PC_KINDS };
+  storyOf, LUNAR_PREFIX, GIO_PREFIX, EVEN_LABEL, CP_KINDS, PC_KINDS };

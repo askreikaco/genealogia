@@ -5,6 +5,8 @@
 // (REAUTH_MS): the client sends the person through Google again (/api/auth/google?mode=reauth) and retries.
 'use strict';
 const A = require('./accounts');
+const PR = require('./passkey-rules');
+const TF = require('./totp-routes');
 
 function mount(app, d) {
   const { pool, readSessionAll, writeSession, sameSite, H, HttpError, mail, T } = d;
@@ -35,9 +37,9 @@ function mount(app, d) {
     }
   };
   const handle = (sid) => A.sha('s:' + sid).slice(0, 20); // what the page sees instead of the session id
-  const passkeysOf = async (emails) => {
-    if (!emails.length) return [];
-    const { rows } = await pool.query('select id, label, created_at, last_used_at, transports from passkeys where account = any($1) order by created_at', [emails.map((e) => 'g:' + e)]);
+  // The account's passkeys (rows that name it by account_id; see migration 027).
+  const passkeysOf = async (aid) => {
+    const { rows } = await pool.query('select id, label, created_at, last_used_at from passkeys where account_id = $1 order by created_at', [aid]);
     return rows;
   };
   // Tell every verified email of the account about a change (new method, removed method). Never blocks the change.
@@ -56,7 +58,8 @@ function mount(app, d) {
     if (!acct) throw new HttpError(404, 'Không tìm thấy tài khoản.');
     const ids = await A.identitiesOf(pool, c.aid);
     const emails = A.verifiedEmails(ids).map((x) => x.value_norm);
-    const pks = await passkeysOf(emails);
+    const pks = await passkeysOf(c.aid);
+    const totp = await TF.statusOf(pool, c.aid);
     const { rows: sess } = await pool.query('select id, label, ip_prefix, created_at, last_seen_at from sessions where account_id = $1 and revoked_at is null order by last_seen_at desc limit 50', [c.aid]);
     const { rows: ev } = await pool.query('select kind, detail, ip_prefix, ua, at from account_events where account_id = $1 order by at desc limit 20', [c.aid]);
     const { rows: fam } = await pool.query(`select distinct on (f.id) f.id, f.slug, f.name, m.role from members m join families f on f.id = m.family_id
@@ -67,12 +70,13 @@ function mount(app, d) {
       methods: A.signInCount(ids, pks.length),
       emails: ids.filter((x) => x.type === 'email').map((x) => ({ id: String(x.id), email: x.value_norm, primary: x.is_primary, verified: !!x.verified_at })),
       linked: ids.filter((x) => x.provider_sub).map((x) => ({ id: String(x.id), type: x.type, email: x.value_norm, linked_at: x.created_at, last_used_at: x.last_used_at })),
+      totp,
       passkeys: pks.map((p) => ({ id: String(p.id), label: p.label || 'Passkey', created_at: p.created_at, last_used_at: p.last_used_at })),
       sessions: sess.map((r) => ({ id: handle(r.id), label: r.label, ip: r.ip_prefix, created_at: r.created_at, last_seen_at: r.last_seen_at, current: r.id === c.sid })),
       events: ev.map((r) => ({ kind: r.kind, detail: r.detail, at: r.at, device: r.ua, ip: r.ip_prefix })),
       families: fam.map((r) => ({ slug: r.slug, name: r.name, role: r.role })),
       // later phases, shown as "Sắp có" on the page; P2b: owners/admins will need a passkey or an authenticator app
-      soon: { phone: true, apple: true, zalo: true, facebook: true, totp: true, recovery_codes: true },
+      soon: { phone: true, apple: true, zalo: true, facebook: true },
     });
   }));
 
@@ -136,8 +140,7 @@ function mount(app, d) {
     const c = await ctx(req, res); needFresh(c);
     if (!/^\d{1,18}$/.test(req.params.id)) throw new HttpError(400, 'Mã không hợp lệ.');
     const ids = await A.identitiesOf(pool, c.aid);
-    const emails = A.verifiedEmails(ids).map((x) => x.value_norm);
-    const why = A.removeBlock(ids, req.params.id, (await passkeysOf(emails)).length);
+    const why = A.removeBlock(ids, req.params.id, (await passkeysOf(c.aid)).length);
     if (why) throw new HttpError(why === 'Không tìm thấy.' ? 404 : 409, why);
     const x = ids.find((i) => String(i.id) === req.params.id);
     await pool.query('delete from identities where account_id = $1 and id = $2', [c.aid, req.params.id]);
@@ -147,6 +150,22 @@ function mount(app, d) {
     }
     await A.event(pool, c.aid, x.type === 'email' ? 'email_removed' : x.type + '_unlinked', { value: x.value_norm }, req);
     await notify(c.aid, x.type === 'email' ? `Đã gỡ email ${x.value_norm} khỏi tài khoản` : `Đã gỡ liên kết ${x.type === 'google' ? 'Google' : x.type} (${x.value_norm})`, req);
+    res.json({ ok: true });
+  }));
+
+  // Passkeys: remove one (Cách đăng nhập). Needs a fresh sign-in; never the last way to sign in.
+  app.delete('/api/account/passkeys/:id', sameSite, HR(async (req, res) => {
+    const c = await ctx(req, res); needFresh(c);
+    if (!/^\d{1,18}$/.test(req.params.id)) throw new HttpError(400, 'Mã không hợp lệ.');
+    const ids = await A.identitiesOf(pool, c.aid);
+    const pks = await passkeysOf(c.aid);
+    const pk = pks.find((p) => String(p.id) === req.params.id);
+    if (!pk) throw new HttpError(404, 'Không tìm thấy passkey này.');
+    const why = PR.passkeyRemoveBlock(ids, pks.length);
+    if (why) throw new HttpError(409, why);
+    await pool.query('delete from passkeys where account_id = $1 and id = $2', [c.aid, req.params.id]);
+    await A.event(pool, c.aid, 'passkey_removed', { label: pk.label }, req);
+    await notify(c.aid, `Đã gỡ passkey ${pk.label}`, req);
     res.json({ ok: true });
   }));
 

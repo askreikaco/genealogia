@@ -5,6 +5,8 @@ import * as S from './store.js';
 import { openSheet } from './relui.js';
 import { confirmModal } from './ui.js';
 import { searchPeople } from './fuzzy.js';
+import { canUsePasskeys, canAddPasskey, addPasskey, signInWithPasskey } from './passkey.js';
+import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger } from './danger.js';
 
 let api = null;
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -42,6 +44,15 @@ function syncInline() {
 // ---- 1. sign-in: "Cách khác" sheet (code from a relative, or a passkey) ----
 export function wireLogin(dialogEl) {
   dialogEl.querySelector('[data-elder]')?.addEventListener('click', () => { dialogEl.close(); dialogEl.remove(); otherSheet(); });
+  // "Đăng nhập bằng passkey": shown only where the browser can do passkeys; no email typed (the passkey names the account).
+  const pk = dialogEl.querySelector('.pk-login');
+  if (pk) canUsePasskeys().then((ok) => {
+    if (!ok) return;
+    pk.hidden = false;
+    pk.querySelector('[data-pk-login]').addEventListener('click', async () => {
+      try { await passkeySignIn(); } catch (e) { pk.querySelector('.err').textContent = e.message; }
+    });
+  });
 }
 function otherSheet() {
   const d = openSheet(`<h2>Đăng nhập cách khác</h2>
@@ -89,40 +100,12 @@ function codeScreen() {
   start();
 }
 
-// ---- passkeys (WebAuthn, vendored @simplewebauthn/browser UMD; no CDN) ----
+// ---- passkeys (passkey.js: WebAuthn through the vendored browser library) ----
 const PK_FLAG = 'gp_pk_offer';
-let swaPromise = null;
-function loadWebAuthn() {
-  if (window.SimpleWebAuthnBrowser) return Promise.resolve(window.SimpleWebAuthnBrowser);
-  if (!swaPromise) swaPromise = new Promise((ok, bad) => {
-    const s = document.createElement('script');
-    s.src = '/vendor/simplewebauthn-browser.umd.min.js';
-    s.onload = () => ok(window.SimpleWebAuthnBrowser); s.onerror = () => bad(new Error('Không tải được phần vân tay.'));
-    document.head.append(s);
-  });
-  return swaPromise;
-}
-// The offer is for devices with a platform authenticator (fingerprint, Face ID, Windows Hello). Without one, a passkey
-// would only be a security key: not what the family means by "vân tay / Face ID", so no offer.
-async function passkeySupported() {
-  try {
-    if (!window.PublicKeyCredential || !(await loadWebAuthn()).browserSupportsWebAuthn()) return false;
-    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-  } catch { return false; }
-}
-async function passkeyRegister() {
-  const SWA = await loadWebAuthn();
-  const s = await call('POST', withFam('/api/passkey/register/options'), {});
-  const response = await SWA.startRegistration({ optionsJSON: s.options });
-  await call('POST', withFam('/api/passkey/register/verify'), { ch: s.ch, response });
-}
-async function passkeySignIn() {
-  const SWA = await loadWebAuthn();
-  const s = await call('POST', '/api/passkey/login/options', {});
-  const response = await SWA.startAuthentication({ optionsJSON: s.options });
-  await call('POST', '/api/passkey/login/verify', { ch: s.ch, response });
-  location.reload();
-}
+const post = (u, b) => call('POST', u, b);
+const passkeySupported = canAddPasskey;
+const passkeySignIn = async () => { await signInWithPasskey(post); location.reload(); };
+const passkeyRegister = () => addPasskey(post, famQ() ? '?' + famQ() : '');
 // Whether this device can offer a passkey for this account (signed in, platform authenticator, none yet). Checked once.
 let offerReady = false;
 async function passkeyCheck() {
@@ -222,10 +205,10 @@ async function managersSheet(id) {
   const paint = (j) => {
     d.querySelector('.rel-body').innerHTML = `<h2>Người thân quản lý</h2>
       <p class="sub">${esc(j.person.name)} · người quản lý thao tác theo quyền của mình.</p>
-      <div class="calm-list">${j.managers.map((m) => rowWith(m.name, m.email, `<button type="button" class="btn ter sm" data-rm="${esc(m.email)}">Bỏ</button>`)).join('')}</div>
+      <div class="calm-list">${j.managers.map((m) => rowWith(m.name, m.email, dangerButton('Bỏ', `data-rm="${esc(m.email)}"`, { size: 'sm' }))).join('')}</div>
       <form class="row" data-add><input class="fld" type="email" name="email" placeholder="Email người quản lý" required><button class="btn sm">Thêm</button></form>
       <p class="err" role="alert"></p>`;
-    d.querySelectorAll('[data-rm]').forEach((b) => { b.onclick = () => change(b.dataset.rm, false); });
+    d.querySelectorAll('[data-rm]').forEach((b) => { b.onclick = () => confirmDanger({ title: `Bỏ quyền quản lý của ${b.dataset.rm}?`, lose: 'Người này không còn quản lý hồ sơ này.', restore: 'Có thể thêm lại sau.', confirm: 'Bỏ quyền', onConfirm: () => change(b.dataset.rm, false) }); });
     d.querySelector('[data-add]').onsubmit = (e) => { e.preventDefault(); change(new FormData(e.target).get('email').trim(), true); };
   };
   const change = async (email, on) => {

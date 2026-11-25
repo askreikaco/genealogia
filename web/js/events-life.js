@@ -12,7 +12,7 @@
 // (no duplicate). Every derived row points at the person it is about (person_id), and follows that person's
 // privacy: visible(data) false -> left out (living relatives are for members only).
 import { historyItems, KEY_HISTORY } from './events-history.js';
-import { startDays, endDays, eventDays, birthIso, isoOfDied } from './events.js';
+import { startDays, endDays, eventDays, birthIso, isoOfDied, sortEvents } from './events.js';
 
 const nm = (d) => (d && d.name) || '';
 const yearOf = (iso) => (iso ? Number(String(iso).slice(0, 4)) : null);
@@ -43,11 +43,12 @@ export function legacyAccess(persons) {
   };
 }
 
-// Death of a record as an event date: died "1990" or "5/3/1990"; no year -> null.
+// Death and birth of a record as event dates. A year that is not recorded gives no row (relatives get none; the
+// person's own estimate is estimatedLifeRows).
 function deathEv(d) {
   if (!d) return null;
   const iso = isoOfDied(d.died);
-  return iso ? { date_kind: d.died && /^~|khoảng/i.test(String(d.died)) ? 'about' : 'exact', date_from: iso } : null;
+  return iso ? { date_kind: /^~|khoảng/i.test(String(d.died)) ? 'about' : 'exact', date_from: iso } : null;
 }
 function birthEv(d) {
   const iso = birthIso(d);
@@ -67,7 +68,8 @@ export function deriveLifeEvents(personId, persons, { rel = null, eventsOf = () 
     const od = persons.get(otherId);
     if (otherId !== personId && (!od || !visible(od))) return;
     out.push({ id: `d:${group}:${type}:${otherId}:${ev.date_from}`, derived: true, group, type, person_id: otherId, label,
-      date_kind: ev.date_kind || 'exact', date_from: ev.date_from, date_to: ev.date_to || null, place: ev.place || '' });
+      date_kind: ev.date_kind || 'exact', date_from: ev.date_from, date_to: ev.date_to || null, place: ev.place || '',
+      ...(ev.name ? { names: [ev.name] } : {}) });
   };
   const kin = (d, m, f) => (d && d.sex === 'f' ? f : m);
 
@@ -104,7 +106,8 @@ export function deriveLifeEvents(personId, persons, { rel = null, eventsOf = () 
     else { const p = R.partners(cid).find((x) => x.start_year); if (p) add('desc', 'cuoi', `Con ${nm(cd)} kết hôn`, cid, { date_kind: 'exact', date_from: String(p.start_year) }); }
     for (const gid of R.children(cid)) {
       const gd = persons.get(gid); if (!gd) continue;
-      add('desc', 'sinh', `Cháu ${nm(gd)} ra đời · con của ${nm(cd)}`, gid, birthEv(gd));
+      const gb = birthEv(gd);
+      add('desc', 'sinh', `Cháu ${nm(gd)} ra đời · con của ${nm(cd)}`, gid, gb && { ...gb, name: `${nm(gd)} · con của ${nm(cd)}` });
     }
   }
 
@@ -116,7 +119,28 @@ export function deriveLifeEvents(personId, persons, { rel = null, eventsOf = () 
     if (e.person_id === personId && stored.some((s) => s.type === e.type && yearOf(s.date_from) === yearOf(e.date_from))) return false;
     return true;
   });
-  return inLifetime(uniq, me, { today, stored });
+  return collapseGrandchildren(sortEvents(inLifetime(uniq, me, { today, stored })));  // chronological; undated last
+}
+
+// Three or more grandchildren born in the same year: one row "N cháu ra đời" (names on expand), at the first one's place.
+function collapseGrandchildren(rows) {
+  const isG = (r) => r.group === 'desc' && r.type === 'sinh' && r.label.startsWith('Cháu ');
+  const byYear = new Map();
+  for (const r of rows) if (isG(r)) { const y = yearOf(r.date_from); byYear.set(y, [...(byYear.get(y) || []), r]); }
+  const made = new Map();
+  for (const [y, list] of byYear) if (list.length >= 3) {
+    made.set(y, { ...list[0], id: `d:desc:sinh:chau:${y}`, label: `${list.length} cháu ra đời`, person_id: null, grouped: true, names: list.flatMap((r) => r.names || []) });
+  }
+  if (!made.size) return rows;
+  const out = []; const emitted = new Set();
+  for (const r of rows) {
+    if (isG(r) && made.has(yearOf(r.date_from))) {
+      const y = yearOf(r.date_from); if (!emitted.has(y)) { out.push(made.get(y)); emitted.add(y); }
+      continue;
+    }
+    out.push(r);
+  }
+  return out;
 }
 
 // End day of the person's own recorded death: a stored (not derived) 'mat' event with a date. Derived rows of
@@ -159,14 +183,17 @@ function inLifetime(rows, me, { today, stored }) {
 // Historical context rows from a pack (events-history.js), inside the lifetime window only: era/reign bands, war
 // start/end rows, single events. Marked group 'hist' (never counted as family events).
 // window: { from, to } years/ISO to use instead of the lifetime (an estimated life, estimate-graph.js).
-export function historyRows(me, pack, { today = null, events = [], regions = ['vn', 'world'], all = false, window = null } = {}) {
+// country: the family's country (families.country; null = VN). Shows that country's entries plus the world ones.
+export function historyRows(me, pack, { today = null, events = [], country = 'VN', all = false, window = null } = {}) {
+  const c = country || 'VN';
   const w = window ? { from: startDays(window.from), to: endDays(window.to) } : lifeWindow(me, { today, events });
   if (w.from === null || w.to === null) return [];
   const inside = (iso) => { const x = startDays(iso); return x !== null && x >= w.from && x <= w.to; };
   const overlaps = (a, b) => { const s = startDays(a); const e = endDays(b); return s !== null && e !== null && s <= w.to && e >= w.from; };
   const lifeStartYear = new Date(w.from * 864e5).getUTCFullYear();
-  const clampStart = (a) => (startDays(a) < w.from ? String(lifeStartYear) : a);
-  return historyItems(pack.filter((h) => regions.includes(h.region) && (all || KEY_HISTORY.has(h.id))), { inside, overlaps, clampStart })
+  const clampStart = (a) => (startDays(a) < w.from ? String(lifeStartYear).padStart(4, '0') : a); // ≥ birth year, four digits
+  const shown = (h) => h.region === 'world' || (h.country || 'VN') === c;
+  return historyItems(pack.filter((h) => shown(h) && (all || KEY_HISTORY.has(h.id))), { inside, overlaps, clampStart })
     .map((r) => ({ ...r, derived: true, group: 'hist', type: 'khac', person_id: null }));
 }
 

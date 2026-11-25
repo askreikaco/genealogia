@@ -45,6 +45,20 @@ async function scoreAll(q, { family = '', min = 0 } = {}) {
   return { people: people.length, pairs: pairs.length, scored, skipped, alreadyLinked };
 }
 
+// Candidate pairs of ONE tree: duplicates inside the tree (merge.js). Same scoring; persons of this tree only.
+// Returns { scored, skipped } best first; nothing is written here (store() writes).
+async function scoreWithin(q, fam, { min = 0 } = {}) {
+  const people = await loadPeople(q, [fam]);
+  const { pairs, skipped } = R.withinPairs(people);
+  const scored = [];
+  for (const [a, b] of pairs) {
+    const r = R.scorePair(a, b, { sameTree: true });
+    if (r.score >= min) scored.push({ a, b, score: r.score, reasons: r.reasons });
+  }
+  scored.sort((x, y) => y.score - x.score || x.a.id.localeCompare(y.a.id));
+  return { scored, skipped };
+}
+
 // Store pairs at or above `min` (default MIN). Idempotent: a 'new' row gets the fresh score; a dismissed or linked
 // pair keeps its status. Returns { inserted, updated, kept }.
 async function store(q, scored, min = R.MIN) {
@@ -64,4 +78,4 @@ async function store(q, scored, min = R.MIN) {
   return { inserted, updated, kept };
 }
 
-module.exports = { loadPeople, scoreAll, store };
+module.exports = { loadPeople, scoreAll, scoreWithin, store };

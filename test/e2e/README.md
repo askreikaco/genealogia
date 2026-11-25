@@ -19,6 +19,8 @@ Tests skip (with a reason) when playwright, Chrome or the database URL is missin
 
 | file | what it checks | needs DB |
 |---|---|---|
+| `trash-pages.test.js` | Thùng rác: undo toast restores an event, person delete shows its impact and needs a reason, a big delete waits for a second admin, the trash page restores; screenshots 390 light/dark | yes |
+| `danger-pages.test.js` | event editor is a page (back, sticky Hủy · Lưu, sources as cards), delete only in the danger zone and confirmed (Escape cancels), person delete asks to type the name; screenshots 390 light/dark | yes |
 | `hidden-controls-guest.test.js`, `-member.test.js`, `-editor.test.js` | no interactive element is in the DOM but invisible (outside closed dialogs and collapsed form sections) on every route, for one role | no |
 | `hidden-controls-shell.test.js` | book.html has no hidden element; only the active nav layout is in the DOM at 390 and 1280 px | no |
 | `form-fields.test.js` | person form: fields per role, prefills, dates, death fields, suggest mode, saves that keep unopened sections, draft restored into a closed section | no (mocked API) |

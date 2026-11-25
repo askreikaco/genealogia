@@ -76,6 +76,10 @@ test('owner of both trees: "Có thể là cùng một người" with reasons; li
       await page.waitForSelector('#mtpend .mt-pend', { timeout: 15000 });
       const sec = page.locator('#mtpend .mt-pend');
       assert.match(await sec.locator('h2').innerText(), /Có thể là cùng một người/);
+      // The review page is redrawn on every store sync ("Đang đồng bộ" -> "Đã đồng bộ"), and a redraw empties the
+      // section for a moment: wait until the sync is done and the two rows are back, then count (count() does not wait).
+      await page.waitForFunction(() => document.querySelector('#sync')?.textContent.includes('Đã đồng bộ'), null, { timeout: 15000 });
+      await page.waitForFunction(() => document.querySelectorAll('#mtpend .mt-pend .mt-row').length === 2, null, { timeout: 10000 }).catch(() => {});
       assert.equal(await sec.locator('.mt-row').count(), 2);
       const wife = sec.locator('.mt-row', { hasText: 'Bùi Thị Hiền' });
       assert.match(await wife.innerText(), /Họ Bùi Thử/); assert.match(await wife.innerText(), /cùng họ tên/); assert.match(await wife.innerText(), /khớp \d+%/);

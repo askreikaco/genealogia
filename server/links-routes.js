@@ -2,12 +2,13 @@
 // other tree for the link sheet. Rules in links-rules.js. Mounted by server.js. History rows go on both persons.
 'use strict';
 const L = require('./links-rules');
+const CR = require('./claim-rules');
 
 const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
 const yearOf = (v) => { const m = /(\d{4})/.exec(String(v || '')); return m ? m[1] : ''; };
 
 function mount(app, d) {
-  const { pool, who, famOf, findFamily, canRead, H, HttpError } = d;
+  const { pool, who, famOf, findFamily, canRead, H, HttpError, readSession } = d;
   const personRow = async (q, id) => (await q.query('select id, family_id, deleted, data from persons where id=$1', [id])).rows[0] || null;
   const famLabel = (f) => f.short_name || f.name;
   const hist = (q, personId, label, oldV, newV, by) => q.query(
@@ -68,7 +69,8 @@ function mount(app, d) {
         if (!lk) throw new HttpError(404, 'Không tìm thấy liên kết.');
         if (lk.status !== 'pending') throw new HttpError(409, 'Liên kết này đã được xử lý.');
         const wB = await who(req, lk.b_family);
-        if (!L.canDecide(wB.role)) throw new HttpError(wB.email || wB.code ? 403 : 401, 'Chỉ Chủ họ hoặc Quản trị của cây nhận duyệt được.');
+        const appAdmin = CR.isAppAdmin(readSession(req)?.email, CR.appAdmins(process.env.GP_APP_ADMINS)); // an app admin decides any pending link (claim-rules canDecideLink)
+        if (!CR.canDecideLink({ roleB: wB.role, appAdmin })) throw new HttpError(wB.email || wB.code ? 403 : 401, 'Chỉ Chủ họ hoặc Quản trị của cây nhận duyệt được.');
         const by = actor(wB); const status = action === 'accept' ? 'accepted' : 'rejected';
         await client.query('update person_links set status=$2, accepted_by=$3, decided_at=now() where id=$1', [id, status, by]);
         if (status === 'accepted') {
@@ -93,14 +95,17 @@ function mount(app, d) {
       if (!lk) throw new HttpError(404, 'Không tìm thấy liên kết.');
       const wA = await who(req, lk.a_family); const wB = await who(req, lk.b_family);
       if (!L.canRemove(wA.role, wB.role)) throw new HttpError(wA.email || wA.code ? 403 : 401, 'Chỉ Chủ họ hoặc Quản trị của một trong hai cây gỡ được.');
+      const TR = require('./trash'); const wT = isTopRole(wA) ? wA : wB;
+      await TR.brake((await findFamily(isTopRole(wA) ? lk.a_family : lk.b_family)) || { id: lk.a_family, slug: lk.a_family, name: lk.a_family }, wT);
       await client.query('delete from person_links where id=$1', [id]);
+      const trashId = await TR.put(client, { famId: isTopRole(wA) ? lk.a_family : lk.b_family, kind: 'person_link', itemId: id, personId: isTopRole(wA) ? lk.a_person : lk.b_person, label: 'Liên kết với cây khác', rows: [lk], w: wT, by: actor(wT) });
       if (lk.status === 'accepted') {
         const by = actor(isTopRole(wA) ? wA : wB);
         await hist(client, lk.a_person, 'Liên kết với cây khác', true, null, by);
         await hist(client, lk.b_person, 'Liên kết với cây khác', true, null, by);
       }
       await client.query('commit');
-      res.json({ ok: true });
+      res.json({ ok: true, trash_id: trashId });
     } catch (e) { await client.query('rollback').catch(() => {}); throw e; } finally { client.release(); }
   }));
   const isTopRole = (w) => L.isTop(w.role);

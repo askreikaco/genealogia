@@ -4,6 +4,7 @@
 // remove one that is not shown. Fetched per person when a profile is drawn (cached a minute), not stored offline.
 import { esc } from './model.js';
 import { toast } from './ui.js';
+import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger } from './danger.js';
 
 export const FIELDS = { name: 'Họ tên', born: 'Năm sinh', died: 'Năm mất', birth_place: 'Nơi sinh', place: 'Nơi sống', burial: 'An táng' };
 export const QUALITY = { rat_thap: 'rất thấp', thap: 'thấp', binh_thuong: 'bình thường', cao: 'cao', rat_cao: 'rất cao' };
@@ -45,7 +46,7 @@ function itemHtml(x, canEdit) {
   const meta = [x.by ? `Ghi bởi ${esc(x.by)}` : '', x.at ? fmtAt(x.at) : '', `tin cậy: ${esc(QUALITY[x.quality] || x.quality)}`].filter(Boolean).join(' · ');
   return `<li class="var-item${x.chosen ? ' on' : ''}" data-vid="${x.id}"><div class="var-hd"><b>${esc(x.value)}</b>${x.chosen ? '<span class="tag blue sm">Đang hiển thị</span>' : ''}</div>
     <span class="sub">${esc(x.source || 'Không ghi nguồn')}</span><span class="sub">${meta}</span>
-    ${canEdit && !x.chosen ? `<div class="row"><button type="button" class="btn sm gh" data-var-use="${x.id}">Dùng giá trị này</button><button type="button" class="btn sm ter" data-var-del="${x.id}" aria-label="Xoá giá trị ${esc(x.value)}">Xoá</button></div>` : ''}</li>`;
+    ${canEdit && !x.chosen ? `<div class="row"><button type="button" class="btn sm gh" data-var-use="${x.id}">Dùng giá trị này</button>${dangerButton('Xoá', `data-var-del="${x.id}" aria-label="Xoá giá trị ${esc(x.value)}"`, { size: 'sm' })}</div>` : ''}</li>`;
 }
 const addForm = (field) => `<details class="var-add"><summary class="btn sm gh">+ Thêm giá trị khác</summary><div class="form-stack">
   <label>${esc(FIELDS[field])}<input data-var-value maxlength="200" autocomplete="off"></label>
@@ -80,7 +81,7 @@ export function openSheet({ fam, personId, personName, field, done }) {
     }
     const del = e.target.closest('[data-var-del]');
     if (del) {
-      try { await api(`/api/variants/${del.dataset.varDel}?${famQ(fam)}`, { method: 'DELETE' }); await reload('Đã xoá giá trị.'); } catch (x) { fail(x); }
+      const vid = del.dataset.varDel; confirmDanger({ title: 'Xoá giá trị này?', lose: 'Giá trị khác này bị xoá khỏi danh sách.', confirm: 'Xoá vĩnh viễn', onConfirm: async () => { await api(`/api/variants/${vid}?${famQ(fam)}`, { method: 'DELETE' }); await reload('Đã xoá giá trị.'); } });
       return;
     }
     if (e.target.closest('[data-var-save]')) {

@@ -6,6 +6,8 @@
 // is a member there). Nobody else learns that the pair exists.
 'use strict';
 const L = require('./links-rules');
+const M = require('./match-store');
+const RULES = require('./match-rules');
 
 const yearOf = (v) => { const m = /(\d{4})/.exec(String(v || '')); return m ? m[1] : ''; };
 const years = (d) => [yearOf(d.born || d.birth_date), yearOf(d.died || d.death_date)].filter(Boolean).join('–');
@@ -38,7 +40,7 @@ function mount(app, d) {
     const f = await famOf(req); const w = await who(req, f.id);
     if (!EDIT.includes(w.role)) throw new HttpError(w.email || w.code ? 403 : 401, 'Cần quyền biên tập ở cây này.');
     const r = await rowFor(pool, id);
-    if (!r || (r.a_family !== f.id && r.b_family !== f.id)) throw new HttpError(404, 'Không tìm thấy đề xuất.');
+    if (!r || (r.a_family !== f.id && r.b_family !== f.id) || r.a_family === r.b_family) throw new HttpError(404, 'Không tìm thấy đề xuất.');
     const v = await viewOf(req, r, f.id); if (!v) throw new HttpError(404, 'Không tìm thấy đề xuất.');
     return { f, w, r, v };
   }
@@ -48,12 +50,40 @@ function mount(app, d) {
     if (!EDIT.includes(w.role)) throw new HttpError(w.email || w.code ? 403 : 401, 'Cần quyền biên tập ở cây này.');
     const { rows } = await pool.query(`select s.*, pa.data a_data, pb.data b_data from match_suggestions s
       join persons pa on pa.id = s.a_person and not pa.deleted join persons pb on pb.id = s.b_person and not pb.deleted
-      where (s.a_family = $1 or s.b_family = $1) and s.status = 'new' order by s.score desc, s.id limit 200`, [f.id]);
+      where (s.a_family = $1 or s.b_family = $1) and s.a_family <> s.b_family and s.status = 'new' order by s.score desc, s.id limit 200`, [f.id]);
     const items = [];
     for (const r of rows) { const v = await viewOf(req, r, f.id); if (v) items.push(v); }
     res.json({ items });
   }));
 
+  // "Có thể trùng" inside this tree (merge.js): pairs of the tree's own people, computed from the match engine on request
+  // (idempotent, stored like the cross-tree ones). A dismissed pair is never shown again. Editors and above only.
+  app.get('/api/duplicates', H(async (req, res) => {
+    const f = await famOf(req); const w = await who(req, f.id);
+    if (!EDIT.includes(w.role)) throw new HttpError(w.email || w.code ? 403 : 401, 'Cần quyền biên tập ở cây này.');
+    const { scored } = await M.scoreWithin(pool, f.id, { min: RULES.MIN });
+    await M.store(pool, scored);
+    const { rows } = await pool.query(`select s.*, pa.data a_data, pb.data b_data from match_suggestions s
+      join persons pa on pa.id = s.a_person and not pa.deleted join persons pb on pb.id = s.b_person and not pb.deleted
+      where s.a_family = $1 and s.b_family = $1 and s.status = 'new' order by s.score desc, s.id limit 100`, [f.id]);
+    // a pair with an open merge vote (decisions.js) is shown as waiting, not offered again
+    const open = new Set((await pool.query(`select subject_ref, payload->>'keep' as keep from decisions
+      where family_id=$1 and kind='merge_person' and state='open'`, [f.id])).rows.flatMap((x) => [x.subject_ref, x.keep]));
+    const items = rows.map((r) => ({ id: r.id, score: Number(r.score), reasons: r.reasons || [], status: r.status,
+      pending: open.has(r.a_person) || open.has(r.b_person),
+      a: { id: r.a_person, name: r.a_data.name || '', years: years(r.a_data) }, b: { id: r.b_person, name: r.b_data.name || '', years: years(r.b_data) } }));
+    res.json({ items, family: f.id });
+  }));
+  app.post('/api/duplicates/:id/dismiss', H(async (req, res) => {
+    const f = await famOf(req); const w = await who(req, f.id);
+    if (!EDIT.includes(w.role)) throw new HttpError(w.email || w.code ? 403 : 401, 'Cần quyền biên tập ở cây này.');
+    const id = Number(req.params.id);
+    const r = (await pool.query('select * from match_suggestions where id=$1 and a_family=$2 and b_family=$2', [id || 0, f.id])).rows[0];
+    if (!r) throw new HttpError(404, 'Không tìm thấy gợi ý.');
+    if (r.status !== 'new') throw new HttpError(409, 'Gợi ý này đã được xử lý.');
+    await pool.query("update match_suggestions set status='dismissed', decided_by=$2, decided_at=now() where id=$1", [id, actor(w)]);
+    res.json({ ok: true });
+  }));
   app.post('/api/match-suggestions/:id/dismiss', H(async (req, res) => {
     const { w, r } = await gate(req, Number(req.params.id));
     if (r.status !== 'new') throw new HttpError(409, 'Đề xuất này đã được xử lý.');

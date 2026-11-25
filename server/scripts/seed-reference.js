@@ -7,6 +7,7 @@
 // Spec: { "trees": [ { slug, name, surname, han, country, visibility, tags, source, persons: [...], links: [...] } ] }
 //   person: { ref (QID), name, alt_names: [], sex ('m'|'f'|''), born, died, note, source_url }
 //   link:   { parent, child } (parent-child, by QID) | { a, b, kind: 'couple' } (spouses, by QID)
+//   emblem (optional): a PNG file next to the spec (family_emblems, the app's emblem image; PNG only, 256 KB at most)
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -18,6 +19,8 @@ const REF_NAME = 'Tài khoản tham khảo (Wikidata)';
 const WHO = 'seed-reference';
 const QID = /^Q\d+$/;
 const SLUG = /^ref-[a-z0-9-]{3,60}$/;
+const EMBLEM_MAX = 256 * 1024;
+const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 if (!process.env.DATABASE_URL) { // read only DATABASE_URL from the repo-root .env (never printed)
   const envFile = path.resolve(__dirname, '..', '..', '.env');
@@ -34,6 +37,11 @@ function loadSpec(file) {
     if (!SLUG.test(t.slug || '')) throw new Error(`bad slug "${t.slug}": use ref-<a-z0-9->`);
     if (!t.name) throw new Error(`${t.slug}: name missing`);
     if (t.visibility !== 'public') throw new Error(`${t.slug}: visibility must be 'public'`);
+    if (t.emblem) { // read here, once: a PNG (magic checked, as the server does), 256 KB at most
+      const buf = fs.readFileSync(path.resolve(path.dirname(file), t.emblem));
+      if (buf.length > EMBLEM_MAX || !buf.subarray(0, 8).equals(PNG_SIG)) throw new Error(`${t.slug}: emblem must be a PNG of at most 256 KB`);
+      t.emblemData = buf;
+    }
     if (!Array.isArray(t.persons) || !t.persons.length) throw new Error(`${t.slug}: no persons`);
     const refs = new Set();
     for (const p of t.persons) {
@@ -102,7 +110,7 @@ function hasCycle(pairs) {
 }
 
 async function planTree(q, t, hasCountry) {
-  const plan = { slug: t.slug, name: t.name, country: t.country || null, conflicts: [], warnings: [], family: null, persons: [], pc: [], cp: [], ids: new Map() };
+  const plan = { slug: t.slug, name: t.name, country: t.country || null, conflicts: [], warnings: [], family: null, emblem: null, persons: [], pc: [], cp: [], ids: new Map() };
   const f = (await q.query('select id, name, han from families where id = $1 or slug = $1', [t.slug])).rows[0];
   if (f) {
     const own = (await q.query("select 1 from members where family_id = $1 and email = $2 and role = 'owner' and status = 'active'", [t.slug, REF_EMAIL])).rowCount;
@@ -113,6 +121,11 @@ async function planTree(q, t, hasCountry) {
     plan.family = { action: 'create' };
   }
   if (!hasCountry && t.country) plan.warnings.push(`families.country column missing: ${t.country} not stored`);
+  if (t.emblemData) {
+    const cur = (await q.query("select encode(sha256(data), 'hex') h from family_emblems where family_id = $1", [t.slug])).rows[0];
+    const want = crypto.createHash('sha256').update(t.emblemData).digest('hex');
+    plan.emblem = { action: !cur ? 'create' : cur.h === want ? 'skip' : 'update' };
+  }
 
   for (const p of t.persons) {
     const data = personData(p, t);
@@ -173,6 +186,10 @@ async function applyTree(c, plan, t, accountId, hasCountry) {
     await c.query('update families set name = $2, han = $3, updated_at = now() where id = $1', [t.slug, t.name, t.han || null]);
   }
   if (hasCountry && t.country) await c.query('update families set country = $2 where id = $1', [t.slug, t.country]);
+  if (plan.emblem && plan.emblem.action !== 'skip') {
+    await c.query(`insert into family_emblems (family_id, mime, data, updated_at) values ($1, 'image/png', $2, now())
+      on conflict (family_id) do update set mime = excluded.mime, data = excluded.data, updated_at = now()`, [t.slug, t.emblemData]);
+  }
 
   for (const p of plan.persons) {
     if (p.action === 'create') {
@@ -218,11 +235,12 @@ async function applyTree(c, plan, t, accountId, hasCountry) {
     for (const { t, plan } of plans) {
       const count = (arr) => ({ create: arr.filter((x) => x.action === 'create').length, update: arr.filter((x) => x.action === 'update').length, skip: arr.filter((x) => x.action === 'skip').length, conflict: arr.filter((x) => x.action === 'conflict').length });
       const P = count(plan.persons); const L = count(plan.pc); const C = count(plan.cp);
+      const E = plan.emblem ? plan.emblem.action : null;
       // TOTAL counts what would be written; a tree with conflicts is written by no run, so it adds its conflicts only
       const writes = plan.conflicts.length ? { create: 0, update: 0, skip: 0 } : {
-        create: P.create + L.create + C.create + (plan.family.action === 'create' ? 1 : 0),
-        update: P.update + (plan.family.action === 'update' ? 1 : 0),
-        skip: P.skip + L.skip + C.skip + (plan.family.action === 'skip' ? 1 : 0),
+        create: P.create + L.create + C.create + (plan.family.action === 'create' ? 1 : 0) + (E === 'create' ? 1 : 0),
+        update: P.update + (plan.family.action === 'update' ? 1 : 0) + (E === 'update' ? 1 : 0),
+        skip: P.skip + L.skip + C.skip + (plan.family.action === 'skip' ? 1 : 0) + (E === 'skip' ? 1 : 0),
       };
       for (const [k, v] of Object.entries({ ...writes, conflict: P.conflict })) tot[k] += v;
       console.log(`\n[${plan.slug}] ${plan.name}${plan.country ? ` (${plan.country})` : ''}`);
@@ -230,6 +248,7 @@ async function applyTree(c, plan, t, accountId, hasCountry) {
       console.log(`  persons       create ${P.create} | update ${P.update} | skip ${P.skip} | conflict ${P.conflict}`);
       console.log(`  parent_child  create ${L.create} | skip ${L.skip}`);
       console.log(`  couple        create ${C.create} | skip ${C.skip}`);
+      if (E) console.log(`  emblem        ${E}`);
       for (const w of plan.warnings) console.log(`  WARN ${w}`);
       for (const x of plan.conflicts) console.log(`  CONFLICT ${x}`);
       if (plan.conflicts.length && apply) console.log('  -> tree skipped (conflicts): nothing written for it');

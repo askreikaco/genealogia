@@ -1,9 +1,12 @@
-// App update notice: a new deploy while the app is open. No imports, so server/test/update.test.js can load it in a vm.
-// Rules: a new version found while the app is open shows "Có bản mới · Tải lại" (the notice); an idle app applies it
-// on the next open, when it comes back to the foreground, on a manual check, and at least once a day; never while a
-// form has unsaved changes or a dialog is open (isIdle).
+// App update: a new deploy while the app is open. No imports, so server/test/update.test.js can load it in a vm.
+// Rules: the server is asked which build is live at start, when the app comes back to the foreground, and at most once
+// a day (a manual check always asks). A newer build is applied by itself when the app is idle (no form with unsaved
+// input, no dialog open): at once on start, return or a manual check; on the next navigation or when the app is hidden
+// if the browser found it while open. Busy: the notice "Có bản mới · Tải lại" shows and nothing reloads. A pending update
+// is applied on an idle moment a day after it was found.
 const DAY_MS = 24 * 60 * 60 * 1000;
-const SINCE_KEY = 'gp-upd-since'; // when the pending update was first seen (localStorage; per device)
+const SINCE_KEY = 'gp-upd-since';   // when the pending update was first seen (localStorage; per device)
+const CHECKED_KEY = 'gp-upd-checked'; // when the server was last asked for its build (localStorage; the once-a-day throttle)
 // The build this page was shipped with. Placeholder on master ("gp-dev"): the deploy stamps the release version
 // (gp-X.Y.Z, from the git tag, see .github/workflows/deploy.yml) into the deployed copy of this file and sw.js.
 // /api/version reports sw.js's V, so a different one means a newer build is live.
@@ -42,18 +45,23 @@ export function buildLabel(build) {
 // now() -> ms.
 export function createUpdater(deps) {
   const st = { pending: false, latest: null };
-  const since = () => { try { return Number(deps.store.get(SINCE_KEY)) || 0; } catch { return 0; } };
-  const remember = (v) => { try { deps.store.set(SINCE_KEY, v); } catch { /* private window: the daily rule waits for a fresh start */ } };
+  const num = (k) => { try { return Number(deps.store.get(k)) || 0; } catch { return 0; } };
+  const put = (k, v) => { try { deps.store.set(k, v); } catch { /* private window: the daily rules wait for a fresh start */ } };
+  const since = () => num(SINCE_KEY);
+  const remember = (v) => put(SINCE_KEY, v);
 
   function apply() { st.pending = false; remember(''); deps.showNotice(false); deps.applyNow(); }
 
-  // why: 'open' (app started), 'visible' (came back), 'manual' (Kiểm tra cập nhật), 'detect' (found while open).
+  // why: 'open' (app started), 'visible' (came back), 'hide' (going to the background), 'nav' (another page of the app),
+  // 'manual' (Kiểm tra cập nhật), 'detect' (the browser found a new worker while open).
+  // Idle: applied at once, except 'detect', which waits silently for nav, hide, open or visible (or a day, see above).
+  // Busy: the notice shows.
   function decide(why) {
     if (!st.pending) return;
+    const idle = deps.isIdle();
     const daily = since() > 0 && deps.now() - since() >= DAY_MS;
-    const quiet = why === 'open' || why === 'visible' || why === 'manual' || daily;
-    if (quiet && deps.isIdle()) return apply();
-    deps.showNotice(true);
+    if (idle && (why !== 'detect' || daily)) return apply();
+    deps.showNotice(!idle);
   }
 
   function markPending(why) {
@@ -61,11 +69,15 @@ export function createUpdater(deps) {
     decide(why);
   }
 
-  // Asks the server which build is live. A newer one than this page's build means a deploy went out.
+  // Asks the server which build is live, at most once a day (a manual check always asks). A newer one than this page's
+  // build means a deploy went out. Only a successful answer starts the day, so an offline app asks again later.
   async function check(why) {
+    const last = num(CHECKED_KEY);
+    if (why !== 'manual' && last && deps.now() - last < DAY_MS) return { ok: true, skipped: true, newer: false };
     let v;
     try { v = await deps.fetchVersion(); } catch { return { ok: false }; }
     if (!v || !v.v) return { ok: false };
+    put(CHECKED_KEY, String(deps.now()));
     st.latest = v;
     if (isNewer(deps.build, v.v)) { markPending(why); return { ok: true, newer: true, v }; }
     return { ok: true, newer: false, v };

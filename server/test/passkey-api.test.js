@@ -186,3 +186,66 @@ test('thay mặt: the manager writes on behalf of the person (history says so); 
   const hp = await pool.query("select by_user from history where person_id=$1 and new_value::text like '%Nơi plain%' limit 1", [PID]);
   assert.equal(hp.rows[0].by_user.includes('thay mặt'), false);
 });
+
+test('fresh sign-in: a Google account adds a passkey only after a sign-in within ten minutes', { skip }, async () => {
+  const stale = cookieFrom(await call('POST', '/api/test/session', { email: EM.owner, name: 'Chủ', auth_age_ms: 11 * 60e3 }));
+  const o = await call('POST', `/api/passkey/register/options?family=${FAM}`, {}, stale);
+  assert.equal(o.status, 401);
+  assert.equal(o.json.reauth, true, 'the page is told to confirm the sign-in first');
+  const fresh = await signIn(EM.owner, 'Chủ');
+  const ok = await call('POST', `/api/passkey/register/options?family=${FAM}`, {}, fresh);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.options.authenticatorSelection.residentKey, 'required', 'a discoverable key: sign-in needs no email');
+  assert.equal(ok.json.options.authenticatorSelection.userVerification, 'required');
+});
+
+test('discoverable sign-in: the options name no credential; a challenge past its expiry is refused', { skip }, async () => {
+  const o = await call('POST', '/api/passkey/login/options', {});
+  assert.ok(!o.json.options.allowCredentials || o.json.options.allowCredentials.length === 0, 'no credential list');
+  assert.equal(o.json.options.userVerification, 'required');
+  await pool.query("update passkey_challenges set expires_at = now() - interval '1 second' where id = $1", [o.json.ch]);
+  const late = await call('POST', '/api/passkey/login/verify', { ch: o.json.ch, response: authenticator('127.0.0.1', base).assert(o.json.options) });
+  assert.equal(late.status, 400, 'an expired challenge is refused');
+});
+
+test('remove a passkey: refused as the last way to sign in, allowed while Google stays, needs a fresh sign-in', { skip }, async () => {
+  const cm = await signIn(EM.member, 'Thành viên');
+  const account = async () => (await call('GET', '/api/account', undefined, cm)).json;
+  const a0 = await account();
+  const google = a0.linked.find((x) => x.type === 'google');
+  assert.ok(google, 'the member has a Google sign-in');
+  const { rows: [pk] } = await pool.query('select id from passkeys where cred_id = $1', [b64u(CRED)]);
+  const stale = cookieFrom(await call('POST', '/api/test/session', { email: EM.member, name: 'Thành viên', auth_age_ms: 11 * 60e3 }));
+  const st = await call('DELETE', `/api/account/passkeys/${pk.id}`, {}, stale);
+  assert.equal(st.status, 401);
+  assert.equal(st.json.reauth, true);
+  const del = await call('DELETE', `/api/account/passkeys/${pk.id}`, {}, cm);
+  assert.equal(del.status, 200, JSON.stringify(del.json));
+  assert.equal((await account()).passkeys.length, 0);
+  // Google is now the only way in: it cannot go.
+  const gBlocked = await call('DELETE', `/api/account/identities/${google.id}`, {}, cm);
+  assert.equal(gBlocked.status, 409);
+  // Add a passkey back; with it, Google may go, and then the passkey is the last way in and cannot.
+  const o = await call('POST', `/api/passkey/register/options?family=${FAM}`, {}, cm);
+  const v = await call('POST', `/api/passkey/register/verify?family=${FAM}`, { ch: o.json.ch, response: authenticator('127.0.0.1', base).register(o.json.options) }, cm);
+  assert.equal(v.status, 200, JSON.stringify(v.json));
+  const { rows: [again] } = await pool.query('select id from passkeys where cred_id = $1', [b64u(CRED)]);
+  const gOk = await call('DELETE', `/api/account/identities/${google.id}`, {}, cm);
+  assert.equal(gOk.status, 200, JSON.stringify(gOk.json));
+  const last = await call('DELETE', `/api/account/passkeys/${again.id}`, {}, cm);
+  assert.equal(last.status, 409);
+  assert.match(last.json.error, /cách đăng nhập duy nhất/);
+});
+
+test('migration 027: a passkey saved without account_id gets its account from the verified email; running it again changes nothing', { skip }, async () => {
+  await signIn(EM.elder, 'Người thân');
+  const { rows: [ac] } = await pool.query("select account_id from identities where type = 'email' and value_norm = $1 and verified_at is not null", [EM.elder]);
+  assert.ok(ac, 'the elder account exists');
+  const legacy = 'legacy-' + TAG;
+  await pool.query("insert into passkeys (cred_id, public_key, counter, transports, account, account_id, family_id, label) values ($1, '\\x00', 0, '{}', $2, null, $3, 'Cũ')", [legacy, 'g:' + EM.elder, FAM]);
+  const sql = fs.readFileSync(path.join(__dirname, '..', 'migrations', '027_passkeys_account.sql'), 'utf8');
+  await pool.query(sql);
+  await pool.query(sql);
+  const { rows } = await pool.query('select account_id from passkeys where cred_id = $1', [legacy]);
+  assert.equal(rows[0].account_id, ac.account_id);
+});

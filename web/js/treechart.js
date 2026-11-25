@@ -70,7 +70,7 @@ export function chartSvg(M, L, selId, scale = 1, linked = new Set()) {
     const label = n.spouse ? (sx === 'f' ? 'Vợ: ' : sx === 'm' ? 'Chồng: ' : 'Vợ/chồng: ') + d.name : d.name;
     const sel = n.p.id && n.p.id === selId;
     return `<g class="cbx ${sx}${n.spouse ? ' sp' : ''}${sel ? ' sel' : ''}" ${n.p.id ? `data-sel="${n.p.id}"` : ''} transform="translate(${n.x},${n.y})" tabindex="0" role="button" aria-label="${esc(rank(d))} ${esc(d.name)}${sx === 'm' ? ', nam' : sx === 'f' ? ', nữ' : ''}${years(d).includes('~') ? ', ' + years(d).replace(/~/g, 'khoảng ') : ''}">${shape}<rect class="b" width="${BW}" height="${BH}"/><rect class="s" width="4" height="${BH}"/>
-      <text x="12" y="20" class="cn">${esc(label)}</text><text x="12" y="37" class="cm">${esc(n.spouse ? meta : rank(d) + ' · ' + meta)}</text>${n.grouped || n.spouse ? '' : spLine(n.p, d)}${n.p.id && linked.has(n.p.id) ? `<text class="clk" x="${BW - 8}" y="18" text-anchor="end"><title>Cũng có trong cây khác</title>⇄</text>` : ''}${tg}</g>`;
+      <text x="12" y="20" class="cn">${esc(label)}${d.name_han && !n.spouse ? `<tspan class="ch" lang="zh-Hant"> ${esc(d.name_han)}</tspan>` : ''}</text><text x="12" y="37" class="cm">${esc(n.spouse ? meta : rank(d) + ' · ' + meta)}</text>${n.grouped || n.spouse ? '' : spLine(n.p, d)}${n.p.id && linked.has(n.p.id) ? `<text class="clk" x="${BW - 8}" y="18" text-anchor="end"><title>Cũng có trong cây khác</title>⇄</text>` : ''}${tg}</g>`;
   };
   return `<svg class="tchart" viewBox="-4 -4 ${L.w + 8} ${L.h + 22}" width="${(L.w + 8) * scale}" height="${(L.h + 22) * scale}"><path class="cl" d="${L.paths.join('')}"/>${L.nodes.map(box).join('')}</svg>`;
 }

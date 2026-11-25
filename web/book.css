@@ -101,6 +101,7 @@ html.inapp .pages{background:var(--c-bg)}
 .eh{gap:0.667em;align-items:flex-start}
 .reg{font-size:0.952em;min-width:2.095em;height:1.714em;margin-top:1px}
 .nm{color:var(--red);font-weight:700;letter-spacing:0}
+.nhan{font-size:var(--fs-1);font-weight:400;color:var(--c-text-2)}
 .par{font-family:var(--serif);font-style:italic;font-size:0.905em;color:var(--ink2)}
 .ln{font-size:0.933em;line-height:1.5}
 .ln i,.f i{font-style:normal;color:var(--ink2);font-family:var(--sans);font-size:0.81em;margin-right:0.19em}
@@ -169,3 +170,7 @@ html[data-bk-orient=port]{--pw:595px;--ph:842px}
 
 /* person code after the name (web/js/codes.js) */
 .pcode{font-weight:400;font-size:.85em;color:var(--ink2);white-space:nowrap}
+/* the stable person code (mã người, web/js/shortid.js): own line under the name in an entry, inline in the index; Settings can hide it */
+.eh .sid{display:block;font-family:var(--mono)}
+.ie .sid{font-family:var(--mono)}
+html[data-bk-codes="0"] .sid{display:none}

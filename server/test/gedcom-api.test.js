@@ -62,6 +62,7 @@ test.after(async () => {
   await pool.query('delete from suggestions where family_id=$1', [FAM]);
   await pool.query('delete from events where family_id=$1', [FAM]);
   await pool.query('delete from parent_child where family_id=$1', [FAM]);
+  await pool.query('delete from stories where family_id=$1', [FAM]);
   await pool.query('delete from couple where family_id=$1', [FAM]);
   await pool.query('delete from relation_migrations where family_id=$1', [FAM]);
   await pool.query('delete from history where person_id in (select id from persons where family_id=$1)', [FAM]);
@@ -157,4 +158,39 @@ test('import: bad input is refused with a message', { skip }, async () => {
   const notGed = await call('POST', '/api/gedcom/import', { family: FAM, content: 'đây không phải GEDCOM\nchỉ là chữ', dry_run: true }, editorCookie);
   assert.strictEqual(notGed.status, 400);
   assert.ok(notGed.json.error.includes('Không tìm thấy người'));
+});
+
+test('stories: an export read back by import adds no story (dry run and apply), and the story is not written twice', { skip }, async () => {
+  await pool.query("insert into stories (id, family_id, person_id, kind, title, body, created_by) values ($1, $2, $3, 'chuyen', 'Chuyện thử', $4, 'test')",
+    ['S' + crypto.randomBytes(6).toString('hex'), FAM, A, 'Dòng 1\nDòng 2']);
+  const ex = await call('GET', `/api/gedcom?family=${FAM}`, undefined, memberCookie);
+  assert.strictEqual(ex.status, 200);
+  assert.ok(ex.text.includes('1 NOTE Câu chuyện: Chuyện thử\n2 CONT Dòng 1\n2 CONT Dòng 2'));
+  const dry = await call('POST', '/api/gedcom/import', { family: FAM, content: ex.text, dry_run: true }, editorCookie);
+  assert.strictEqual(dry.status, 200, dry.text);
+  assert.strictEqual(dry.json.counts.stories_new, 0);
+  assert.strictEqual(dry.json.counts.stories_same, 1);
+  const applied = await call('POST', '/api/gedcom/import', { family: FAM, content: ex.text, dry_run: false }, editorCookie);
+  assert.strictEqual(applied.status, 200, applied.text);
+  assert.strictEqual(applied.json.applied.stories_added, 0);
+  const n = (await pool.query('select count(*)::int n from stories where family_id=$1 and person_id=$2', [FAM, A])).rows[0].n;
+  assert.strictEqual(n, 1, 'still one story');
+});
+
+test('stories: a MyHeritage-style file (CONC, pointer NOTE) writes its stories once, with history', { skip }, async () => {
+  const content = ['0 HEAD', '1 GEDC', '2 VERS 5.5.1', '1 CHAR UTF-8',
+    `0 @${B}@ INDI`, '1 NAME /Trần/ Thị Bảy', '1 SEX F',
+    '1 NOTE Câu chuyện: Ngày di cư', '2 CONC  đầu tiên', '2 CONT Đoạn một',
+    '1 NOTE @N9@',
+    '0 @N9@ NOTE Câu chuyện đời: Tóm tắt', '1 CONC  đời bà', '0 TRLR'].join('\n');
+  const r = await call('POST', '/api/gedcom/import', { family: FAM, content, dry_run: false }, editorCookie);
+  assert.strictEqual(r.status, 200, r.text);
+  assert.strictEqual(r.json.applied.stories_added, 2);
+  const rows = (await pool.query('select kind, title, body from stories where family_id=$1 and person_id=$2 order by kind', [FAM, B])).rows;
+  assert.deepStrictEqual(rows, [{ kind: 'chuyen', title: 'Ngày di cư đầu tiên', body: 'Đoạn một' }, { kind: 'tom_tat', title: 'Tóm tắt đời bà', body: '' }]);
+  const hist = (await pool.query("select by_user from history where person_id=$1 and field='cau_chuyen'", [B])).rows;
+  assert.ok(hist.length === 2 && hist.every((h) => h.by_user.startsWith('nhập GEDCOM')));
+  const again = await call('POST', '/api/gedcom/import', { family: FAM, content, dry_run: false }, editorCookie);
+  assert.strictEqual(again.json.applied.stories_added, 0, 'the second apply adds nothing');
+  assert.strictEqual((await pool.query('select count(*)::int n from stories where family_id=$1 and person_id=$2', [FAM, B])).rows[0].n, 2);
 });

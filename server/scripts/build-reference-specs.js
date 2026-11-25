@@ -3,6 +3,8 @@
 // Usage (from server/): node scripts/build-reference-specs.js <datasetDir> <outDir> [--raw <cacheDir>] [--vi <viCacheDir>]
 // --raw: cached Wikidata responses of the datasets (P27, P21, P39, viwiki sitelinks).
 // --vi:  cached vi.wikipedia pageprops (pp-*.json: title -> QID) and Wikidata claims (wb-*.json) for the surname widening.
+// --myth: owner-sourced legendary people for the Japan tree (Kojiki lineage, no dates), a file in the job folder:
+//        { persons: [ dataset-shaped people with qid, label, description, source_url, sex ], edges: [ dataset edges ] }.
 // Without the caches every claim rule fails closed (no Vietnamese person, sex blank).
 // Living or unknown people are excluded (no death date and born after 1926, or no birth date). The owner-approved
 // undated Dương Tự Minh (Q10757626) is kept with the note "Không rõ năm."; other undated people need a cached era before 1926.
@@ -16,9 +18,10 @@ const args = process.argv.slice(2);
 const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
 const RAW_DIR = flag('--raw');
 const VI_DIR = flag('--vi');
-const positional = args.filter((a, i) => !a.startsWith('--') && !['--raw', '--vi'].includes(args[i - 1]));
+const MYTH_FILE = flag('--myth');
+const positional = args.filter((a, i) => !a.startsWith('--') && !['--raw', '--vi', '--myth'].includes(args[i - 1]));
 const [dir, outDir] = positional;
-if (!dir || !outDir) { console.error('usage: node scripts/build-reference-specs.js <datasetDir> <outDir> [--raw <cacheDir>] [--vi <viCacheDir>]'); process.exit(2); }
+if (!dir || !outDir) { console.error('usage: node scripts/build-reference-specs.js <datasetDir> <outDir> [--raw <cacheDir>] [--vi <viCacheDir>] [--myth <mythFile>]'); process.exit(2); }
 
 const EXCLUDE = new Map([['Q16181054', 'clan item (Hwasan Lee clan), not a person']]);
 const OWNER_UNDATED = new Set(['Q10757626']); // Dương Tự Minh: owner asked for him with "không rõ năm"
@@ -134,7 +137,7 @@ function personSpec(p, { legendary = false, sex = '', group, order, undated = fa
   const out = {
     ref: p.qid, name: vi, alt_names: alt, sex,
     note: [legendary ? 'Truyền thuyết.' : '', undated ? 'Không rõ năm.' : '', desc, extra].filter(Boolean).join(' '),
-    source_url: (viwiki && p.wikipedia?.vi) || p.wikidata_url || `https://www.wikidata.org/wiki/${p.qid}`,
+    source_url: p.source_url || (viwiki && p.wikipedia?.vi) || p.wikidata_url || `https://www.wikidata.org/wiki/${p.qid}`,
   };
   if (group !== undefined) out.group = group;
   if (order !== undefined) out.order = order;
@@ -302,14 +305,18 @@ const isDuongName = (title) => /^Dương /.test(title || '');
 // ---- Japan: imperial line ------------------------------------------------------------------------------------------
 {
   const ds = read('japan-imperial.json');
+  const myth = MYTH_FILE ? JSON.parse(fs.readFileSync(MYTH_FILE, 'utf8')) : { persons: [], edges: [] };
   const kept = ds.emperors.filter(keep);
-  const ids = new Set(kept.map((p) => p.qid));
-  const { links, dropped } = linksOf(ds.edges, ids);
+  const ids = new Set([...kept.map((p) => p.qid), ...myth.persons.map((p) => p.qid)]);
+  const { links, dropped } = linksOf([...ds.edges, ...myth.edges], ids);
   const start = (p) => reignStart(p.qid);
   const ord = (p) => (p.ordinal == null ? Infinity : p.ordinal);
   kept.sort((a, b) => (start(a) ?? Infinity) - (start(b) ?? Infinity) || ord(a) - ord(b) || a.qid.localeCompare(b.qid));
   let legendary = 0; let unknown = 0;
-  const persons = kept.map((p) => {
+  // myth people first (no dates, always legendary), then the dataset's emperors in reign order
+  const mythPersons = myth.persons.map((p) => personSpec(p, { legendary: true, sex: p.sex || '' }));
+  legendary += mythPersons.length;
+  const persons = mythPersons.concat(kept.map((p) => {
     const by = yearOf(first(p.birth));
     const noDated = !first(p.birth) && !first(p.death);
     const s = start(p);
@@ -322,15 +329,17 @@ const isDuongName = (title) => /^Dương /.test(title || '');
     const en = `${ent(p.qid).labels?.en?.value || ''} ${p.label?.en || ''}`;
     const sex = p21.includes(MALE) ? 'm' : p21.includes(FEMALE) ? 'f' : (/Empress/i.test(en) ? '' : 'm');
     return personSpec(p, { legendary: isLegend, sex });
-  });
+  }));
   const tree = {
-    slug: 'ref-jp-imperial', name: 'Hoàng tộc Nhật Bản (tham khảo)', surname: '', han: null, country: 'JP',
+    // han: the crest glyph (ui.js surnameTileOf). The imperial house has no surname: its crest is the Kikumon (菊).
+    slug: 'ref-jp-imperial', name: 'Hoàng tộc Nhật Bản (tham khảo)', surname: '', han: '菊', country: 'JP',
+    emblem: 'emblem-jp-kikumon.png', // the Imperial Seal (Commons, public domain), rendered to PNG beside the spec
     visibility: 'public', tags: TAGS,
-    source: `${SOURCE} Trước năm 539 (lên ngôi của Thiên hoàng Kinmei) đánh dấu truyền thuyết: không có ngày chính xác. Cha/mẹ thiếu giữa các đời được để trống.`,
+    source: `${SOURCE} Trước năm 539 (lên ngôi của Thiên hoàng Kinmei) đánh dấu truyền thuyết: không có ngày chính xác. Cha/mẹ thiếu giữa các đời được để trống.${MYTH_FILE ? ' Thần thoại Kojiki/Nhật Bản Thư Kỷ: bổ sung theo japan-myth.json (Wikidata, Wikipedia).' : ''}`,
     persons, links,
   };
   writeTree(tree);
-  report.push(`japan: kept ${kept.length} of ${ds.emperors.length}, legendary ${legendary}, undated and unordered ${unknown}, dropped edges ${dropped}`);
+  report.push(`japan: kept ${kept.length} of ${ds.emperors.length}, myth ${mythPersons.length}, legendary ${legendary}, undated and unordered ${unknown}, dropped edges ${dropped}`);
 }
 
 // ---- Hwasan Lý -----------------------------------------------------------------------------------------------------

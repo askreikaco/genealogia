@@ -124,10 +124,10 @@ test('history pack: shape, bands, war start/end, only inside the lifetime', asyn
   const H = await mod('events-history.js');
   assert.ok(H.HISTORY_VI.length >= 40);
   assert.equal(new Set(H.HISTORY_VI.map((x) => x.id)).size, H.HISTORY_VI.length, 'ids unique');
-  for (const x of H.HISTORY_VI) {
-    assert.ok(x.id && x.label && ['era', 'reign', 'war', 'event', 'period'].includes(x.kind) && ['vn', 'world'].includes(x.region), JSON.stringify(x));
-    assert.ok(/^\d{4}(-\d{2}(-\d{2})?)?$/.test(x.from) && (!x.to || /^\d{4}(-\d{2}(-\d{2})?)?$/.test(x.to)), JSON.stringify(x));
-    assert.ok(/^https:\/\/vi\.wikipedia\.org\//.test(x.source), x.id);
+  for (const x of H.HISTORY_ALL) {
+    assert.ok(x.id && x.label && ['era', 'reign', 'war', 'event', 'period'].includes(x.kind) && ['vn', 'world', 'jp', 'kr'].includes(x.region), JSON.stringify(x));
+    assert.ok(/^-?\d{4}(-\d{2}(-\d{2})?)?$/.test(x.from) && (!x.to || /^-?\d{4}(-\d{2}(-\d{2})?)?$/.test(x.to)), JSON.stringify(x));
+    assert.ok(/^https:\/\/(vi|en)\.wikipedia\.org\//.test(x.source), x.id);
   }
   const rows = L.historyRows({ born: '1940', died: '1980' }, H.HISTORY_VI, { today: TODAY });
   const ids = rows.map((r) => r.id);
@@ -139,7 +139,7 @@ test('history pack: shape, bands, war start/end, only inside the lifetime', asyn
   assert.ok(rows.length <= 10, 'a short list: ' + rows.length);
   const every = L.historyRows({ born: '1940', died: '1980' }, H.HISTORY_VI, { today: TODAY, all: true }).map((r) => r.id);
   for (const want of ['h:geneve-1954', 'h:paris-1973', 'h:nguyen', 'h:ww2:b']) assert.ok(every.includes(want), 'all: ' + want);
-  for (const id of H.KEY_HISTORY) assert.ok(H.HISTORY_VI.some((x) => x.id === id), 'key id exists: ' + id);
+  for (const id of H.KEY_HISTORY) assert.ok(H.HISTORY_ALL.some((x) => x.id === id), 'key id exists: ' + id);
   assert.ok(!ids.includes('h:doi-moi-1986') && !ids.includes('h:tu-duc') && !ids.includes('h:ww2:a'), 'outside the life');
   const band = rows.find((r) => r.id === 'h:bao-dai');
   assert.ok(band.band && band.date_from === '1940', 'a band that started before the birth sits at the birth year');
@@ -197,4 +197,105 @@ test('a stored mat event with a date (no died): no history rows after its end; a
   // a death date still wins over the stored mat event
   const dd = L.lifeWindow({ born: '1790', died: '1850' }, { today: TODAY, events: own });
   assert.equal(dd.to, E.endDays('1850'));
+});
+
+// Automatic timeline rows (birth, death, marriage, children, grandchildren, relatives' deaths) from one family.
+test('auto rows: 3-digit and approximate years count (941, khoảng 901); the birth row is exact or ~', async () => {
+  const L = await mod('events-life.js'); const E = await mod('events.js');
+  const fam = new Map([
+    ['S', { name: 'Vua Thử', sex: 'm', born: '941', died: '1005' }],
+    ['T', { name: 'Ông Thử Xưa', sex: 'm', born: 'khoảng 901' }],
+  ]);
+  const own = (id) => L.deriveLifeEvents(id, fam, { today: TODAY }).filter((r) => r.group === 'self');
+  const s = own('S');
+  assert.deepEqual(s.map((r) => [r.label, r.date_kind, r.date_from]), [['Ra đời', 'exact', '0941'], ['Mất', 'exact', '1005']]);
+  assert.equal(E.startDays(s[0].date_from) !== null, true, 'a 3-digit year sorts and counts');
+  const t = own('T');
+  assert.deepEqual(t.map((r) => [r.label, r.date_kind, r.date_from]), [['Ra đời', 'about', '0901']]);
+});
+
+test('auto rows: a stored event of the same type and year replaces the derived row; another year does not', async () => {
+  const L = await mod('events-life.js');
+  const fam = new Map([['S', { name: 'Ông Thử', sex: 'm', born: '1900', died: '1970' }]]);
+  const stored = (evs) => ({ eventsOf: (id) => (id === 'S' ? evs : []), today: TODAY });
+  const same = L.deriveLifeEvents('S', fam, stored([{ type: 'sinh', date_kind: 'exact', date_from: '1900-03-05' }]));
+  assert.deepEqual(same.filter((r) => r.type === 'sinh').map((r) => r.date_from), [], 'the stored 1900 birth wins');
+  const other = L.deriveLifeEvents('S', fam, stored([{ type: 'sinh', date_kind: 'exact', date_from: '1901' }]));
+  assert.deepEqual(other.filter((r) => r.type === 'sinh').map((r) => r.date_from), ['1900'], 'a different year stays');
+  const dead = L.deriveLifeEvents('S', fam, stored([{ type: 'mat', date_kind: 'exact', date_from: '1970' }]));
+  assert.deepEqual(dead.filter((r) => r.type === 'mat').map((r) => r.date_from), [], 'the stored 1970 death wins');
+});
+
+test('auto rows: children, grandchildren, spouse, parents and children deaths, sorted by date (undated last)', async () => {
+  const L = await mod('events-life.js'); const E = await mod('events.js');
+  const fam = new Map([
+    ['H', { name: 'Ông Thử Chính', sex: 'm', born: '1900', died: '1980' }],
+    ['V', { name: 'Thử Vợ', sex: 'f', born: '1904', died: '1970' }],
+    ['F', { name: 'Thử Cũ', sex: 'm', born: '1870', died: '1930', }],
+    ['K1', { name: 'Một', sex: 'm', parent: 'H', other_parent: 'V', born: '1925', died: '1975' }],
+    ['K2', { name: 'Hai', sex: 'f', parent: 'H', other_parent: 'V', born: '1930' }],
+    ['G1', { name: 'Bốn', sex: 'm', parent: 'K1', born: '1950' }],
+    ['H2', { name: 'Ông Thử Gốc', sex: 'm', born: '1900' }],
+  ]);
+  fam.set('H', { ...fam.get('H'), parent: 'F' });
+  fam.set('V', { ...fam.get('V'), spouse_of: 'H' });
+  const rows = L.deriveLifeEvents('H', fam, { today: TODAY });
+  const labels = rows.map((r) => r.label);
+  assert.ok(labels.includes('Vợ Thử Vợ mất'), 'spouse death');
+  assert.ok(labels.includes('Cha Thử Cũ mất'), 'parent death');
+  assert.ok(labels.includes('Con Một ra đời'), 'child birth');
+  assert.ok(labels.includes('Con Một mất'), 'child death');
+  assert.ok(labels.some((x) => x.startsWith('Cháu Bốn ra đời')), 'grandchild birth');
+  assert.ok(labels.includes('Con Hai ra đời'));
+  const days = rows.map((r) => E.eventDays(r));
+  assert.deepEqual(days, [...days].sort((a, b) => a - b), 'chronological');
+  // undated rows (an estimate-free relative with no year) are left out: the timeline shows dated rows only
+  assert.ok(rows.every((r) => r.date_from), 'every auto row has a date');
+});
+
+test('no row for a relative with no recorded year (relatives get no estimate); the own estimate stays on estimatedLifeRows', async () => {
+  const L = await mod('events-life.js');
+  const fam = new Map([
+    ['P', { name: 'Cha Thử', sex: 'm', born: '1880', died: '1950' }],
+    ['C', { name: 'Ẩn Năm', sex: 'm', parent: 'P' }],
+  ]);
+  const rows = L.deriveLifeEvents('P', fam, { today: TODAY });
+  assert.equal(rows.some((r) => r.person_id === 'C'), false, 'no undated child row');
+  assert.equal(rows.some((r) => r.estimated), false);
+  const own = L.estimatedLifeRows('C', { conflict: false, bornKnown: false, diedKnown: false, born: [1905, 1915], died: null, bornBasis: ['x'], diedBasis: [] }, []);
+  assert.deepEqual(own.map((r) => r.type), ['sinh'], 'the person\'s own estimate is still shown on that person');
+});
+
+test('grandchildren born in the same year (3 or more): one row "N cháu ra đời" with the names; fewer stay separate', async () => {
+  const L = await mod('events-life.js');
+  const fam = new Map([
+    ['H', { name: 'Ông Thử Gốc', sex: 'm', born: '1800', died: '1900' }],
+    ['K', { name: 'Con Thử', sex: 'm', parent: 'H', born: '1830', died: '1890' }],
+    ['G1', { name: 'An', sex: 'm', parent: 'K', born: '1850' }],
+    ['G2', { name: 'Bình', sex: 'f', parent: 'K', born: '1850' }],
+    ['G3', { name: 'Cường', sex: 'm', parent: 'K', born: '1850' }],
+    ['G4', { name: 'Dũng', sex: 'm', parent: 'K', born: '1855' }],
+  ]);
+  const rows = L.deriveLifeEvents('H', fam, { today: TODAY });
+  const merged = rows.filter((r) => r.label === '3 cháu ra đời');
+  assert.equal(merged.length, 1, 'three in 1850 become one row');
+  assert.deepEqual(merged[0].names, ['An · con của Con Thử', 'Bình · con của Con Thử', 'Cường · con của Con Thử']);
+  assert.equal(merged[0].date_from, '1850');
+  const single = rows.filter((r) => r.label.startsWith('Cháu Dũng'));
+  assert.equal(single.length, 1, 'a single grandchild in another year stays a row');
+});
+
+test('an era that starts before the birth sorts at the birth year and comes first; a 3-digit birth year is dated', async () => {
+  const L = await mod('events-life.js'); const E = await mod('events.js');
+  const pack = [{ id: 'e1', kind: 'era', label: 'Thời nhà Thử', from: '0939', to: '0965', region: 'vn' }];
+  const me = { name: 'Vua Thử', sex: 'm', born: '941', died: '1005', living: 'dead' };
+  const hist = L.historyRows(me, pack, { events: [], today: TODAY, regions: ['vn'], all: true });
+  const band = hist.find((r) => /Thời nhà Thử/.test(r.label));
+  assert.ok(band, 'the era is shown');
+  assert.notEqual(E.eventDays(band), null, 'the era has a day (not undated)');
+  assert.equal(E.yearOfDays(E.eventDays(band)), 941, 'clamped to the birth year');
+  const own = L.deriveLifeEvents('V', new Map([['V', me]]), { today: TODAY });
+  const birth = own.find((r) => r.type === 'sinh');
+  const sorted = E.sortEvents([birth, { ...band }]);
+  assert.equal(sorted[0].band, true, 'the era comes before the same-day birth');
 });

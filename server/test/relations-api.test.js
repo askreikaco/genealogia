@@ -114,7 +114,7 @@ test('add parent-child: a relative marrying a child (sibling couple) is allowed 
   const cyc = await call('POST', '/api/relations', { family: FAM, op_id: ops(3), action: 'add', kind: 'parent_child', parent_id: G1(), child_id: F1(), pc_kind: 'ruot' }, editorCookie);
   assert.equal(cyc.status, 409);
   assert.match(cyc.json.error, /đã là tổ tiên của/);
-  assert.match(cyc.json.error, /Dương Minh Quân/);
+  assert.match(cyc.json.error, /Giả Công Trí/);
 });
 
 test('edit and remove: history "Sửa quan hệ"/"Gỡ quan hệ", a removed row is gone, removing twice is 404', { skip }, async () => {
@@ -143,7 +143,7 @@ test('privacy: a private link is hidden from guests, visible to members; the leg
 
 test('person fields: a changed parent/spouse key is refused in a table family; the same value is accepted', { skip }, async () => {
   // G1 (the grandchild) keeps its parent link C1 -> G1, so parent C1 is the projected value
-  const same = await call('POST', '/api/ops', { family: FAM, ops: [{ op_id: ops(8), id: G1(), fields: { parent: C1(), name: 'Dương Minh Quân' }, ts: Date.now() }] }, editorCookie);
+  const same = await call('POST', '/api/ops', { family: FAM, ops: [{ op_id: ops(8), id: G1(), fields: { parent: C1(), name: 'Giả Công Trí' }, ts: Date.now() }] }, editorCookie);
   assert.equal(same.status, 200);
   assert.equal(same.json.applied.length, 1);
   const bad = await call('POST', '/api/ops', { family: FAM, ops: [{ op_id: ops(9), id: G1(), fields: { parent: F1() }, ts: Date.now() }] }, editorCookie);

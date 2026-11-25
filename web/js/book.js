@@ -6,6 +6,7 @@ import { figSvg } from './bookchart.js';
 import { lbar, ltags, fpanel, setUntag, cic, familyCrest } from './ui.js';
 import { isDead } from './model.js';
 import { tx, childOf, kinRegionPref, setKinRegion, LANGS, REGIONS } from './booktext.js';
+import { formatSid } from './shortid.js';
 
 const qs = new URLSearchParams(location.search);
 const EMBED = qs.get('embed') === '1';
@@ -21,7 +22,7 @@ const Q = {
 };
 const CHI = Q.root;
 // Settings (Cài đặt), per device: applied before the first render. Layout and hide-living change the page, so they reload.
-const PREF_DEF = { theme: 'classic', font: 'serif', size: 'm', layout: 'branch', hideLiving: false, lang: 'vi', orient: 'land' };
+const PREF_DEF = { theme: 'classic', font: 'serif', size: 'm', layout: 'branch', hideLiving: false, showCodes: true, lang: 'vi', orient: 'land' };
 const PREF_OK = { theme: ['classic', 'calm', 'modern'], font: ['serif', 'sans'], size: ['s', 'm', 'l'], layout: ['branch', 'gen', 'summary'], lang: LANGS, orient: ['land', 'port'] };
 // Cách gọi: the app's kinRegion setting (not a book pref), read once here
 let REGION = kinRegionPref();
@@ -31,10 +32,11 @@ try {
   const raw = JSON.parse(localStorage.getItem('bookPrefs') || '{}');
   for (const k of Object.keys(PREF_OK)) if (PREF_OK[k].includes(raw[k])) PREF[k] = raw[k];
   PREF.hideLiving = raw.hideLiving === true;
+  PREF.showCodes = raw.showCodes !== false; // on unless switched off
 } catch {}
 const savePref = (patch) => { PREF = { ...PREF, ...patch }; try { localStorage.setItem('bookPrefs', JSON.stringify(PREF)); } catch {} };
 const applyPrefs = () => {
-  const d = document.documentElement.dataset; d.bkTheme = PREF.theme; d.bkFont = PREF.font; d.bkSize = PREF.size; d.bkOrient = PREF.orient; document.documentElement.lang = PREF.lang;
+  const d = document.documentElement.dataset; d.bkTheme = PREF.theme; d.bkFont = PREF.font; d.bkSize = PREF.size; d.bkOrient = PREF.orient; d.bkCodes = PREF.showCodes ? '1' : '0'; document.documentElement.lang = PREF.lang;
   // print uses the same paper: the @page size follows Khổ (the stylesheet has the landscape default)
   let st = document.getElementById('bkpage');
   if (PREF.orient === 'port') { if (!st) { st = document.createElement('style'); st.id = 'bkpage'; document.head.append(st); } st.textContent = '@page{size:A4 portrait;margin:0}'; } else st?.remove();
@@ -122,7 +124,7 @@ function entryHtml(id, reg, kids, txt) {
   const stories = txt?.st?.length && P(id) === persons.get(id) ? txt.st.map((x) => `<p class="stp">${mentionHtml(x.t, x.m)}</p>`).join('') : '';
   // a spouse with their own data: one summary line under the partner's Vợ/Chồng line (name, years, place)
   const spLines = head ? (txt?.sp || []).filter((id) => P(id)).map((id) => { const q = P(id); return `<div class="ln sp" data-sp="${esc(id)}"><i>${d.sex === 'f' ? T('husband') : T('wife')}</i> ${esc(q.name)}${years(q) ? ' (' + years(q) + ')' : ''}${q.place ? ' · ' + esc(q.place) : ''}</div>`; }).join('') : '';
-  const headHtml = head ? `<div class="eh"><span class="reg">${reg ?? ''}</span><div><span class="rank">${esc(rank(d))}</span> <span class="nm">${esc(d.name)}</span>${PREG[id] && d.parent ? ` <span class="pcode">· ${T('childOfReg')} <a class="xr" href="#${anc(d.parent)}">${PREG[id]}</a></span>` : ''}</div></div>${d.photo ? `<img class="ph" src="${esc(d.photo)}" alt="">` : ''}` : '';
+  const headHtml = head ? `<div class="eh"><span class="reg">${reg ?? ''}</span><div><span class="rank">${esc(rank(d))}</span> <span class="nm">${esc(d.name)}</span>${d.name_han ? ` <span class="nhan" lang="zh-Hant">${esc(d.name_han)}</span>` : ''}${PREG[id] && d.parent ? ` <span class="pcode">· ${T('childOfReg')} <a class="xr" href="#${anc(d.parent)}">${PREG[id]}</a></span>` : ''}${d.sid ? `<span class="pcode sid">${T('codeLabel')} ${esc(formatSid(d.sid))}</span>` : ''}</div></div>${d.photo ? `<img class="ph" src="${esc(d.photo)}" alt="">` : ''}` : '';
   return `<div class="entry${head ? '' : ' cont'}${txt?.more ? ' more' : ''}"${head ? ` id="${anc(id)}"` : ''} data-id="${esc(id)}">${headHtml}
    ${head ? `${facts ? `<div class="ln">${facts}</div>` : ''}${d.spouse ? `<div class="ln"><i>${d.sex === 'f' ? T('husband') : T('wife')}</i> ${esc(d.spouse)}${d.married ? ', ' + T('married') + ' ' + esc(d.married) : ''}</div>` : ''}${spLines}${d.note ? `<div class="ln mut">${esc(d.note)}</div>` : ''}` : ''}
    ${stories}${kidsHtml}${tail && contact ? `<div class="ln ct">${contact}</div>` : ''}${tail && d.verify ? `<div class="flag">${T('toVerify')}: ${esc(d.verify)}</div>` : ''}</div>`;
@@ -133,7 +135,7 @@ function itemHtml(it) {
     case 2: return `<div class="genh">${T('genLabel')} ${it[1]}</div>`;
     case 3: { const d = P(it[1]); const pa = P(it[2]); if (!d) return ''; return `<div class="ie"><span>${esc(rank(d))} ${esc(d.name)} <span class="mut">· ${T('gensWord')} ${d.gen} · ${esc(relOf(pa, d.sex))}</span></span><i></i><b>${esc(it[3])}</b></div>`; }
     case 4: return `<div class="il">${esc(it[1])}</div>`;
-    case 5: { const d = P(it[1]); if (!d) return ''; return `<div class="ie"><span>${esc(d.name)}</span><i></i><b>${it[2] != null ? `<a class="xr" href="#${anc(it[3] || it[1])}">${it[2]}</a>` : '–'}</b></div>`; }
+    case 5: { const d = P(it[1]); if (!d) return ''; return `<div class="ie"><span>${esc(d.name)}${d.sid ? ` <span class="pcode sid">${esc(formatSid(d.sid))}</span>` : ''}</span><i></i><b>${it[2] != null ? `<a class="xr" href="#${anc(it[3] || it[1])}">${it[2]}</a>` : '–'}</b></div>`; }
     case 6: { const d = P(it[1]); if (!d) return ''; return `<div class="ie"><span><b>${esc(rank(d))} ${esc(d.name)}</b>: ${esc(d.verify)}</span><i></i><b>${it[2] ?? ''}</b></div>`; }
     default: return '';
   }
@@ -285,7 +287,8 @@ function settingsForm() {
     <label>${T('paper')}<select id="ppap">${opt('land', T('landscape'), PREF.orient)}${opt('port', T('portrait'), PREF.orient)}</select></label>
     <label>${T('language')}<select id="plang">${opt('vi', T('langVi'), PREF.lang)}${opt('en', T('langEn'), PREF.lang)}</select></label>
     <label>${T('terms')}<select id="preg">${opt('chuan', T('termsStd'), reg)}${opt('nam', T('termsSouth'), reg)}</select></label>
-    <label class="fp-switch"><input type="checkbox" id="phide" ${PREF.hideLiving ? 'checked' : ''}> ${T('hideLiving')}</label>`;
+    <label class="fp-switch"><input type="checkbox" id="phide" ${PREF.hideLiving ? 'checked' : ''}> ${T('hideLiving')}</label>
+    <label class="fp-switch"><input type="checkbox" id="psid" ${PREF.showCodes ? 'checked' : ''}> ${T('showCodes')}</label>`;
 }
 function renderBar() {
   const tbar = document.getElementById('tbar');
@@ -378,6 +381,7 @@ function renderBar() {
   document.getElementById('plang').onchange = (e) => { savePref({ lang: e.target.value }); go({}); };
   document.getElementById('preg').onchange = (e) => { setKinRegion(e.target.value === 'nam' ? 'nam' : 'chuan'); go({}); };
   document.getElementById('phide').onchange = (e) => { savePref({ hideLiving: e.target.checked }); go({}); };
+  document.getElementById('psid').onchange = (e) => { savePref({ showCodes: e.target.checked }); applyPrefs(); };
   document.getElementById('bprint').onclick = async () => { sh.close(); await prepareAll(); window.print(); };
   document.getElementById('bembed').onclick = () => {
     const u = new URL('/book', location.origin);

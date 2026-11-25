@@ -36,7 +36,10 @@
   --lh-1:var(--rk-lh-1);--lh-2:var(--rk-lh-2);--lh-3:var(--rk-lh-3);--lh-4:var(--rk-lh-4);--lh-5:var(--rk-lh-5);--lh-6:var(--rk-lh-6);
   --ls-1:var(--rk-ls-1);--ls-2:var(--rk-ls-2);
   --sz-tile:var(--rk-tile);--sz-tile-sm:var(--rk-tile-sm);--sz-crest-sm:var(--rk-tile-xs);--sz-crest-md:var(--rk-tile);--sz-crest-lg:var(--rk-tile-lg);--r-pill:var(--rk-radius-pill);--r-icon:var(--rk-radius-icon);
+  --sz-dialog:440px;
+  --sz-icon:16px;--sz-icon-lg:20px;
   --c-on-color:#fff;--c-shadow:rgba(0,0,0,.3);--shadow-pop:var(--rk-shadow-pop);
+  --mono:'IBM Plex Mono',monospace;--c-qr-bg:#fff; --sz-qr:200px; /* QR codes need a light quiet zone in both themes */
   /* surname tiles: today's colours in both themes (= --rk-tile-1..6 light). U2 moves dark to --rk-tile-* (contrast) with screenshots. */
   --c-tile-1:#6929c4;--c-tile-2:#198038;--c-tile-3:#0043ce;--c-tile-4:#8a3800;--c-tile-5:#005d5d;--c-tile-6:#9f1853;
   color-scheme:light dark}

@@ -175,9 +175,9 @@ test('sign out one keeps the other signed in; sign out all shows the guest card'
     assert.match(await page.textContent('.acct-card'), new RegExp(MEMBER_NAME));
     await openSheet(page);
     await page.click('dialog.acct-sh [data-out="all"]');
-    await page.waitForSelector('dialog.cfm h2');
-    assert.match(await page.textContent('dialog.cfm h2'), /tất cả/);
-    await Promise.all([page.waitForEvent('load'), page.click('[data-cfm-ok]')]);
+    await page.waitForSelector('dialog.dcf h2');
+    assert.match(await page.textContent('dialog.dcf h2'), /tất cả/);
+    await Promise.all([page.waitForEvent('load'), page.click('dialog.dcf [data-dcf-ok]')]);
     await page.waitForSelector('main #login', { timeout: 8000 });
     assert.equal(await page.locator('main #login').count(), 1, 'guest: Đăng nhập is offered');
     await ctx.close();

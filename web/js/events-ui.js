@@ -151,7 +151,7 @@ function estCardHtml(row, { estSave }) {
   const basis = (e.basis || []).map((b) => `<span class="est-line">${esc(b)}</span>`).join('') || '<span class="est-line">Chưa có căn cứ.</span>';
   return `<li class="rel est"><div class="dt"><b class="tl-approx">~${esc(e.mid)}</b></div>`
     + `<div class="rail"><span class="dot"></span></div>`
-    + `<div class="card"><span class="kind">${typeIcon(e.type, 16)}${esc(e.label)} <span class="tag gray sm">ước tính</span></span>`
+    + `<div class="card"><span class="kind">${typeIcon(e.type, 16)}${esc(e.label)} <span class="tag gray sm">tự động</span> <span class="tag gray sm">ước tính</span></span>`
     + `<p class="est-range">khoảng ${esc(e.range)}</p>`
     + `<details class="est-basis"><summary>Cách tính</summary><div class="est-lines">${basis}</div></details>`
     + (estSave ? `<button type="button" class="btn sm gh" data-est-save="${esc(row.id)}">Lưu thành sự kiện</button>` : '')
@@ -183,6 +183,7 @@ function cardHtml(row, { ageLabel, canEdit, nameOf, editLbl, personHref = null, 
     + `<div class="card">${kind}<h3>${title}</h3>`
     + (e.description && !d ? `<p>${esc(firstLine(e.description))}${e.description.includes('\n') || e.description.length > 90 ? '…' : ''}</p>` : '')
     + whenLine + (meta || peopleHtml ? `<span class="pl">${[meta ? esc(meta) : '', peopleHtml].filter(Boolean).join(' · ')}</span>` : '')
+    + (e.grouped && e.names && e.names.length ? `<details class="tl-why"><summary>Xem tên ›</summary><p class="sub tl-why-body">${esc(e.names.join(', '))}</p></details>` : '')
     + `<div class="ft">${cnt}${src}${edit}</div></div></li>`;
 }
 const yearOfLabel = (row) => (row.days === null ? '' : String(yearOfDays(row.days)));
@@ -195,7 +196,7 @@ export function tlList(rows, { nameOf, canEdit, editLbl = 'Sửa', span = false,
       out += `<li class="stg"><p class="tl-lbl">${esc(row.stage)}</p></li>`; last = row.stage;
     }
     const ageLabel = row.age && !row.e.band && !(row.e.group === 'self' && row.e.type === 'sinh') ? (row.age.approx ? approxHtml(`${row.age.years} tuổi`, `khoảng ${row.age.years} tuổi`) : esc(`lúc ${row.age.years} tuổi`)) : '';
-    out += row.e.estimated ? estCardHtml(row, { estSave }) : cardHtml(row, { ageLabel, canEdit, nameOf, editLbl, personHref, selfId });
+    out += row.e.estimated ? estCardHtml(row, { estSave: estSave && row.e.person_id === selfId }) : cardHtml(row, { ageLabel, canEdit, nameOf, editLbl, personHref, selfId });
   }
   return `<ol class="tl2">${out}</ol>`;
 }
@@ -225,7 +226,7 @@ export function lifeStoriesHtml({ name, events, summary, stories, canEdit, canAd
 }
 
 // ---- event editor (dialog on the timeline, and inline in the person form). Values live in data-f attributes. ----
-export function evEditorHtml(item = {}, { people = [], persons = [], canDelete = false, id = '' } = {}) {
+export function evEditorHtml(item = {}, { people = [], persons = [], id = '', page = false } = {}) {
   const v = { type: 'sinh', date_text: '', place: '', place_new: '', description: '', lunar: '', ...item };
   if (item.date_kind && !v.date_text) v.date_text = formatEventDate(item);
   const chips = people.map((pid) => personChip(pid, persons)).join('');
@@ -241,16 +242,17 @@ export function evEditorHtml(item = {}, { people = [], persons = [], canDelete =
     <div class="evx-people"><span class="sub">Người liên quan</span><div class="chips" data-chips>${chips}</div>
       <input class="pk-q" type="search" placeholder="Tìm người…" autocomplete="off" aria-label="Tìm người liên quan" data-pk-q>
       <div class="pk-res" data-pk-res></div></div>
-    <div class="evx-src"><span class="sub">Nguồn</span><div data-srcs>${srcs}</div><button type="button" class="linkbtn" data-src-add>+ Thêm nguồn</button></div>
+    <div class="evx-src"><span class="sub">Nguồn</span><div data-srcs>${srcs}</div><button type="button" class="btn ter sm src-add" data-src-add>+ Thêm nguồn</button></div>
     <p class="err" data-evx-err role="alert" hidden></p>
-    <div class="row end evx-acts">${canDelete ? '<button type="button" class="btn ter dng-t" data-evx-del>Xóa sự kiện</button>' : ''}<button type="button" class="btn gh" data-evx-cancel>Hủy</button><button type="button" class="btn" data-evx-save>Lưu sự kiện</button></div>
+    <div class="row end evx-acts${page ? ' fp-bar' : ''}"><button type="button" class="btn gh" data-evx-cancel>Hủy</button><button type="button" class="btn" data-evx-save>Lưu sự kiện</button></div>
   </div>`;
 }
 const personChip = (pid, persons) => { const p = persons.find((x) => x.id === pid); return `<span class="pchip" data-pid="${esc(pid)}">${esc(p ? p.name : pid)}<button type="button" class="pchip-x" data-pchip-x aria-label="Bỏ người này">×</button></span>`; };
-const sourceRow = (s = {}) => `<div class="srow" data-src><input data-sf="title" value="${esc(s.title || '')}" placeholder="Tên nguồn" maxlength="300" aria-label="Tên nguồn" autocomplete="off">`
-  + `<input data-sf="url" value="${esc(s.url || '')}" placeholder="Link (tuỳ chọn)" maxlength="2000" aria-label="Link nguồn" autocomplete="off">`
-  + `<select data-sf="quality" aria-label="Chất lượng nguồn"><option value="">Chất lượng</option>${Object.entries(SOURCE_QUALITY).map(([k, l]) => `<option value="${k}" ${s.quality === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`
-  + `<button type="button" class="linkbtn" data-src-del aria-label="Bỏ nguồn">×</button></div>`;
+// One source as a card: name, link and quality, each full width on a phone, side by side when there is room.
+const sourceRow = (s = {}) => `<div class="srow" data-src><div class="srow-h"><span class="sub">Nguồn</span><button type="button" class="linkbtn" data-src-del aria-label="Bỏ nguồn">×</button></div>`
+  + `<label class="fld">Tên nguồn<input data-sf="title" value="${esc(s.title || '')}" placeholder="vd Gia phả viết tay 1950" maxlength="300" aria-label="Tên nguồn" autocomplete="off"></label>`
+  + `<label class="fld">Link (tuỳ chọn)<input data-sf="url" value="${esc(s.url || '')}" placeholder="https://…" maxlength="2000" aria-label="Link nguồn" autocomplete="off"></label>`
+  + `<label class="fld">Chất lượng<select data-sf="quality" aria-label="Chất lượng nguồn"><option value="">Chưa rõ</option>${Object.entries(SOURCE_QUALITY).map(([k, l]) => `<option value="${k}" ${s.quality === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label></div>`;
 
 // Reads the editor's values: { item, error }. Dates are parsed here (the server checks them again).
 export function readEvx(root) {

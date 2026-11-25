@@ -2,6 +2,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
@@ -43,4 +44,37 @@ test('no tag -> the package.json version (the first release)', () => {
 test('bad input throws (a deploy must not stamp a guess)', () => {
   assert.throws(() => V.nextVersion({ lastTag: 'gp-v79', subject: 'fix: x' }), /not vX\.Y\.Z/);
   assert.throws(() => V.nextVersion({ lastTag: '', pkgVersion: 'dev' }), /no tag/);
+});
+
+// Regression: the two squash messages that were wrongly bumped to a major (v1.80.0 -> v2.0.0, v2.0.0 -> v3.0.0).
+// Their bodies mention "BREAKING CHANGE" in a bullet, not as a footer; each must be a minor bump.
+test('real squash messages with "BREAKING CHANGE" in a bullet -> minor (v1.80.0 -> v1.81.0 -> v1.82.0)', () => {
+  const dir = path.join(__dirname, 'fixtures', 'semver');
+  const cases = [
+    ['0ef4609-release-train-2.txt', 'v1.80.0', '1.81.0'], // was v2.0.0 (#71)
+    ['98b31db-release-train-3.txt', 'v1.81.0', '1.82.0'], // was v3.0.0 (#81)
+  ];
+  for (const [file, lastTag, expected] of cases) {
+    const message = fs.readFileSync(path.join(dir, file), 'utf8');
+    const [subject = '', ...rest] = message.split('\n');
+    const body = rest.join('\n');
+    assert.match(subject, /^feat\(giapha\): /, file);
+    assert.match(body, /BREAKING CHANGE/, `${file} keeps the phrase in a bullet`);
+    assert.doesNotMatch(body, /^BREAKING[ -]CHANGE:/m, `${file} has no footer`);
+    assert.strictEqual(V.bumpKind(subject, body), 'minor', file);
+    assert.strictEqual(V.nextVersion({ lastTag, subject, body }), expected, file);
+  }
+});
+
+test('BREAKING CHANGE footer must start a line; a mention inside a line does not count', () => {
+  assert.strictEqual(V.bumpKind('feat: x', 'Ghi chú: BREAKING CHANGE: không phải footer'), 'minor');
+  assert.strictEqual(V.bumpKind('feat: x', '* feat! or BREAKING CHANGE -> major'), 'minor');
+  assert.strictEqual(V.bumpKind('feat: x', '* note\nBREAKING CHANGE: /api/x bị bỏ'), 'major');
+  assert.strictEqual(V.bumpKind('fix: x', 'BREAKING-CHANGE: y'), 'major');
+  assert.strictEqual(V.bumpKind('fix: x', 'BREAKING CHANGE y'), 'patch');
+});
+
+test('a "!" in the body does not count, only before the header colon', () => {
+  assert.strictEqual(V.bumpKind('fix: x', '* feat!: đổi định dạng'), 'patch');
+  assert.strictEqual(V.bumpKind('fix(api)!: x', ''), 'major');
 });

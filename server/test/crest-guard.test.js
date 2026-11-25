@@ -61,3 +61,12 @@ test('the crest component lives in ui.js and the emblem image in emblem.js', () 
   assert.match(fs.readFileSync(path.join(JS, 'ui.js'), 'utf8'), /export function familyCrest/);
   assert.match(fs.readFileSync(path.join(JS, 'emblem.js'), 'utf8'), /export const famCrest/);
 });
+
+test('a family crest is the emblem image when it has one, else the character tile (one component, ui.js)', () => {
+  const ui = fs.readFileSync(path.join(JS, 'ui.js'), 'utf8');
+  const body = ui.slice(ui.indexOf('export function familyCrest'), ui.indexOf('export function familyCrest') + 400);
+  assert.match(body, /if \(f\?\.has_emblem\) return `<span class="crest-sq crest-\$\{size\} crest-img"[^`]*famCrest\(f\)/, 'emblem branch');
+  assert.match(body, /return surnameTileOf\(famShort\(String\(f\?\.name \|\| ''\)\)\.trim\(\), \{ size, han: f\?\.han \|\| '' \}\);/, 'character fallback with the family han');
+  const emblem = fs.readFileSync(path.join(JS, 'emblem.js'), 'utf8');
+  assert.match(emblem, /export const famCrest = \(f\) => \(f\?\.has_emblem \? `<img class="crest" alt="" src=/);
+});

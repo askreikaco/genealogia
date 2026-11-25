@@ -13,6 +13,9 @@ const mail = require('./mail');
 const ACC = require('./accounts');
 const mountElder = require('./elder-routes').mount;
 const T = require('./mail-templates');
+const TRASH = require('./trash');
+const DEC = require('./decisions');
+const NEWS = require('./news');
 const mountSuccession = require('./succession-routes');
 const mountLinks = require('./links-routes').mount;
 const mountMatch = require('./match-routes').mount;
@@ -21,6 +24,8 @@ const mountPlaces = require('./places-routes').mount;
 const mountPlacesCurate = require('./places-curate-routes').mount;
 const mountVariants = require('./variants-routes').mount;
 const mountGedcom = require('./gedcom-routes');
+const TWO = require('./totp-routes');
+const TOTP_RULES = require('./totp-rules');
 const EV = require('./events');
 const { mountOAuth } = require('./ai-oauth');
 const { mountMcp } = require('./ai-mcp');
@@ -129,7 +134,7 @@ const DEFAULT_FAMILY = 'duong';
 class HttpError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
 // Route wrapper: HttpError -> its status and message; anything else -> the error handler.
 const H = (fn) => async (req, res, next) => {
-  try { await fn(req, res); } catch (e) { if (e instanceof HttpError) return res.status(e.status).json({ error: e.message }); next(e); }
+  try { await fn(req, res); } catch (e) { if (e instanceof HttpError) return res.status(e.status).json({ error: e.message, ...(e.reauth ? { reauth: true } : {}) }); next(e); }
 };
 // Family by id or slug. Only lower-case letters, digits and dashes are accepted.
 async function findFamily(ref) {
@@ -274,15 +279,22 @@ app.get('/api/auth/google/callback', async (req, res) => {
     // Google's own name parts (for the join form's Họ / Tên); a bare full name is never split by us.
     // The account joins the list on this device and becomes the active one.
     const r2 = await ACC.resolveGoogle(pool, { sub, email, name: G_EDITORS.get(email) || c.name || email });
+    const next = /(?:^|;\s*)gp_n=([a-z0-9/_-]{1,80})(?:;|$)/i.exec(req.headers.cookie || '')?.[1] || '';
+    res.append('Set-Cookie', 'gp_n=; Path=/api/auth; Max-Age=0');
+    const to = next === 'oauth/consent' ? '/oauth/consent' : next ? '/#' + next : '/'; // consent page: its own screen
+    // Two-step sign-in on: the first factor is done, the session waits for the code (totp-routes.js)
+    if (await TWO.enabledFor(pool, r2.accountId)) {
+      if (r2.linked && !r2.created) await ACC.event(pool, r2.accountId, 'google_linked', { value: email }, req);
+      await TWO.beginTwoStep(pool, req, res, { aid: r2.accountId, payload: { email, name: G_EDITORS.get(email) || c.name || email, gn: String(c.given_name || '').slice(0, 80), fn: String(c.family_name || '').slice(0, 80), to, via: 'google' } });
+      return res.redirect('/#dang-nhap-2fa');
+    }
     const sid = await ACC.createSession(pool, r2.accountId, req);
     await ACC.event(pool, r2.accountId, r2.created ? 'account_created' : 'signin', { via: 'google' }, req);
     if (r2.linked && !r2.created) await ACC.event(pool, r2.accountId, 'google_linked', { value: email }, req);
     const added = addAccount(req, res, { k: 'g', email, name: G_EDITORS.get(email) || c.name || email, gn: String(c.given_name || '').slice(0, 80), fn: String(c.family_name || '').slice(0, 80), aid: r2.accountId, sid, at: Date.now() });
     if (!added) await ACC.revoke(pool, [sid]);
-    const next = /(?:^|;\s*)gp_n=([a-z0-9/_-]{1,80})(?:;|$)/i.exec(req.headers.cookie || '')?.[1] || '';
-    res.append('Set-Cookie', 'gp_n=; Path=/api/auth; Max-Age=0');
     if (!added) return fail(MAX_MSG);
-    res.redirect(next === 'oauth/consent' ? '/oauth/consent' : next ? '/#' + next : '/'); // consent page: its own screen
+    res.redirect(to);
   } catch (e) { console.error('google login', e.message); fail('Lỗi đăng nhập Google.'); }
 });
 
@@ -296,6 +308,10 @@ async function googleAccountMode(req, res, mode, { sub, email }) {
   if (mode === 'reauth') {
     const { rows } = await pool.query("select 1 from identities where account_id = $1 and type = 'google' and provider_sub = $2", [acc.aid, sub]);
     if (!rows.length) return back('err=' + encodeURIComponent('Tài khoản Google vừa chọn không thuộc tài khoản này. Chọn đúng tài khoản Google.'));
+    if (await TWO.enabledFor(pool, acc.aid)) { // the code too: a fresh sign-in is both factors (totp-routes.js)
+      await TWO.beginTwoStep(pool, req, res, { aid: acc.aid, mode: 'reauth', sid: acc.sid, payload: { to: '/#tai-khoan?ok=reauth' } });
+      return res.redirect('/#dang-nhap-2fa');
+    }
     await pool.query('update sessions set auth_at = now() where id = $1 and account_id = $2', [acc.sid, acc.aid]);
     await pool.query("update identities set last_used_at = now() where type = 'google' and provider_sub = $1", [sub]);
     await ACC.event(pool, acc.aid, 'reauth', {}, req);
@@ -422,9 +438,11 @@ app.post('/api/accounts/signout', sameSite, H(async (req, res) => {
 }));
 // Elder access: device sign-in by code, managers, devices, sign-in cards (elder-routes.js).
 mountElder(app, { pool, who, readSessionAll, addAccount, sameSite, H, HttpError, famOf, mail });
-require('./passkey-routes').mount(app, { pool, who, addAccount, sameSite, H, HttpError, famOf });
+require('./passkey-routes').mount(app, { pool, who, addAccount, readSessionAll, sameSite, H, HttpError, famOf, notify: (...a) => accountApi.notify(...a) });
 // Account page API (#tai-khoan): profile, emails, linked Google, devices, security activity (account-routes.js).
 accountApi = require('./account-routes').mount(app, { pool, readSessionAll, writeSession, sameSite, H, HttpError, mail, T });
+// Two-step sign-in and recovery codes (totp-routes.js): the account side and the second step of a sign-in.
+TWO.mount(app, { pool, readSessionAll, writeSession, addAccount, sameSite, H, HttpError, notify: (...a) => accountApi.notify(...a), secretKey: TOTP_RULES.deriveKey(SECRET), maxMsg: MAX_MSG });
 
 // Test only (NODE_ENV=test): a signed-in Google session for an email, without Google. Never registered in production.
 if (process.env.NODE_ENV === 'test') {
@@ -434,6 +452,10 @@ if (process.env.NODE_ENV === 'test') {
     // like Google: the account of this (test) Google id, a server session; auth_age_ms makes the sign-in look older
     const sub = String(req.body?.sub || 'test-' + crypto.createHash('sha256').update(email).digest('hex').slice(0, 20));
     ACC.resolveGoogle(pool, { sub, email, name: String(req.body?.name || email) }).then(async (r) => {
+      if (await TWO.enabledFor(pool, r.accountId)) { // two-step on: the code comes next (POST /api/auth/2fa/verify)
+        await TWO.beginTwoStep(pool, req, res, { aid: r.accountId, payload: { email, name: String(req.body?.name || email), via: 'test', to: '/' } });
+        return res.json({ needs_2fa: true });
+      }
       const sid = await ACC.createSession(pool, r.accountId, req);
       await ACC.event(pool, r.accountId, r.created ? 'account_created' : 'signin', { via: 'test' }, req);
       const at = Date.now() - Math.max(0, Number(req.body?.auth_age_ms) || 0);
@@ -495,12 +517,14 @@ app.get('/api/book/outline', H(async (req, res) => {
     orient: q.orient === 'port' ? 'port' : 'land',
   };
   const optKey = [opts.root, opts.dir, opts.maxGen, opts.spouses ? 1 : 0, opts.daughters, opts.status, opts.layout, opts.orient].join('|');
-  const { rows } = await pool.query('select id, data, version, deleted from persons where family_id = $1', [f.id]);
+  const { rows } = await pool.query('select id, data, version, deleted, short_id from persons where family_id = $1', [f.id]);
   const ver = rows.reduce((m, r) => Math.max(m, Number(r.version)), 0);
+  // the codes (mã người) are printed and sized by the plan, so a code change is a new plan too
+  const sidDigest = crypto.createHash('sha1').update(rows.map((r) => r.id + ':' + (r.short_id || '')).join('|')).digest('hex');
   // stories: the book prints them as paragraphs of each entry; a living person's go to members only
   const { rows: stRows } = await pool.query('select person_id, kind, title, body from stories where family_id = $1 order by person_id, id', [f.id]);
   const stDigest = crypto.createHash('sha1').update(JSON.stringify(stRows)).digest('hex');
-  const key = [f.id, ver, full ? 'full' : 'public', optKey, stDigest, f.founder_person_id || ''].join('|');
+  const key = [f.id, ver, full ? 'full' : 'public', optKey, stDigest, sidDigest, f.founder_person_id || ''].join('|');
   let plan = bookCache.get(key);
   if (!plan) {
     const lib = await bookPlanLib();
@@ -510,7 +534,7 @@ app.get('/api/book/outline', H(async (req, res) => {
     for (const r of stRows) { if (!stOf.has(r.person_id)) stOf.set(r.person_id, []); stOf.get(r.person_id).push(r); }
     const all = (await withRel(rel, rows, full)).filter((r) => !r.deleted && r.data).map((r) => {
       const seen = R.canSeeEventsOf(r.data, { member: full, familyReadable: true });
-      return { id: r.id, data: full ? r.data : publicView(r.data), st: seen ? (stOf.get(r.id) || []).map((s) => ({ kind: s.kind, title: s.title, body: s.body })) : [] };
+      return { id: r.id, data: withSid(full ? r.data : publicView(r.data), r.short_id), st: seen ? (stOf.get(r.id) || []).map((s) => ({ kind: s.kind, title: s.title, body: s.body })) : [] };
     });
     const bm = lib.bookModel(all, { founder_person_id: f.founder_person_id || null });
     plan = lib.planBook(bm, opts);
@@ -592,7 +616,11 @@ app.post('/api/events/:id/delete', need('editor'), (req, res, next) => evWrite(r
   const cur = await client.query('select person_id from events where id=$1 and family_id=$2', [req.params.id, f.id]);
   if (!cur.rows[0]) return null;
   if (!(await EV.claimOp(client, opId, cur.rows[0].person_id))) return { duplicate: true };
-  return { deleted: await EV.deleteEvent(client, f.id, req.params.id, actorName(w)) };
+  await TRASH.brake(f, w);
+  const full = (await client.query('select * from events where id=$1', [req.params.id])).rows[0];
+  const deleted = await EV.deleteEvent(client, f.id, req.params.id, actorName(w));
+  const label = [full.date_text, full.place, (full.description || '').slice(0, 60)].filter(Boolean).join(' · ') || 'Sự kiện';
+  return { deleted, trash_id: await TRASH.put(client, { famId: f.id, kind: 'event', itemId: full.id, personId: full.person_id, label, rows: [full], w, by: actorName(w) }) };
 }));
 app.post('/api/stories', need('editor'), (req, res, next) => evWrite(req, res, next, async (client, f, w, opId) => {
   const R = await EV.rules(); const err = R.validateStory(req.body?.story); if (err) throw new HttpError(400, err);
@@ -611,7 +639,10 @@ app.post('/api/stories/:id/delete', need('editor'), (req, res, next) => evWrite(
   const cur = await client.query('select person_id from stories where id=$1 and family_id=$2', [req.params.id, f.id]);
   if (!cur.rows[0]) return null;
   if (!(await EV.claimOp(client, opId, cur.rows[0].person_id))) return { duplicate: true };
-  return { deleted: await EV.deleteStory(client, f.id, req.params.id, actorName(w)) };
+  await TRASH.brake(f, w);
+  const full = (await client.query('select * from stories where id=$1', [req.params.id])).rows[0];
+  const deleted = await EV.deleteStory(client, f.id, req.params.id, actorName(w));
+  return { deleted, trash_id: await TRASH.put(client, { famId: f.id, kind: 'story', itemId: full.id, personId: full.person_id, label: full.title || 'Câu chuyện', rows: [full], w, by: actorName(w) }) };
 }));
 
 // ---- write (editors): idempotent ops, newest-wins per field ----
@@ -642,12 +673,17 @@ app.post('/api/relations', need('editor'), async (req, res, next) => {
   const client = await pool.connect();
   try {
     await client.query('begin');
-    const out = await applyRelOp(client, req.body || {}, actorName(w), f.id);
+    const b = req.body || {};
+    const rmT = b.action === 'remove' ? { parent_child: 'parent_child', couple: 'couple' }[b.kind] : null;
+    const rm = rmT ? (await client.query(`select * from ${rmT} where id=$1 and family_id=$2`, [Number(b.id) || 0, f.id])).rows[0] : null;
+    if (rm) await TRASH.brake(f, w);
+    const out = await applyRelOp(client, b, actorName(w), f.id);
+    if (rm && out.applied) out.trash_id = await TRASH.put(client, { famId: f.id, kind: rmT, itemId: rm.id, personId: rmT === 'parent_child' ? rm.child_id : rm.a_id, label: (out.label || 'Quan hệ').replace(/^Gỡ quan hệ: /, ''), rows: [rm], w, by: actorName(w) });
     await client.query('commit');
     res.json(out);
   } catch (e) {
     await client.query('rollback').catch(() => {});
-    if (e instanceof RelError) return res.status(e.status).json({ error: e.message });
+    if (e instanceof RelError || e instanceof HttpError) return res.status(e.status).json({ error: e.message });
     next(e);
   } finally { client.release(); }
 });
@@ -673,6 +709,8 @@ app.post('/api/ops', need('editor'), async (req, res, next) => {
       }
       const err = validateOp(op);
       if (err) { rejected.push({ op_id: op?.op_id, reason: err }); continue; }
+      // a person delete needs a reason and goes through Thùng rác (POST /api/persons/:id/delete)
+      if (op.fields && op.fields._deleted === true) { rejected.push({ op_id: op.op_id, reason: 'Xóa người cần lý do: dùng “Xóa người này” (đi qua Thùng rác).' }); continue; }
       const pf = await client.query('select family_id from persons where id=$1', [op.id]);
       if (pf.rows[0] && pf.rows[0].family_id !== f.id) { rejected.push({ op_id: op.op_id, reason: 'Người này không thuộc dòng họ này.' }); continue; }
       await client.query('begin');
@@ -1174,7 +1212,7 @@ let fuzzyMod = null;
 const fuzzy = async () => fuzzyMod || (fuzzyMod = await import(require('url').pathToFileURL(path.join(__dirname, '..', 'web', 'js', 'fuzzy.js')).href));
 // One family as the API shows it. $1 = the signed-in email (or null): my_role is that account's active role here.
 const FAM_SELECT = `select f.id, f.slug, f.name, f.han, f.place, f.color, f.visibility, f.updated_at,
-    f.short_name, f.founder_person_id, f.origin_place, f.branch_gen, f.branch_order,
+    f.short_name, f.founder_person_id, f.origin_place, f.branch_gen, f.branch_order, f.country,
     (select count(*)::int from persons p where p.family_id = f.id and not p.deleted) as people,
     (select count(distinct p.data->>'gen')::int from persons p where p.family_id = f.id and not p.deleted and p.data ? 'gen') as generations,
     (select m.role from members m where m.family_id = f.id and m.email = $1 and m.status = 'active') as my_role
@@ -1229,6 +1267,7 @@ app.patch('/api/families/:ref', H(async (req, res) => {
   if (b.visibility !== undefined) { if (!FAM_VIS.includes(b.visibility)) throw new HttpError(400, 'Quyền xem không hợp lệ.'); set.visibility = b.visibility; }
   if (b.short_name !== undefined) set.short_name = str(b.short_name, 60) || null;
   if (b.origin_place !== undefined) set.origin_place = str(b.origin_place, 120) || null;
+  if (b.country !== undefined) { const c = String(b.country || '').trim().toUpperCase(); if (c && !/^[A-Z]{2}$/.test(c)) throw new HttpError(400, 'Quốc gia không hợp lệ.'); set.country = c || null; }
   if (b.branch_gen !== undefined) { if (b.branch_gen === null || b.branch_gen === '') set.branch_gen = null; else { const g = Number(b.branch_gen); if (!Number.isInteger(g) || g < 1 || g > 30) throw new HttpError(400, 'Đời của chi không hợp lệ (1–30).'); set.branch_gen = g; } }
   if (b.branch_order !== undefined) {
     if (b.branch_order === null) set.branch_order = null;
@@ -1314,7 +1353,8 @@ app.post('/api/families/:ref/leave', H(async (req, res) => {
 // Succession: trusted contacts, inactivity, death reports, claims, offers, reclaim, create a family (succession-routes.js).
 mountSuccession(app, { pool, who, readSession, findFamily, canRead, ROLE_RANK });
 // "Same person" links between family trees (links-routes.js).
-const linksApi = mountLinks(app, { pool, who, famOf, findFamily, canRead, H, HttpError });
+const linksApi = mountLinks(app, { pool, who, famOf, findFamily, canRead, H, HttpError, readSession });
+require('./claim-routes').mount(app, { pool, who, famOf, canRead, H, HttpError, readSession, mail, T, publicUrl: mail.publicUrl }); // Nhận quản lý (claim-routes.js)
 // "Có thể là cùng một người" suggestions (match-routes.js; computed by scripts/match-run.js): a suggested link goes
 // through the same proposal as a hand-made one.
 mountMatch(app, { pool, who, famOf, findFamily, canRead, H, HttpError, propose: linksApi.propose });
@@ -1328,6 +1368,11 @@ mountPlaces(app, { pool, readSession, who, famOf, canRead, H, HttpError });
 // Conflicting data (variants-routes.js): several sourced values per field; choosing one writes the field through applyOp.
 mountVariants(app, { pool, who, famOf, canRead, H, HttpError, ROLE_RANK, applyOp, actorName, validateValue,
   seeLife: async (data, member) => (await EV.rules()).canSeeEventsOf(data, { member, familyReadable: true }), onWrite: () => bookCache.clear() });
+// Thùng rác: every delete is kept GP_TRASH_DAYS (default 30) days, then the archive (historical data kept; living people's items purged after GP_ARCHIVE_LIVING_DAYS, 365); person deletes need a reason (trash.js).
+TRASH.mount(app, { pool, who, famOf, H, HttpError, ROLE_RANK, actorName, mail, T, mirrorLegacy: REL.mirrorLegacy, isTable: REL.isTable, publicUrl: mail.publicUrl, onWrite: () => bookCache.clear() });
+// Biểu quyết (decisions.js): gỡ / khôi phục người by family vote; the chooser's options and the page's routes.
+DEC.mount(app, { pool, who, famOf, H, HttpError, ROLE_RANK, actorName, mail, T, publicUrl: mail.publicUrl, onWrite: () => bookCache.clear() });
+NEWS.mount(app, { pool, who, famOf, H, HttpError, ROLE_RANK, actorName, mail, T, publicUrl: mail.publicUrl });
 // AI connections (MCP): OAuth for AI clients, consent in the app, the /mcp endpoint. The AI acts as the signed-in person
 // (ai-perm.js); admin actions only become requests (ai_requests) that an admin approves in Cài đặt.
 const aiDeps = { pool, whoFor, readSession, findFamily, canRead, actorName, applyOp, acctKey, sameSite, doInvite, doRoleChange, doRemove,
@@ -1426,6 +1471,9 @@ if (require.main === module) {
   setTimeout(succTick, 60e3); setInterval(succTick, 3600e3);
   // Places: look new places up in open data (off unless PLACES_ENRICH=1; GeoNames only with GEONAMES_USER).
   require('./places-enrich').startWorker({ pool });
+  // Thùng rác: hourly, runs due delete requests; archive / purge only with GP_TRASH_PURGE=1 (else logs a dry run)
+  const trashTick = () => { NEWS.sweep().catch((e) => console.error('news sweep failed:', e.message)); DEC.sweep().catch((e) => console.error('decision sweep failed:', e.message)); return TRASH.sweep().catch((e) => console.error('trash sweep failed:', e.message)); };
+  setTimeout(trashTick, 120e3); setInterval(trashTick, 3600e3);
 }
 // Two-way Google Sheet sync (off unless SHEET_SYNC=on). Never overlaps: the job takes a pg advisory lock.
 if (require.main === module && process.env.SHEET_SYNC === 'on') {

@@ -84,7 +84,7 @@ test('profile: Quan hệ section at phone width, no horizontal scroll, no Hán o
   try {
     await openProfile(page, 'P001');
     const t = await txt(page);
-    assert.match(t, /Trần Thị Lan/); assert.match(t, /Lê Thị Mai/); assert.match(t, /Vợ thứ 2/);
+    assert.match(t, /Giả Ngọc Giao/); assert.match(t, /Giả Thanh Huệ/); assert.match(t, /Vợ thứ 2/);
     const sw = await page.evaluate(() => document.documentElement.scrollWidth);
     assert.ok(sw <= 390, 'no horizontal page scroll: ' + sw);
     await page.locator('button[data-rel-add]').click();
@@ -117,7 +117,7 @@ test('add spouse #3 (step 1-3, new person) shows in the profile in order; a seco
     await openProfile(page, 'P001');
     const t = await txt(page);
     assert.match(t, /Đoàn Thị Thu/); assert.match(t, /Vợ thứ 3 · cưới 1995/);
-    // second wife (Lê Thị Mai, P003) gets a son
+    // second wife (Giả Thanh Huệ, P003) gets a son
     await openProfile(page, 'P003');
     await addFlow(page, 'P003', 'child');
     await page.locator('#rel-q').fill('Vương Thị Quý');
@@ -143,7 +143,7 @@ test('relative couple: a neutral note, not a block; own-ancestor link blocked wi
   try {
     await openProfile(page, 'P004');
     await addFlow(page, 'P004', 'spouse');
-    await page.locator('#rel-q').fill('Vương Thị Mẫu');
+    await page.locator('#rel-q').fill('Giả Mỹ Nhàn');
     await page.locator('.calm[data-pick="P005"]').click();
     await page.locator('button[data-next]').click();
     await page.locator('button[data-kind="ban_doi"]').click();
@@ -155,14 +155,14 @@ test('relative couple: a neutral note, not a block; own-ancestor link blocked wi
 
     await openProfile(page, 'P001');
     await addFlow(page, 'P001', 'parent');
-    await page.locator('#rel-q').fill('Dương Minh Quân');
+    await page.locator('#rel-q').fill('Giả Công Trí');
     await page.locator('.calm[data-pick="P007"]').click();
     await page.locator('button[data-next]').click();
     await page.locator('button[data-save]').click();
     await page.waitForSelector('.err', { timeout: 8000 });
     const err = await page.locator('.err').innerText();
     assert.match(err, /đã là tổ tiên của/);
-    assert.match(err, /Dương Minh Quân/);
+    assert.match(err, /Giả Công Trí/);
   } finally { await ctx.close(); }
 });
 
@@ -170,13 +170,13 @@ test('a relation row opens that person\'s profile; ⋯ holds Sửa quan hệ; no
   const { ctx, page } = await ownerPage(390);
   try {
     await openProfile(page, 'P001');
-    const box = page.locator('.relrows .calm-row', { hasText: 'Trần Thị Lan' }).first();
+    const box = page.locator('.relrows .calm-row', { hasText: 'Giả Ngọc Giao' }).first();
     const row = box.locator('a.calm');
     assert.equal(await row.evaluate((a) => !!a.querySelector('button, a')), false, 'no nested interactive element in the row');
     assert.equal(await row.locator('svg.calm-c').count(), 0, 'no chevron on a row that has ⋯');
     assert.equal(await page.locator('.relrows a.calm[data-rel-edit], .relrows button.calm').count(), 0, 'rows are links');
     if (SHOT) await page.screenshot({ path: path.join(SHOT, 'quanhe-more-390.png'), fullPage: false, clip: await page.locator('section.relsec').boundingBox() });
-    await box.getByRole('button', { name: 'Tùy chọn cho Trần Thị Lan' }).click();
+    await box.getByRole('button', { name: 'Tùy chọn cho Giả Ngọc Giao' }).click();
     await page.waitForSelector('.menu [role=menuitem]');
     assert.deepEqual(await page.locator('.menu [role=menuitem]').allInnerTexts(), ['Sửa quan hệ', 'Xem trên cây', 'Xóa quan hệ']);
     if (SHOT) await page.screenshot({ path: path.join(SHOT, 'quanhe-menu-390.png') });
@@ -184,7 +184,7 @@ test('a relation row opens that person\'s profile; ⋯ holds Sửa quan hệ; no
     await page.waitForSelector('.rel-sheet[open]');
     await page.keyboard.press('Escape');
     await openProfile(page, 'P001');
-    await page.locator('.relrows a.calm', { hasText: 'Trần Thị Lan' }).first().click();
+    await page.locator('.relrows a.calm', { hasText: 'Giả Ngọc Giao' }).first().click();
     await page.waitForFunction(() => /person\//.test(location.hash) && !/P001$/.test(location.hash), null, { timeout: 8000 });
     assert.equal(await page.locator('.rel-sheet[open]').count(), 0, 'tapping the name does not open the edit sheet');
   } finally { await ctx.close(); }
@@ -194,21 +194,21 @@ test('edit a spouse kind, then remove the relation after a confirm (history kept
   const { ctx, page } = await ownerPage(390);
   try {
     await openProfile(page, 'P001');
-    await openRelMenu(page, 'Trần Thị Lan', 'Sửa quan hệ');
+    await openRelMenu(page, 'Giả Ngọc Giao', 'Sửa quan hệ');
     await page.waitForSelector('.rel-sheet');
     if (SHOT) await page.locator('.rel-sheet').screenshot({ path: path.join(SHOT, 'edit-rel-390.png') });
     await page.locator('.rel-sheet button[data-kind="vo_le"]').click();
     await page.locator('.rel-sheet button[data-save]').click();
     await page.waitForFunction(() => !document.querySelector('.rel-sheet')?.open, null, { timeout: 8000 }).catch(() => {});
     await openProfile(page, 'P001');
-    assert.match(await txt(page), /Trần Thị Lan[\s\S]*vợ lẽ|vợ lẽ/);
-    // remove: row ⋯ Xóa quan hệ opens the sheet on its confirm
-    await openRelMenu(page, 'Trần Thị Lan', 'Xóa quan hệ');
-    await page.locator('.rel-sheet button[data-remove]').click();
-    await page.waitForFunction(() => !document.querySelector('.rel-sheet')?.open, null, { timeout: 8000 }).catch(() => {});
+    assert.match(await txt(page), /Giả Ngọc Giao[\s\S]*vợ lẽ|vợ lẽ/);
+    // remove: row ⋯ Xóa quan hệ opens the shared destructive confirm
+    await openRelMenu(page, 'Giả Ngọc Giao', 'Xóa quan hệ');
+    await page.locator('dialog.dcf [data-dcf-ok]').click();
+    await page.waitForFunction(() => !document.querySelector('dialog.dcf'), null, { timeout: 8000 }); // closes once the removal is saved
     await openProfile(page, 'P001');
     // the spouse row is gone; a child's line may still name her as mother (parent links are separate records)
-    const spouseRows = await page.locator('.relrows a.calm', { hasText: 'Trần Thị Lan' }).count();
+    const spouseRows = await page.locator('.relrows a.calm', { hasText: 'Giả Ngọc Giao' }).count();
     assert.equal(spouseRows, 0, 'removed spouse no longer listed');
     const h = await pool.query("select count(*)::int n from history where person_id='P001' and new_value::text like '%Gỡ quan hệ%' or old_value::text like '%Gỡ quan hệ%'");
     assert.ok(h.rows[0].n >= 1, 'history keeps the removal');
@@ -235,7 +235,7 @@ test('pedigree: a repeated ancestor is a link to where it was drawn; the tree sh
     if (SHOT) await page.locator('section', { hasText: 'Tổ tiên' }).screenshot({ path: path.join(SHOT, 'pedigree-collapse-1280.png') });
     await page.goto(base + '/#tree/@P001');
     await page.waitForSelector('.tdesk svg.tchart', { timeout: 10000 });
-    await page.waitForFunction(() => /Dương Văn Cường/.test(document.querySelector('.tdesk svg.tchart')?.textContent || ''), null, { timeout: 8000 });
+    await page.waitForFunction(() => /Giả Văn An/.test(document.querySelector('.tdesk svg.tchart')?.textContent || ''), null, { timeout: 8000 });
     const tree = await page.locator('.tdesk svg.tchart').textContent();
     assert.match(tree, /Vợ: |Chồng: /);
     if (SHOT) await page.locator('.tdesk svg.tchart').screenshot({ path: path.join(SHOT, 'tree-2-wives-1280.png') });
@@ -278,7 +278,7 @@ test('design shots: Quan hệ full page (390 light and dark, 1280) and the tree 
   try {
     await page.goto(base + '/#tree/@P001');
     await page.waitForSelector('.tdesk svg.tchart', { timeout: 10000 });
-    await page.waitForFunction(() => /Dương Văn Cường/.test(document.querySelector('.tdesk svg.tchart')?.textContent || ''), null, { timeout: 8000 });
+    await page.waitForFunction(() => /Giả Văn An/.test(document.querySelector('.tdesk svg.tchart')?.textContent || ''), null, { timeout: 8000 });
     await page.locator('.tdesk svg.tchart').screenshot({ path: path.join(SHOT, 'tree-2-wives-1280.png') });
   } finally { await ctx.close(); }
 });

@@ -86,12 +86,37 @@ test('validation rejects bad input and accepts a good event', async () => {
 
 test('auto summary is built from the events, in date order, without derived events', async () => {
   const E = await lib();
-  const text = E.autoSummary('Dương Văn Tâm', [
+  const text = E.autoSummary('Giả Quang Nghĩa', [
     { type: 'cuoi', date_kind: 'exact', date_from: '1985', place: 'Củ Chi', description: '' },
     { type: 'sinh', date_kind: 'exact', date_from: '1962', place: 'Củ Chi' },
     { type: 'sinh', derived: true, date_kind: 'exact', date_from: '1900' },
   ]);
-  assert.ok(text.startsWith('Dương Văn Tâm sinh năm 1962'), text);
+  assert.ok(text.startsWith('Giả Quang Nghĩa sinh năm 1962'), text);
   assert.ok(text.indexOf('1962') < text.indexOf('1985'));
   assert.ok(!text.includes('1900'));
+});
+
+test('day numbers are exact for years 0–99, 1940 and BCE (Date.UTC read 40 as 1940)', async () => {
+  const E = await lib();
+  // oracle: ISO strings (4-digit years, and the 6-digit form for BCE) parsed by the engine, day = ms / 864e5
+  const ref = (iso) => new Date(iso).getTime() / 864e5;
+  assert.equal(E.dayNum(40, 1, 1), ref('0040-01-01T00:00:00Z'), 'year 40');
+  assert.equal(E.dayNum(43, 1, 1), ref('0043-01-01T00:00:00Z'), 'year 43');
+  assert.equal(E.dayNum(1940, 1, 1), ref('1940-01-01T00:00:00Z'), 'year 1940');
+  assert.equal(E.dayNum(-660, 1, 1), ref('-000660-01-01T00:00:00Z'), 'year -660');
+  assert.equal(E.dayNum(43, 3, 15), ref('0043-03-15T00:00:00Z'), 'month and day');
+  assert.equal(E.dayNum(40, 2, 29), ref('0040-02-29T00:00:00Z'), 'leap day in year 40');
+  // ordering: BCE < 40 < 43 < 1940
+  assert.ok(E.dayNum(-660, 1, 1) < E.dayNum(40, 1, 1), '-660 before 40');
+  assert.ok(E.dayNum(40, 1, 1) < E.dayNum(43, 1, 1), '40 before 43');
+  assert.ok(E.dayNum(43, 1, 1) < E.dayNum(1940, 1, 1), '43 before 1940');
+  // the year reads back exactly
+  for (const y of [40, 43, -660, 1940]) assert.equal(E.yearOfDays(E.dayNum(y, 1, 1)), y, 'year back: ' + y);
+  // sorting: stored dates 0040 and 0043 go before 1940
+  const sorted = E.sortEvents([
+    { id: 'c', date_kind: 'exact', date_from: '1940' },
+    { id: 'b', date_kind: 'exact', date_from: '0043' },
+    { id: 'a', date_kind: 'exact', date_from: '0040' },
+  ]).map((x) => x.id);
+  assert.deepEqual(sorted, ['a', 'b', 'c'], 'order 40, 43, 1940');
 });

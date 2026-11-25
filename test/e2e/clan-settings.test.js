@@ -107,7 +107,7 @@ test('admin: everything is automatic first (founder, split, order, short name) w
     assert.match(await s.page.textContent('#clan-view'), /Dương · Tân Lập/, 'short name follows quê gốc while typing');
     await s.page.click('#fclan button:not([type=button])');
     await s.page.waitForFunction(() => /Đã lưu chi và thủy tổ/.test(document.body.innerText));
-    assert.deepEqual({ ...s.patches.at(-1) }, { short_name: null, founder_person_id: null, branch_gen: null, branch_order: null, origin_place: 'Tân Lập' });
+    assert.deepEqual({ ...s.patches.at(-1) }, { short_name: null, founder_person_id: null, branch_gen: null, branch_order: null, origin_place: 'Tân Lập', country: '' }); // country: the Quốc gia field saves with the form (unchanged)
     assert.deepStrictEqual(s.errors, []);
     await s.ctx.close();
   } finally { await b.close(); }

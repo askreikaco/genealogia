@@ -3,26 +3,27 @@
 // Trees the viewer cannot see are a count only. Online only: the page needs the server.
 import { esc } from './model.js';
 import { calmRow, surnameTile, surnameTileOf } from './ui.js';
-import { clanHref, familySurname } from './clan-core.js';
+import { clanHref, familySurname, inClan } from './clan-core.js';
+import { countryName } from './countries.js';
 
-export { clanHref, familySurname };
+export { clanHref, familySurname, inClan };
 // "Xem cả họ Dương ›" for a family name (empty when the name has no surname).
-export const clanLinkHtml = (familyName, cls = 'clan-in') => {
-  const h = clanHref(familyName); const s = familySurname(familyName);
+export const clanLinkHtml = (familyName, cls = 'clan-in', country = '') => {
+  const h = clanHref(familyName, country); const s = familySurname(familyName);
   return h ? `<a class="${cls}" href="${esc(h)}">Xem cả họ ${esc(s)} ›</a>` : '';
 };
 
 const num = (n) => Number(n || 0).toLocaleString('vi-VN');
 // Clan meta for the #tree tree-cards: { trees, han } the viewer can see. Cached 5 minutes; onReady once when it changes.
 const metas = new Map();
-export function clanMeta(familyName, onReady) {
-  const h = clanHref(familyName); if (!h) return null;
+export function clanMeta(familyName, onReady, country = '') {
+  const h = clanHref(familyName, country); if (!h) return null;
   const slug = h.slice(4); const c = metas.get(slug);
   if (c && (c.loading || Date.now() - c.at < 300e3)) return c;
   metas.set(slug, { ...(c || { trees: 0, han: '' }), at: c?.at || 0, loading: true });
   fetch(`/api/clans/${encodeURIComponent(slug)}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((j) => {
-    const n = { at: Date.now(), trees: j?.kpis?.trees || 0, han: j?.han || '' }; metas.set(slug, n);
-    if (n.trees !== (c?.trees || 0) || n.han !== (c?.han || '')) onReady();
+    const n = { at: Date.now(), trees: j?.kpis?.trees || 0, han: j?.han || '', countries: j?.countries || [] }; metas.set(slug, n);
+    if (n.trees !== (c?.trees || 0) || n.han !== (c?.han || '') || JSON.stringify(n.countries) !== JSON.stringify(c?.countries || [])) onReady();
   }).catch(() => metas.set(slug, { at: Date.now(), trees: c?.trees || 0, han: c?.han || '' }));
   return metas.get(slug);
 }
@@ -58,7 +59,7 @@ const founderText = (t) => {
   return `thủy tổ ${t.founder.name}${y ? ' · ' + y : ''}`;
 };
 function treeRow(t, surname) {
-  const sub = [founderText(t), t.origin, `${num(t.people)} người`].filter(Boolean).map(esc).join(' · ')
+  const sub = [founderText(t), t.origin, t.country ? countryName(t.country) : '', `${num(t.people)} người`].filter(Boolean).map(esc).join(' · ')
     + (t.shared ? ` · <span class="clan-lk"><span aria-hidden="true">⇄</span> ${num(t.shared)} người chung</span>` : '');
   return calmRow({ href: famHref(t.slug), tile: surnameTile(surname), title: t.label, subtitle: sub, attrs: `data-clan-tree="${esc(t.id)}"` });
 }
@@ -69,12 +70,13 @@ const groupHtml = (g, surname) => `<section class="cd clan-clu" aria-label="Cụ
 
 let seq = 0; // the newest request wins (the user may move on while one loads). The loading state has no h1, so the bar
 // takes the page title (Họ X) when it arrives.
-export async function clanPage(main, slug, { page = 1 } = {}) {
+export async function clanPage(main, slug, { page = 1, country = '' } = {}) {
   const my = ++seq;
   main.innerHTML = '<div class="skel" role="status" aria-live="polite"><p class="sub">Đang tải…</p><span class="skel-l"></span><span class="skel-l w2"></span></div>';
   let j;
   try {
-    const r = await fetch(`/api/clans/${encodeURIComponent(slug)}?page=${page}`, { cache: 'no-store' });
+    const qc = /^([A-Za-z]{2}|NONE)$/.test(country) ? country.toUpperCase() : '';
+    const r = await fetch(`/api/clans/${encodeURIComponent(slug)}?page=${page}${qc ? '&country=' + qc : ''}`, { cache: 'no-store' });
     j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || 'Không tải được.');
   } catch (e) {
@@ -85,15 +87,20 @@ export async function clanPage(main, slug, { page = 1 } = {}) {
   if (my !== seq || !/^#(\/[a-z0-9-]+\/)?ho\//.test(location.hash)) return;
   const s = j.surname;
   const pager = j.pages > 1 ? `<nav class="clan-pg" aria-label="Trang">
-    ${j.page > 1 ? `<a class="btn ter sm" href="#ho/${esc(slug)}?trang=${j.page - 1}">‹ Trang trước</a>` : '<span></span>'}
+    ${j.page > 1 ? `<a class="btn ter sm" href="#ho/${esc(slug)}?trang=${j.page - 1}${j.country ? '&qg=' + esc(j.country) : ''}">‹ Trang trước</a>` : '<span></span>'}
     <span class="sub">Trang ${j.page}/${j.pages}</span>
-    ${j.page < j.pages ? `<a class="btn ter sm" href="#ho/${esc(slug)}?trang=${j.page + 1}">Trang sau ›</a>` : '<span></span>'}</nav>` : '';
+    ${j.page < j.pages ? `<a class="btn ter sm" href="#ho/${esc(slug)}?trang=${j.page + 1}${j.country ? '&qg=' + esc(j.country) : ''}">Trang sau ›</a>` : '<span></span>'}</nav>` : '';
+  // Quốc gia: one chip per country (trees the viewer may see), "Chưa rõ" last; the chip filters the groups.
+  const total = (j.countries || []).reduce((n, c) => n + c.trees, 0);
+  const chip = (code, label, n) => `<a class="chipb${(j.country || '') === code ? ' on' : ''}" href="#ho/${esc(slug)}${code ? '?qg=' + esc(code) : ''}" aria-current="${(j.country || '') === code ? 'true' : 'false'}">${esc(label)} <span class="sub">${num(n)}</span></a>`;
+  const chips = j.countries?.length ? `<nav class="clan-qg" aria-label="Quốc gia">${chip('', 'Tất cả', total)}${j.countries.map((c) => chip(c.code, c.code === 'NONE' ? 'Chưa rõ' : countryName(c.code), c.trees)).join('')}</nav>` : '';
   const unlinked = j.unlinked.length || (j.page === j.pages && j.private_count) ? `<section class="cd clan-clu clan-un" aria-label="Cây chưa liên kết">
     <b class="clan-h">Cây chưa liên kết</b><span class="sub">Chưa có người nào được hai cây xác nhận là cùng một người.</span>
     <div class="clan-rows">${j.unlinked.map((t) => treeRow(t, s)).join('')}</div>
     ${j.page === j.pages && j.private_count ? `<p class="clan-priv">+${num(j.private_count)} cây riêng tư</p>` : ''}</section>` : '';
   main.innerHTML = `<h1>Họ ${esc(s)}${j.han ? ` <span lang="zh-Hant">${esc(j.han)}</span>` : ''}</h1>
     <div class="kpis s"><div class="kpi"><span class="sub">Cụm dòng họ</span><b>${num(j.kpis.groups)}</b></div><div class="kpi"><span class="sub">Cây</span><b>${num(j.kpis.trees)}</b></div><div class="kpi"><span class="sub">Người</span><b>${num(j.kpis.people)}</b></div></div>
+    ${chips}
     <p class="sub clan-note">Các cây mang họ ${esc(s)}. Một cụm là các cây đã được hai bên xác nhận có người chung (⇄), xếp theo thủy tổ: năm sớm nhất trước. Cây riêng tư chỉ hiện số lượng.</p>
     <div class="clan-lay">${j.groups.map((g) => groupHtml(g, s)).join('')}${unlinked}</div>${pager}`;
 }

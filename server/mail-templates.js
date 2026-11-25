@@ -159,4 +159,39 @@ function accountChanged({ what, when, device, url }) {
   return { subject: title, ...build(title, paras, { label: 'Mở trang Tài khoản', url }) };
 }
 
-module.exports = { esc, vnTime, trustedInvite, ownerReminder, handoverNotice, handoverOffer, handoverCode, confirmRequest, ownerChanged, claimStarted, claimWindow, claimObjected, contribution, joinDecision, accountVerifyEmail, accountChanged };
+// Thùng rác (server/trash.js): a person deleted / restored, a delete waiting for approval.
+function trashNotice({ family, title, paras = [], url }) {
+  return { subject: `${title} · ${family}`, ...build(title, [...paras, `Dòng họ: ${family}.`], { label: 'Mở Thùng rác', url }) };
+}
+// Nhận quản lý (tree claim): a claim opened for a tree with no active owner (sent to the owners of an abandoned tree),
+// its approval or rejection (to the claimant and the other owners). The notice runs until `until`.
+function treeClaimOpened({ family, claimant, abandoned, until, url }) {
+  const title = `Có người xin nhận quản lý ${family}`;
+  const paras = [`${claimant || 'Một người'} đã nộp đơn xin nhận quản lý dòng họ này${abandoned ? ' vì các Chủ họ hiện có đã lâu không đăng nhập hoặc đã mất' : ''}.`,
+    `Đơn được công khai góp ý đến ${vnTime(until)} (giờ Việt Nam). Sau đó quản trị ứng dụng sẽ xem xét. Nếu bạn vẫn quản lý dòng họ, hãy đăng nhập để góp ý hoặc phản đối.`];
+  return { subject: title, ...build(title, paras, { label: 'Xem dòng họ', url }) };
+}
+function treeClaimDecided({ family, approved, reason, url }) {
+  const title = approved ? `Bạn đã được nhận quản lý ${family}` : `Đơn nhận quản lý ${family} chưa được duyệt`;
+  const paras = approved ? [`Quản trị ứng dụng đã duyệt đơn. Bạn là Chủ họ của dòng họ này và có thể cùng quản lý với các Chủ họ khác.`]
+    : [`Quản trị ứng dụng chưa duyệt đơn của bạn.`, `Lý do: ${reason || 'không ghi'}`];
+  return { subject: title, ...build(title, paras, { label: 'Mở dòng họ', url }) };
+}
+// Another owner was added to a tree by an app admin (sent to the owners already there).
+function treeOwnerAdded({ family, name, url }) {
+  const title = `${name} đã được thêm làm Chủ họ ${family}`;
+  return { subject: title, ...build(title, [`Quản trị ứng dụng đã duyệt đơn nhận quản lý. ${name} giờ có quyền Chủ họ cùng với bạn.`], { label: 'Mở dòng họ', url }) };
+}
+// The brake stopped an account's deletes (more than the hourly limit).
+function deleteBrake({ family, who, count, limit, url }) {
+  const title = `Đã tạm dừng việc xóa trong ${family}`;
+  const paras = [`${who} đã xóa ${count} mục trong một giờ (giới hạn ${limit}). Việc xóa tiếp theo của tài khoản này bị từ chối trong một giờ.`,
+    'Mọi mục đã xóa vẫn nằm trong Thùng rác và khôi phục được. Nếu đây không phải việc bạn mong muốn, hãy xem Thùng rác và đổi quyền của tài khoản này.'];
+  return { subject: title, ...build(title, paras, { label: 'Mở Thùng rác', url }) };
+}
+
+// Tin họ: a new post or a gathering reminder (in-app notice and mail to members).
+function newsNotice({ family, title, paras = [], url }) {
+  return { subject: `${title} · ${family}`, ...build(title, [...paras, `Dòng họ: ${family}.`], { label: 'Mở tin', url }) };
+}
+module.exports = { treeClaimOpened, treeClaimDecided, treeOwnerAdded, newsNotice, trashNotice, deleteBrake, esc, vnTime, trustedInvite, ownerReminder, handoverNotice, handoverOffer, handoverCode, confirmRequest, ownerChanged, claimStarted, claimWindow, claimObjected, contribution, joinDecision, accountVerifyEmail, accountChanged };

@@ -19,16 +19,16 @@ test('nextOrder: 10 after nine children, 1 when none, halves and junk ignored', 
 });
 
 test('nameHit: accents ignored; an empty search hits nothing', () => {
-  assert.equal(P.nameHit(['Dương Văn Tâm'], 'duong van tam'), true);
-  assert.equal(P.nameHit(['Dương Văn Tâm'], 'Hùng'), false);
-  assert.equal(P.nameHit(['Dương Văn Tâm'], ''), false);
+  assert.equal(P.nameHit(['Giả Quang Nghĩa'], 'gia quang nghia'), true);
+  assert.equal(P.nameHit(['Giả Quang Nghĩa'], 'Hùng'), false);
+  assert.equal(P.nameHit(['Giả Quang Nghĩa'], ''), false);
 });
 
 test('child: generation +1, family name of the line; an unmatched search is the name', () => {
   const anchor = { name: 'Dương Văn Bảy', sex: 'm', gen: 7 };
   eq(P.relPrefill('child', { anchor }), { gen: 8, name: 'Dương ' });
-  eq(P.relPrefill('child', { anchor, q: 'Dương Văn Tâm', qMatched: false }), { gen: 8, name: 'Dương Văn Tâm' });
-  eq(P.relPrefill('child', { anchor, q: 'Dương Văn Tâm', qMatched: true }), { gen: 8, name: 'Dương ' }, 'a search that found someone is not a new name');
+  eq(P.relPrefill('child', { anchor, q: 'Giả Quang Nghĩa', qMatched: false }), { gen: 8, name: 'Giả Quang Nghĩa' });
+  eq(P.relPrefill('child', { anchor, q: 'Giả Quang Nghĩa', qMatched: true }), { gen: 8, name: 'Dương ' }, 'a search that found someone is not a new name');
 });
 
 test('child of a daughter of the line: the family name follows her line (mother), not the son-in-law', () => {
@@ -37,7 +37,7 @@ test('child of a daughter of the line: the family name follows her line (mother)
 });
 
 test('child from a person married in: the line is the spouse they married into', () => {
-  const anchor = { name: 'Trần Thị Lan', sex: 'f' };
+  const anchor = { name: 'Giả Ngọc Giao', sex: 'f' };
   eq(P.relPrefill('child', { anchor, line: { name: 'Vương Minh Thuận' } }), { name: 'Vương ' }, 'no generation of her own');
 });
 

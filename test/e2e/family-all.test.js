@@ -110,8 +110,11 @@ test('giỗ combines both families with a chip on every row, sorted by date', { 
   try {
     const { ctx, page, errors } = await open(b, { roles: BOTH, width: 390, hash: '/tat-ca/gio' });
     await page.waitForFunction(() => document.querySelectorAll('.gior').length === 3); // both families pulled
+    // the giỗ list is redrawn on every store sync: wait for the sync to settle before counting (count() does not wait)
+    await page.waitForFunction(() => document.querySelector('#sync')?.textContent.includes('Đã đồng bộ'), null, { timeout: 15000 });
     const rows = await page.locator('.gior').count();
     assert.equal(rows, 3); // Dương Văn Cha (10/3), Nguyễn Văn Xa (5/8), Nguyễn Thị Hoa (20/1)
+    await page.locator('.gior .fchip-n').first().waitFor({ state: 'visible' });
     assert.equal(await page.locator('.gior .fchip-n').count(), rows);
     const names = await page.locator('.gior .fchip-n').allTextContents();
     assert.ok(names.includes('Dương') || names.some((x) => /Dương/.test(x)));

@@ -22,6 +22,17 @@ test('the plan is deterministic and numbered 1..N', async () => {
   assert.equal(a.pages[1].kind, 'lead');
 });
 
+test('a person code takes its own line in the entry height; a person without one is unchanged', async () => {
+  const { bookModel, entryHeight } = await lib();
+  const id = SEED[0].id; const other = SEED[1].id;
+  const base = bookModel(persons());
+  const coded = bookModel(persons().map((p) => (p.id === id ? { ...p, data: { ...p.data, sid: 'K7Q29MV' } } : p)));
+  const at = (M, pid) => entryHeight(M, M.all.find((p) => p.id === pid));
+  const grow = at(coded, id) - at(base, id);
+  assert.ok(grow > 0 && grow < 20, `one code line (${grow.toFixed(1)} px)`);
+  assert.equal(at(coded, other), at(base, other), 'no code, no extra height');
+});
+
 test('table of contents points at pages of the right kind', async () => {
   const { bookModel, planBook } = await lib();
   const plan = planBook(bookModel(persons()), '');

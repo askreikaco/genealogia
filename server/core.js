@@ -6,7 +6,7 @@ const FIELDS = {
   name: 'text', surname: 'text', given: 'text', name_order: { enum: ['', 'family_first', 'given_first'] }, thu: 'text', sex: { enum: ['m', 'f', ''] }, gen: 'int', parent: 'text', order: 'num',
   birth_date: 'text', birth_lunar: 'text', birth_place: 'text', death_date: 'text',
   spouse: 'text', spouse_of: 'text', spouse_n: 'int', other_parent: 'text', born: 'text', died: 'text', death_lunar: 'text', gio_lunar: 'text',
-  place: 'text', alias: 'text', title_name: 'text', job: 'text', religion: 'text', married: 'text',
+  place: 'text', alias: 'text', name_han: 'text', title_name: 'text', job: 'text', religion: 'text', married: 'text',
   burial: 'text', photo: 'text', phone: 'text', email: 'text', address: 'text', facebook: 'text',
   zalo: 'text', social: 'text', contact_public: { enum: ['', 'yes', 'no'] },
   living: { enum: ['', 'living', 'dead', 'unknown'] }, note: 'text', verify: 'text', source: 'text',
@@ -37,12 +37,25 @@ function publicView(d, opts = {}) {
   return out;
 }
 
+// Tên chữ Hán (name_han): Han characters and spaces only, at most 40 characters. Same rule as web/js/formrules.js.
+const MAX_HAN = 40;
+const HAN_RE = /^[\p{Script=Han}\s]+$/u;
+function hanNameError(v) {
+  if (typeof v !== 'string') return 'name_han must be text';
+  const t = v.trim();
+  if (!t) return null;
+  if (Array.from(t).length > MAX_HAN) return `name_han: tối đa ${MAX_HAN} ký tự`;
+  if (!HAN_RE.test(t)) return 'name_han: chỉ nhập chữ Hán và dấu cách';
+  return null;
+}
+
 function validateValue(field, v) {
   const t = FIELDS[field];
   if (!t) return `unknown field ${field}`;
   if (v === null || v === '') return null;
   if (t === 'int') return Number.isInteger(v) ? null : `${field} must be an integer`;
   if (t === 'num') return Number.isFinite(v) ? null : `${field} must be a number`;
+  if (field === 'name_han') return hanNameError(v);
   if (t === 'text') return typeof v === 'string' && v.length <= MAX_TEXT ? null : `${field} must be text <= ${MAX_TEXT}`;
   if (t.enum) return t.enum.includes(v) ? null : `${field} must be one of ${t.enum.join(', ')}`;
   return null;
@@ -85,4 +98,4 @@ function mergeOp(row, op, now = Date.now()) {
   return { data, fieldTs, deleted, changes };
 }
 
-module.exports = { FIELDS, CONTACT, DELETE, isDead, publicView, validateValue, validateOp, mergeOp };
+module.exports = { FIELDS, CONTACT, DELETE, MAX_HAN, HAN_RE, hanNameError, isDead, publicView, validateValue, validateOp, mergeOp };

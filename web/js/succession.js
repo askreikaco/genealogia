@@ -4,6 +4,7 @@
 // app.js calls init() once with what it owns (render, dialogs, sign-in URL, the store, the visibility options).
 import { esc } from './model.js';
 import { toast, surnameTileOf, famShort } from './ui.js';
+import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger } from './danger.js';
 
 const deps = { render: () => {}, S: null, dialog: null, confirm: null, googleUrl: () => '/api/auth/google', hashNext: () => '', visOpts: [] };
 const mainEl = () => document.querySelector('#main');
@@ -58,7 +59,7 @@ const contactRow = (c, i, n, owner) => `<div class="succ-row">
     <button type="button" class="btn ter sm" data-succ="up" data-id="${c.id}"${i === 0 ? ' disabled' : ''} aria-label="Đưa lên trên: ${esc(c.name || c.email)}">↑</button>
     <button type="button" class="btn ter sm" data-succ="down" data-id="${c.id}"${i === n - 1 ? ' disabled' : ''} aria-label="Đưa xuống dưới: ${esc(c.name || c.email)}">↓</button>
     ${c.status === 'invited' ? `<button type="button" class="btn ter sm" data-succ="resend" data-id="${c.id}">Gửi lại lời mời</button>` : ''}
-    <button type="button" class="btn ter sm dng-t" data-succ="remove" data-id="${c.id}">Bỏ</button></span>` : ''}
+    ${dangerButton('Bỏ', `data-succ="remove" data-id="${c.id}"`, { size: 'sm' })}</span>` : ''}
 </div>`;
 
 function actionRows(st) {
@@ -112,7 +113,7 @@ async function act(fam, kind, id) {
     return go('trusted/order', 'Đã sắp xếp', { ids });
   }
   if (kind === 'resend') return go(`trusted/${Number(id)}/resend`, 'Đã gửi lại lời mời');
-  if (kind === 'remove') return deps.confirm('Bỏ người này?', 'Người này không còn được hỏi khi có việc chuyển quyền. Có thể mời lại sau.', 'Bỏ', () => go(`trusted/${Number(id)}/remove`, 'Đã bỏ'));
+  if (kind === 'remove') return confirmDanger({ title: 'Bỏ người này khỏi danh sách tin cậy?', lose: 'Người này không còn được hỏi khi có việc chuyển quyền.', restore: 'Có thể mời lại sau.', confirm: 'Bỏ khỏi danh sách', onConfirm: () => go(`trusted/${Number(id)}/remove`, 'Đã bỏ') });
   if (kind === 'cancel') return go('handover/cancel', 'Đã hủy việc chuyển quyền');
   if (kind === 'object') return api('POST', `/api/handover/${Number(id)}/object`).then(() => { drop(fam); toast('Đã ghi nhận phản đối. Việc nhận quyền dừng lại.'); });
   if (kind === 'claim') return deps.confirm('Xin nhận quyền Chủ họ?', 'Chỉ làm được khi dòng họ không còn ai để trao quyền. Các thành viên khác sẽ được hỏi ủng hộ. Trong 30 ngày, Chủ họ có thể đăng nhập để từ chối.', 'Xin nhận quyền', () => go('claim', 'Đã gửi yêu cầu nhận quyền'));

@@ -79,11 +79,62 @@ test('updater: the same build is no update', async () => {
   assert.deepStrictEqual(h.shown, []);
 });
 
-test('updater: a newer build found while the app is open shows the notice (no reload by itself)', async () => {
+test('updater: a newer build the browser finds while the app is open waits silently for navigation, hide or return', async () => {
   const h = harness({ serverV: NEXT, idle: true });
   await h.u.check('detect');
+  assert.strictEqual(h.applied, 0, 'found while open and idle: no reload yet');
+  assert.deepStrictEqual(h.shown, [false], 'no notice when idle');
+  await h.u.decide('nav');
+  assert.strictEqual(h.applied, 1, 'the next navigation applies it');
+});
+
+test('updater: while busy, a found build shows the notice and nothing reloads; the next navigation applies it once idle', async () => {
+  const h = harness({ serverV: NEXT, idle: false });
+  await h.u.check('detect');
   assert.deepStrictEqual(h.shown, [true]);
-  assert.strictEqual(h.applied, 0, 'found while open: notice only');
+  await h.u.decide('nav');
+  assert.strictEqual(h.applied, 0, 'still busy');
+  h.idle = true;
+  await h.u.decide('hide');
+  assert.strictEqual(h.applied, 1, 'going to the background, once idle, applies it');
+});
+
+test('updater: hiding the idle app applies a pending update', async () => {
+  const h = harness({ serverV: NEXT, idle: true });
+  await h.u.check('detect');
+  h.u.decide('hide');
+  assert.strictEqual(h.applied, 1);
+});
+
+test('updater: the version check runs at most once a day; a manual check always asks', async () => {
+  let asks = 0;
+  const store = {};
+  const u = M.createUpdater({
+    build: M.BUILD, fetchVersion: async () => { asks++; return { v: M.BUILD }; }, isIdle: () => true,
+    applyNow: () => {}, showNotice: () => {},
+    store: { get: (k) => (k in store ? store[k] : null), set: (k, v) => { store[k] = v; } },
+    now: () => t,
+  });
+  let t = 5_000_000;
+  assert.strictEqual((await u.check('open')).skipped, undefined);
+  assert.strictEqual(asks, 1);
+  t += 60 * 1000;
+  assert.strictEqual((await u.check('visible')).skipped, true, 'a minute later: throttled');
+  assert.strictEqual(asks, 1);
+  await u.check('manual');
+  assert.strictEqual(asks, 2, 'manual checks are not throttled');
+  t += 24 * 60 * 60 * 1000;
+  await u.check('visible');
+  assert.strictEqual(asks, 3, 'a day later: asks again');
+  assert.strictEqual(store['gp-upd-checked'], String(t), 'the last check time is kept in localStorage');
+});
+
+test('updater: an offline check does not start the day, so the next start asks again', async () => {
+  const h = harness({ serverV: M.BUILD });
+  h.fetchFail = true;
+  assert.strictEqual((await h.u.check('open')).ok, false);
+  h.fetchFail = false;
+  assert.strictEqual((await h.u.check('visible')).skipped, undefined, 'asked again at once');
 });
 
 test('updater: coming back to an idle app applies the update', async () => {

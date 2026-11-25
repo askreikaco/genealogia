@@ -326,3 +326,66 @@ test('Vietnamese text survives unchanged, long values are split into CONC lines 
   assert.strictEqual(doc.persons[0].note[0], long.trim());
   assert.strictEqual(doc.persons[0].name, 'Nguyễn Du');
 });
+
+// Stories come back on import: our export round-trips with no duplicates, and MyHeritage/Ancestry-style notes
+// (CONC/CONT, pointer NOTE records) are read as stories too.
+test('stories round trip: export, then import of the same file adds no story (kind, title and body match)', () => {
+  const fx = fixture();
+  const text = exportOf(fx);
+  const first = planOf(text, fx, { stories: [] });
+  assert.strictEqual(first.counts.stories_new, 2, 'empty database: both stories are new');
+  const p1 = first.persons.find((p) => p.xref === 'P001');
+  assert.deepStrictEqual(p1.stories.map((s) => [s.kind, s.title, s.body]), [['chuyen', 'Chuyện nhà', 'Nội dung\nDòng hai']]);
+  const p2 = first.persons.find((p) => p.xref === 'P002');
+  assert.deepStrictEqual(p2.stories.map((s) => [s.kind, s.title, s.body]), [['tom_tat', '', 'Tóm tắt đời bà']]);
+  // The stories as stored (rows from the table) are the same as in the file: nothing is new.
+  const stored = fx.stories.map((s) => ({ person_id: s.person_id, kind: s.kind, title: s.title, body: s.body }));
+  const second = planOf(text, fx, { stories: stored });
+  assert.strictEqual(second.counts.stories_new, 0);
+  assert.strictEqual(second.counts.stories_same, 2);
+  assert.strictEqual(second.counts.stories_skipped, 0);
+  assert.ok(second.persons.every((p) => p.stories.length === 0));
+});
+
+test('stories round trip: a title with a line break (stored) matches the same story read back from the file', () => {
+  const fx = fixture();
+  fx.stories = [{ person_id: 'P001', kind: 'chuyen', title: 'Dòng một\nDòng hai', body: 'Thân bài' }];
+  const text = exportOf(fx);
+  const again = planOf(text, fx, { stories: fx.stories });
+  assert.strictEqual(again.counts.stories_new, 0, 'the line break in the title is a space on both sides');
+  assert.strictEqual(again.counts.stories_same, 1);
+});
+
+test('stories: MyHeritage-style CONC/CONT and a pointer NOTE record are read as stories', () => {
+  const text = ['0 HEAD', '1 GEDC', '2 VERS 5.5.1', '1 CHAR UTF-8',
+    '0 @I1@ INDI', '1 NAME Nguyễn Văn Ất', '1 SEX M',
+    '1 NOTE Câu chuyện: Di cư vào Nam', '2 CONC  năm 1954', '2 CONT Dòng hai',
+    '1 NOTE @N1@',
+    '1 NOTE Ghi chú thường không phải câu chuyện',
+    '0 @N1@ NOTE Câu chuyện đời: Tóm tắt', '1 CONC  của ông', '1 CONT Đoạn sau',
+    '0 TRLR'].join('\n');
+  const doc = G.readGedcom(R, text);
+  const p = doc.persons[0];
+  assert.strictEqual(p.stories, 2);
+  assert.deepStrictEqual(p.storyList, [
+    { kind: 'chuyen', title: 'Di cư vào Nam năm 1954', body: 'Dòng hai' },
+    { kind: 'tom_tat', title: 'Tóm tắt của ông', body: 'Đoạn sau' }]);
+  assert.deepStrictEqual(p.note, ['Ghi chú thường không phải câu chuyện'], 'a plain note stays the note');
+  const plan = planOf(text, { persons: [], events: [], pc: [], cp: [] });
+  assert.strictEqual(plan.counts.stories_new, 2);
+  assert.strictEqual(plan.persons[0].stories.length, 2);
+});
+
+test('stories: the same story twice in one file is written once; a second summary with other text is skipped', () => {
+  const text = ['0 HEAD', '1 GEDC', '2 VERS 5.5.1', '0 @I1@ INDI', '1 NAME /Trần/ Văn Đức',
+    '1 NOTE Câu chuyện: Một chuyện', '2 CONT Nội dung', '1 NOTE Câu chuyện: Một chuyện', '2 CONT Nội dung',
+    '1 NOTE Câu chuyện đời: Bản một', '1 NOTE Câu chuyện đời: Bản hai', '0 TRLR'].join('\n');
+  const plan = planOf(text, { persons: [{ id: 'P009', data: { name: 'Trần Văn Đức' } }], events: [], pc: [], cp: [] }, { stories: [] });
+  assert.strictEqual(plan.counts.stories_new, 2, 'one chuyen and one tom_tat');
+  assert.strictEqual(plan.counts.stories_skipped, 1, 'the second summary (other text) is skipped; the duplicate chuyen is not');
+  // The person already has a different summary: the file one is not written.
+  const have = [{ person_id: 'P009', kind: 'tom_tat', title: 'Bản cũ', body: '' }];
+  const again = planOf(text, { persons: [{ id: 'P009', data: { name: 'Trần Văn Đức' } }], events: [], pc: [], cp: [] }, { stories: have });
+  assert.strictEqual(again.counts.stories_skipped, 2, 'both summaries in the file differ from the stored one');
+  assert.ok(again.warnings.some((w) => w.includes('câu chuyện đời')));
+});

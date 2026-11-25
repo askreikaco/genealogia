@@ -1,5 +1,44 @@
 {
   "modules": {
+    "claim": {
+      "paths": [
+        "server/claim-*.js",
+        "server/test/claim*.test.js",
+        "web/js/claim.js",
+        "server/migrations/*_tree_claims.sql",
+        "server/mail-templates.js"
+      ],
+      "e2e": [
+        "test/e2e/claim-pages.test.js"
+      ]
+    },
+    "decisions": {
+      "paths": [
+        "server/decision-rules.js",
+        "server/decisions.js",
+        "server/test/council.test.js",
+        "server/migrations/*_decisions.sql",
+        "web/js/council.js"
+      ],
+      "e2e": [
+        "test/e2e/council-pages.test.js",
+        "test/e2e/council-app.test.js"
+      ]
+    },
+    "danger": {
+      "paths": [
+        "web/js/danger.js",
+        "server/test/danger-guard.test.js",
+        "web/js/trash-ui.js",
+        "server/trash.js",
+        "server/test/trash.test.js",
+        "server/migrations/*_trash.sql"
+      ],
+      "e2e": [
+        "test/e2e/danger-pages.test.js",
+        "test/e2e/trash-pages.test.js"
+      ]
+    },
     "match": {
       "paths": [
         "server/match-*.js",
@@ -10,6 +49,17 @@
       ],
       "e2e": [
         "test/e2e/match*.test.js"
+      ]
+    },
+    "dupes": {
+      "paths": [
+        "server/merge*.js",
+        "server/test/merge*.test.js",
+        "web/js/dupes.js",
+        "server/migrations/034_merge_person.sql"
+      ],
+      "e2e": [
+        "test/e2e/dupes*.test.js"
       ]
     },
     "variants": {
@@ -48,19 +98,44 @@
         "test/e2e/links*.test.js"
       ]
     },
+    "news": {
+      "paths": [
+        "server/news*.js",
+        "server/news-rules.js",
+        "server/test/news*.test.js",
+        "web/js/news.js",
+        "web/js/lich-merge.js",
+        "server/migrations/031_news.sql"
+      ],
+      "e2e": [
+        "test/e2e/news*.test.js"
+      ]
+    },
     "accounts": {
       "paths": [
         "server/test/accounts*.test.js",
+        "server/test/passkey*.test.js",
         "server/accounts.js",
         "server/account-routes.js",
+        "server/passkey-routes.js",
+        "server/passkey-rules.js",
         "server/scripts/accounts-backfill.js",
         "web/js/account.js",
-        "server/migrations/025_accounts.sql"
+        "web/js/passkey.js",
+        "server/test/totp*.test.js",
+        "server/totp-routes.js",
+        "server/totp-rules.js",
+        "web/js/twostep.js",
+        "server/migrations/025_accounts.sql",
+        "server/migrations/027_passkeys_account.sql",
+        "server/migrations/033_totp.sql"
       ],
       "e2e": [
         "test/e2e/accounts.test.js",
         "test/e2e/e2e-signin*.test.js",
-        "test/e2e/accounts-page.test.js"
+        "test/e2e/accounts-page.test.js",
+        "test/e2e/accounts-passkey.test.js",
+        "test/e2e/totp.test.js"
       ]
     },
     "ai": {
@@ -82,7 +157,8 @@
         "server/test/book*.test.js"
       ],
       "e2e": [
-        "test/e2e/book-*.test.js"
+        "test/e2e/book-*.test.js",
+        "test/e2e/book-codes.test.js"
       ]
     },
     "tree": {
@@ -126,6 +202,15 @@
         "test/e2e/elder*.test.js"
       ]
     },
+    "contacts": {
+      "paths": [
+        "server/test/contacts*.test.js",
+        "web/js/contacts-*.js"
+      ],
+      "e2e": [
+        "test/e2e/contacts-*.test.js"
+      ]
+    },
     "events": {
       "paths": [
         "server/events.js",
@@ -149,7 +234,8 @@
         "server/test/events-life.test.js"
       ],
       "e2e": [
-        "test/e2e/estimate-graph.test.js"
+        "test/e2e/estimate-graph.test.js",
+        "test/e2e/timeline-auto.test.js"
       ]
     },
     "form": {
@@ -169,6 +255,19 @@
       ],
       "e2e": [
         "test/e2e/gedcom*.test.js"
+      ]
+    },
+    "han": {
+      "paths": [
+        "server/test/name-han*.test.js",
+        "test/e2e/name-han*.test.js",
+        "server/core.js",
+        "server/gedcom.js",
+        "web/js/formrules.js",
+        "web/js/treechart.js"
+      ],
+      "e2e": [
+        "test/e2e/name-han.test.js"
       ]
     },
     "lists": {
@@ -193,6 +292,15 @@
       ],
       "e2e": [
         "test/e2e/profile-*.test.js"
+      ]
+    },
+    "facts": {
+      "paths": [
+        "web/js/facts.js",
+        "server/test/facts*.test.js"
+      ],
+      "e2e": [
+        "test/e2e/facts-*.test.js"
       ]
     },
     "search": {
@@ -220,14 +328,18 @@
         "web/app.css",
         "web/tokens.css",
         "web/index.html",
+        "web/js/app.js",
         "server/test/hidden-controls*.test.js",
         "server/test/keep-mounted*.test.js",
         "server/test/minimal-ui*.test.js"
       ],
       "e2e": [
         "test/e2e/hidden-controls*.test.js",
+        "test/e2e/nav-overlay*.test.js",
+        "test/e2e/nav-landscape*.test.js",
         "test/e2e/keep-mounted*.test.js",
         "test/e2e/minimal-ui*.test.js",
+        "test/e2e/sidebar-toggle*.test.js",
         "test/e2e/sticky-toolbar*.test.js"
       ]
     },
@@ -294,6 +406,8 @@
         "server/clan-*.js",
         "server/test/clan*.test.js",
         "web/js/clan.js",
+        "web/js/countries.js",
+        "server/migrations/*_family_country.sql",
         "web/js/clan-core.js"
       ],
       "e2e": [

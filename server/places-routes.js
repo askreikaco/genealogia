@@ -137,16 +137,20 @@ function mount(app, d) {
     const client = await pool.connect();
     try {
       await client.query('begin');
-      const { w, p } = await personFor(req, client);
+      const { f, w, p } = await personFor(req, client);
       if (!isEditor(w)) throw new HttpError(w.email || w.code ? 403 : 401, 'Cần quyền biên tập để bỏ gắn địa danh.');
+      const TR = require('./trash');
+      const old = (await client.query('select * from person_places where person_id=$1 and field=$2', [p.id, req.params.field])).rows;
+      if (old.length) await TR.brake(f, w);
       const del = await client.query('delete from person_places where person_id=$1 and field=$2 returning place_id', [p.id, req.params.field]);
+      const trashId = old.length ? await TR.put(client, { famId: f.id, kind: 'place_link', itemId: `${p.id}:${req.params.field}`, personId: p.id, label: `Địa danh (${req.params.field})`, rows: old, w, by: actor(w) }) : null;
       if (del.rowCount) {
         const L = await labels([del.rows[0].place_id]);
         await client.query("insert into history (person_id, field, old_value, new_value, by_user) values ($1,'dia_danh',$2,null,$3)",
           [p.id, JSON.stringify({ field: req.params.field, place_id: del.rows[0].place_id, name: (L.get(del.rows[0].place_id) || {}).name || '' }), actor(w)]);
       }
       await client.query('commit');
-      res.json({ ok: true, removed: del.rowCount });
+      res.json({ ok: true, removed: del.rowCount, trash_id: trashId });
     } catch (e) { await client.query('rollback').catch(() => {}); throw e; } finally { client.release(); }
   }));
 

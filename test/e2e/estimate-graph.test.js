@@ -91,6 +91,9 @@ test('estimated birth and death rows show from the family, Cách tính opens the
     await lifeTab(page);
     const birth = page.locator('.tl2 li.est', { hasText: 'Sinh (ước tính)' });
     const death = page.locator('.tl2 li.est', { hasText: 'Mất (ước tính)' });
+    // the life tab is redrawn on every store sync: wait for the sync to settle and both rows before counting
+    await page.waitForFunction(() => document.querySelector('#sync')?.textContent.includes('Đã đồng bộ'), null, { timeout: 15000 });
+    await birth.first().waitFor({ state: 'visible' }); await death.first().waitFor({ state: 'visible' });
     assert.equal(await birth.count(), 1, 'one estimated birth row');
     assert.equal(await death.count(), 1, 'one estimated death row (died at 60)');
     assert.match(await birth.innerText(), /khoảng 1815–1835/, 'birth from father 1800 and child 1850');

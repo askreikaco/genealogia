@@ -61,6 +61,8 @@ test('reviewer: #gop-y opens Cần duyệt (N); compact rows, ×2 duplicates, pe
       await page.waitForFunction(() => document.querySelectorAll('#rlist .rv').length === 3 && document.querySelector('#rlist .rv-ph'));
       await page.waitForTimeout(400);
       await page.waitForFunction(() => document.querySelectorAll('#rlist .rv').length === 3 && document.querySelector('#rlist .rv-ph'));
+      // the list is redrawn on every store sync: wait for the sync to settle before the counts below
+      await page.waitForFunction(() => document.querySelector('#sync')?.textContent.includes('Đã đồng bộ'), null, { timeout: 15000 });
       const tabs = page.locator('.gopy-tabs [role=tab]');
       assert.equal((await tabs.nth(0).textContent()).trim(), 'Cần duyệt (4)');
       assert.equal(await tabs.nth(0).getAttribute('aria-selected'), 'true');

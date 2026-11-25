@@ -88,14 +88,14 @@ test('Tìm: the "+" is in the toolbar after Bộ lọc; a search that found no o
     const order = await page.$$eval('.lbar > *', (els) => els.map((e) => (e.matches('[data-add]') ? 'add' : e.matches('[data-fp]') ? 'filter' : e.className)));
     assert.deepEqual(order.slice(-2), ['filter', 'add'], 'Bộ lọc, then "+"');
     await sameLook(page, '.lbar', '[data-add="list"]');
-    await page.fill('#q', 'Dương Văn Tâm');
+    await page.fill('#q', 'Giả Quang Nghĩa');
     await page.waitForSelector('.lempty');
-    assert.equal((await page.textContent('.lempty')).trim(), 'Không thấy “Dương Văn Tâm”. Bấm + để thêm người này.');
+    assert.equal((await page.textContent('.lempty')).trim(), 'Không thấy “Giả Quang Nghĩa”. Bấm + để thêm người này.');
     assert.equal(await page.locator('#acbox:visible').count(), 0, 'no type-ahead popup when nothing matches: one empty state');
     await shot(page, 'tb-list-390.png');
     await page.click('[data-add="list"]');
     await page.waitForSelector('#fpform input[name="name"]', { timeout: 8000 });
-    assert.equal(await page.inputValue('#fpform input[name="name"]'), 'Dương Văn Tâm');
+    assert.equal(await page.inputValue('#fpform input[name="name"]'), 'Giả Quang Nghĩa');
     assert.deepStrictEqual(errors, []);
   } finally { await b.close(); }
 });
@@ -113,8 +113,8 @@ test('Dòng đời: "+" in the timeline toolbar, no loose button under the list;
     await page.waitForTimeout(300);
     await shot(page, 'tb-life-390.png');
     await page.click('[data-ev-add]');
-    await page.waitForSelector('dialog.evdlg [data-f="date_text"]');
-    assert.equal(await page.inputValue('dialog.evdlg [data-f="date_text"]'), '1968');
+    await page.waitForSelector('.evpage [data-f="date_text"]');
+    assert.equal(await page.inputValue('.evpage [data-f="date_text"]'), '1968');
     assert.deepStrictEqual(errors, []);
   } finally { await b.close(); }
 });
@@ -139,17 +139,17 @@ test('Quan hệ: search and Mức narrow every level; "+" with Mức = Con prefi
     await page.waitForFunction(() => /Con · 2 người/.test(document.querySelector('#relbody')?.textContent || '') && !/Cháu/.test(document.querySelector('#relbody').textContent));
     assert.ok(await page.locator('#relbody .ltags [data-untag="lv"]').count(), 'chip for the filter');
     // an unmatched name in the search, then "+": the Con step with the text, then the form with the name
-    await page.fill('#relq', 'Dương Văn Tâm');
+    await page.fill('#relq', 'Giả Quang Nghĩa');
     await page.waitForSelector('#relbody .rel-empty');
-    assert.equal((await page.textContent('#relbody .rel-empty')).trim(), 'Không thấy “Dương Văn Tâm”. Bấm + để thêm người này.');
+    assert.equal((await page.textContent('#relbody .rel-empty')).trim(), 'Không thấy “Giả Quang Nghĩa”. Bấm + để thêm người này.');
     await shot(page, 'tb-rel-390.png');
     await page.click('[data-rel-add]');
     await page.waitForSelector('.rel-sheet #rel-q');
-    assert.equal(await page.inputValue('.rel-sheet #rel-q'), 'Dương Văn Tâm');
+    assert.equal(await page.inputValue('.rel-sheet #rel-q'), 'Giả Quang Nghĩa');
     assert.match(await page.textContent('.rel-sheet h2'), /Con/);
     await page.click('.rel-sheet [data-newp]');
     await page.waitForSelector('#fpform input[name="name"]', { timeout: 8000 });
-    assert.equal(await page.inputValue('#fpform input[name="name"]'), 'Dương Văn Tâm');
+    assert.equal(await page.inputValue('#fpform input[name="name"]'), 'Giả Quang Nghĩa');
     assert.match(await page.textContent('[data-acc-btn="gd"]'), /đời 7/i, 'next generation (Cha is 6)');
     await shot(page, 'tb-rel-form-390.png');
     assert.deepStrictEqual(errors, []);

@@ -1,5 +1,5 @@
 // Next release version (semver) for a deploy: the last tag vX.Y.Z plus the squash commit's Conventional Commits prefix.
-//   feat / feat(scope) -> minor; feat! / type!: or "BREAKING CHANGE" in the body -> major;
+//   feat / feat(scope) -> minor; feat! / type!: or a body line starting "BREAKING CHANGE:" / "BREAKING-CHANGE:" -> major;
 //   fix, perf, refactor, style, ops, docs, test, chore, any other type or no prefix -> patch.
 //   No tag yet -> the package.json version (the first release).
 // Pure: nextVersion() does no I/O. CLI (used by .github/workflows/deploy.yml):
@@ -11,11 +11,13 @@ import { pathToFileURL } from 'node:url';
 
 const SEMVER = /^v?(\d+)\.(\d+)\.(\d+)$/;
 const HEADER = /^([A-Za-z]+)(\([^)\n]*\))?(!)?:/;
+// A footer only: the token starts a line. Prose or squashed bullets that merely mention it do not count.
+const BREAKING_FOOTER = /^BREAKING[ -]CHANGE:/m;
 
 export function bumpKind(subject = '', body = '') {
   const m = HEADER.exec(String(subject).trim());
   if (m && m[3]) return 'major';
-  if (/BREAKING[ -]CHANGE/.test(String(body))) return 'major';
+  if (BREAKING_FOOTER.test(String(body))) return 'major';
   if (m && m[1].toLowerCase() === 'feat') return 'minor';
   return 'patch';
 }

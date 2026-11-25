@@ -50,9 +50,10 @@ function overlap(xs, ys, wFull, wGiven, label, out) {
 }
 
 // a, b: toCtx() objects. Returns { score 0..1 (2 decimals), reasons: [text] }.
-function scorePair(a, b) {
+// opts.sameTree: the two people are in one tree (duplicates inside a tree, merge.js); otherwise they must be in two trees.
+function scorePair(a, b, opts = {}) {
   const reasons = [];
-  if (!a || !b || a.family === b.family) return { score: 0, reasons: ['cùng một cây'] };
+  if (!a || !b || (a.family === b.family && !opts.sameTree)) return { score: 0, reasons: ['cùng một cây'] };
   if (!a.given || a.given !== b.given) return { score: 0, reasons: ['khác tên'] };
   if (a.surname && b.surname && a.surname !== b.surname) return { score: 0, reasons: ['khác họ'] };
   if (a.sex && b.sex && a.sex !== b.sex) return { score: 0, reasons: ['khác giới tính'] };
@@ -116,4 +117,22 @@ function allPairs(list, { cap = 400 } = {}) {
   return { pairs, skipped };
 }
 
-module.exports = { fold, toCtx, scorePair, candidatePairs, allPairs, keyOf, MIN };
+// Candidate pairs INSIDE one tree: the same blocking as allPairs (surname | given name, birth decades within one), but
+// only people of the same tree. Used for "có thể trùng" inside a tree (match-store.js scoreWithin).
+function withinPairs(list, { cap = 400 } = {}) {
+  const buckets = new Map();
+  for (const c of list) { if (!c.given) continue; const k = `${c.surname}|${c.given}`; if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(c); }
+  const pairs = []; const skipped = [];
+  for (const [k, xs] of buckets) {
+    if (xs.length < 2) continue;
+    if (xs.length > cap) { skipped.push({ key: k, size: xs.length }); continue; }
+    for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++) {
+      const a = xs[i]; const b = xs[j];
+      if (a.by != null && b.by != null && Math.abs(Math.floor(a.by / 10) - Math.floor(b.by / 10)) > 1) continue;
+      pairs.push(a.id < b.id ? [a, b] : [b, a]);
+    }
+  }
+  return { pairs, skipped };
+}
+
+module.exports = { fold, toCtx, scorePair, candidatePairs, allPairs, withinPairs, keyOf, MIN };

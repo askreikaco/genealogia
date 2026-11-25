@@ -67,12 +67,18 @@ async function anonPage(scheme = 'light') {
   return { ctx, page, errors };
 }
 const shot = (page, name) => (SHOT ? page.screenshot({ path: path.join(SHOT, name), fullPage: true }) : null);
-// Opens a subpage by hash and waits until the page is drawn (the loading line is gone).
-async function openSub(page, hash) {
+// The account page is drawn again on every store sync and on every hash change, so a count taken right after a draw can
+// read the page mid-redraw (CI: "the email is gone", expected 0, actual 1). Wait for the sync to settle, then for the
+// element the assertion counts, before counting.
+const settled = (page) => page.waitForFunction(() => document.querySelector('#sync')?.textContent.includes('Đã đồng bộ'), null, { timeout: 15000 });
+// Opens a subpage by hash and waits until the page is drawn (the loading line is gone) and its own element is there.
+async function openSub(page, hash, ready = '.acc-root') {
   await page.goto(base + '/#' + hash);
   await page.waitForSelector('.acc-root');
   await page.waitForLoadState('networkidle'); // the app may draw the page twice: wait for the last draw
   await page.waitForFunction(() => !document.body.innerText.includes('Đang tải'));
+  await settled(page);
+  await page.locator(ready).first().waitFor({ state: 'visible' });
 }
 
 test('account sheet: focus on the heading, link to Tài khoản', { skip }, async () => {
@@ -130,14 +136,15 @@ test('subpages: each row opens its page with a back button; every capability is 
   const { ctx, page, errors } = await ownerPage();
   try {
     // sign-in methods: the email form, the Google row, the grouped list, the soon rows
-    await openSub(page, 'tai-khoan/dang-nhap');
+    await openSub(page, 'tai-khoan/dang-nhap', '.acc-root .acc-sub-h');
     assert.equal((await page.textContent('#cbtitle')).trim(), 'Cách đăng nhập');
     assert.equal(await page.locator('#cbback').count(), 1, 'back button on a subpage');
     const subs = await page.$$eval('.acc-root .acc-sub-h', (els) => els.map((e) => e.textContent.trim()));
-    assert.deepEqual(subs, ['Email', 'Số điện thoại', 'Passkey', 'Tài khoản liên kết', 'Xác minh 2 bước']);
-    for (const s of ['Thêm số điện thoại', 'Apple', 'Zalo', 'Facebook', 'Ứng dụng xác thực', 'Mã khôi phục', 'Tạo passkey trên thiết bị này']) {
+    assert.deepEqual(subs, ['Email', 'Số điện thoại', 'Passkey', 'Tài khoản liên kết']); // two-step sign-in lives under Bảo mật
+    for (const s of ['Thêm số điện thoại', 'Apple', 'Zalo', 'Facebook']) {
       assert.equal(await page.locator('.acc-root [data-soon]', { hasText: s }).count(), 1, 'Sắp có: ' + s);
     }
+    assert.equal(await page.locator('.acc-root [data-add-passkey]', { hasText: 'Thêm passkey' }).count(), 1, 'passkeys can be added here');
     assert.equal(await page.locator('[data-soon]').first().isDisabled(), true);
     assert.equal(await page.locator('.acc-root .calm', { hasText: 'Google' }).locator('.tag', { hasText: 'Đã liên kết' }).count(), 1);
     // unlink Google: the ⋯ of the Google row offers "Gỡ liên kết" (not clicked: it is the only sign-in method)
@@ -150,41 +157,51 @@ test('subpages: each row opens its page with a back button; every capability is 
     await page.fill('#acc-em', EXTRA);
     await page.click('.acc-form button[type=submit]');
     await page.waitForSelector(`.acc-root .calm:has-text("${EXTRA}")`);
+    await settled(page);
     assert.equal(await page.locator('.acc-root .calm', { hasText: EXTRA }).locator('.tag', { hasText: 'Chưa xác minh' }).count(), 1);
     await page.locator('.calm-row', { hasText: EXTRA }).locator('[data-em]').click();
     assert.deepEqual(await page.$$eval('.menu [role=menuitem]', (els) => els.map((e) => e.textContent.trim())), ['Gửi lại đường dẫn xác minh', 'Gỡ email']);
     await page.click('.menu [role=menuitem]:has-text("Gỡ email")');
-    await page.click('dialog.cfm [data-cfm-ok]');
+    await page.click('dialog.dcf [data-dcf-ok]');
     await page.waitForSelector('text=Đã gỡ email.');
+    await settled(page);
+    await page.locator('.acc-root .calm', { hasText: EXTRA }).first().waitFor({ state: 'detached' });
     assert.equal(await page.locator('.acc-root .calm', { hasText: EXTRA }).count(), 0, 'the email is gone');
     // devices: this device, and the sign-out of the other ones
-    await openSub(page, 'tai-khoan/thiet-bi');
+    await openSub(page, 'tai-khoan/thiet-bi', '.acc-root .calm');
     assert.equal((await page.textContent('#cbtitle')).trim(), 'Thiết bị đang đăng nhập');
+    await page.locator('.acc-root .calm', { hasText: 'Thiết bị này' }).first().waitFor({ state: 'visible' });
     assert.ok(await page.locator('.acc-root .calm', { hasText: 'Thiết bị này' }).count() >= 1);
+    await page.locator('[data-out-others]').waitFor({ state: 'visible' });
     assert.equal(await page.locator('[data-out-others]').count(), 1, 'other devices exist (one per ownerPage call)');
     await page.click('[data-out-others]');
-    await page.click('dialog.cfm [data-cfm-ok]');
+    await page.click('dialog.dcf [data-dcf-ok]');
     await page.waitForSelector('text=Đã đăng xuất các thiết bị khác.');
+    await settled(page);
+    await page.locator('[data-out-others]').waitFor({ state: 'detached' });
     assert.equal(await page.locator('[data-out-others]').count(), 0);
     // families with the role
-    await openSub(page, 'tai-khoan/dong-ho');
+    await openSub(page, 'tai-khoan/dong-ho', '.acc-root .calm .tag');
     assert.equal((await page.textContent('#cbtitle')).trim(), 'Dòng họ của tôi');
     assert.match(await page.textContent('.acc-root'), /Họ Dương/);
     assert.ok(await page.locator('.acc-root .calm .tag', { hasText: 'Chủ họ' }).count() >= 1, 'families with the role');
     // security activity
-    await openSub(page, 'tai-khoan/bao-mat');
+    await openSub(page, 'tai-khoan/bao-mat', '.acc-root .calm');
     assert.equal((await page.textContent('#cbtitle')).trim(), 'Bảo mật');
+    assert.equal(await page.locator('.acc-root a[href="#tai-khoan/xac-minh"]', { hasText: 'Xác minh 2 bước' }).count(), 1, 'two-step sign-in is under Bảo mật');
     assert.ok(await page.locator('.acc-root .calm').count() >= 1, 'sign-in history is listed');
     // danger zone: the delete row is "Sắp có"
-    await openSub(page, 'tai-khoan/vung-nguy-hiem');
+    await openSub(page, 'tai-khoan/vung-nguy-hiem', '.acc-root [data-soon]');
     assert.equal(await page.locator('.acc-root [data-soon]', { hasText: 'Xóa tài khoản' }).count(), 1);
     assert.deepEqual(errors, []);
   } finally { await ctx.close(); }
 });
 
 test('passkey row and the account name', { skip }, async () => {
-  await pool.query("insert into passkeys (cred_id, public_key, transports, account, family_id, label) values ('acct-page-e2e-cred', '\\x00', '{}', $1, 'duong', 'iPhone e2e') on conflict do nothing", ['g:' + OWNER]);
   const { ctx, page, errors } = await ownerPage({ scheme: 'dark' });
+  // a passkey belongs to the account (account_id, migration 027); the owner's account exists once signed in
+  const { rows: [acct] } = await pool.query("select account_id from identities where type = 'email' and value_norm = $1 and verified_at is not null", [OWNER]);
+  await pool.query("insert into passkeys (cred_id, public_key, transports, account, account_id, family_id, label) values ('acct-page-e2e-cred', '\\x00', '{}', $1, $2, 'duong', 'iPhone e2e') on conflict do nothing", ['g:' + OWNER, acct.account_id]);
   try {
     await openSub(page, 'tai-khoan/dang-nhap');
     assert.match(await page.textContent('.acc-root'), /iPhone e2e/, 'passkey listed');

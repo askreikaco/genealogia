@@ -1,7 +1,9 @@
 // E2E: an AI connection from consent to revoke, in the browser (phone, 390 px). The real server and a SCRATCH database:
 //   GP_TEST_DATABASE_URL=postgres://... NODE_PATH=<dir with playwright> [GP_E2E_CHROME=...] npm run test:e2e (from giapha/server)
 // Checks: /oauth/authorize opens one consent screen (family + scopes, one primary button); allowing sends the code back;
-// Cài đặt lists the connection as a calm row; ⋯ > Thu hồi asks to confirm, then the row is gone and the API no longer has it.
+// Cài đặt lists the connection as a calm row; Gỡ kết nối asks to confirm, then the row is gone and the API no longer has it.
+// Signed out: the card says what it is and its Đăng nhập button opens the sign-in. Signed in: Kết nối ứng dụng AI opens
+// the sheet with this origin's /mcp address and steps for Claude and ChatGPT.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
@@ -70,11 +72,51 @@ test('consent, then revoke from Cài đặt', { skip }, async () => {
     await page.goto(`${base}/#settings`);
     const row = page.locator('.ai-row', { hasText: CLIENT });
     await row.waitFor();
-    await row.locator('summary').click();
-    await row.getByRole('button', { name: 'Thu hồi' }).click();
-    await page.locator('dialog.cfm [data-cfm-ok]').click();
+    await row.getByRole('button', { name: 'Gỡ kết nối' }).click();
+    await page.locator('dialog.dcf [data-dcf-ok]').click();
     await page.locator('.ai-row', { hasText: CLIENT }).waitFor({ state: 'detached' });
     const left = await (await fetch(base + '/api/ai/connections', { headers: { cookie } })).json();
     assert.ok(!left.items.some((x) => x.client_name === CLIENT), 'gone from the server too');
+  } finally { await browser.close(); }
+});
+
+// Signed out: the card explains itself and its button starts the app's sign-in (the sign-in dialog opens on this page).
+test('signed out: the card says what it is and Đăng nhập starts sign-in', { skip }, async () => {
+  const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+    await ctx.route(/^https:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com)\//, (r) => r.abort());
+    const page = await ctx.newPage();
+    await page.goto(`${base}/#settings`);
+    const card = page.locator('.ai-sec');
+    await card.getByText('Cho phép Claude, ChatGPT').waitFor();
+    await card.getByRole('button', { name: 'Đăng nhập' }).click();
+    await page.locator('dialog', { hasText: 'Đăng nhập để sửa' }).waitFor();
+    assert.equal(await page.locator('dialog[open]').count(), 1, 'one sign-in dialog opens');
+  } finally { await browser.close(); }
+});
+
+// Signed in: the connect sheet shows this origin's /mcp address, a copy button, and steps for Claude and ChatGPT.
+test('signed in: connect sheet shows the MCP address and steps', { skip }, async () => {
+  const sess = await fetch(base + '/api/test/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: OWNER, name: 'Chủ AI e2e' }) });
+  const cookie = sess.headers.get('set-cookie').split(';')[0];
+  const i = cookie.indexOf('=');
+  const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+    await ctx.route(/^https:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com)\//, (r) => r.abort());
+    await ctx.addCookies([{ name: cookie.slice(0, i), value: cookie.slice(i + 1), url: base }]);
+    const page = await ctx.newPage();
+    await page.goto(`${base}/#settings`);
+    await page.locator('.ai-sec [data-connect]').click();
+    const sheet = page.locator('dialog.ai-sheet');
+    await sheet.waitFor();
+    assert.equal((await sheet.locator('.ai-url code').textContent()).trim(), `${base}/mcp`);
+    assert.equal(await sheet.locator('[data-copy]').count(), 1, 'copy button');
+    const lists = sheet.locator('.ai-steps');
+    assert.equal(await lists.count(), 2, 'steps for Claude and ChatGPT');
+    assert.equal(await lists.nth(0).locator('li').count(), 3, 'three steps for Claude');
+    await sheet.locator('[data-close]').click();
+    await page.locator('dialog.ai-sheet').waitFor({ state: 'detached' });
   } finally { await browser.close(); }
 });

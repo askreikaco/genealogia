@@ -1,7 +1,8 @@
 // GEDCOM routes: export (members and above) and import (owners and admins; the editor code counts as admin).
 // Import: POST with dry_run (default) returns the plan; dry_run false applies the same plan in one transaction:
 //   new people and empty fields go straight in (history "nhập GEDCOM"), a field with another value goes to the review
-//   queue as a suggestion with its base (3-way like any suggestion), events and relations are added when missing.
+//   queue as a suggestion with its base (3-way like any suggestion), events and relations are added when missing,
+//   story notes (Câu chuyện) are written as stories unless the person already has the same one.
 // Rules live in gedcom.js (pure), event and date rules in web/js/events.js, fuzzy names in web/js/fuzzy.js.
 'use strict';
 const crypto = require('crypto');
@@ -30,9 +31,10 @@ module.exports = function mountGedcom(app, deps) {
     const { rows: persons } = await q.query('select id, data from persons where family_id = $1 and not deleted', [f.id]);
     const { rows: events } = await q.query(
       'select id, person_id, type, date_kind, date_from, date_to, place, description, lunar from events where family_id = $1', [f.id]);
+    const { rows: stories } = await q.query('select person_id, kind, title, body from stories where family_id = $1', [f.id]);
     const table = await REL.isTable(q, f.id);
     const rel = await REL.readRel(q, f.id, true);
-    const plan = G.planImport(doc, { R, F, persons, events, pc: rel.pc, cp: rel.cp, relMode: table ? 'table' : 'legacy', newId });
+    const plan = G.planImport(doc, { R, F, persons, events, stories, pc: rel.pc, cp: rel.cp, relMode: table ? 'table' : 'legacy', newId });
     return { doc, plan, table };
   }
 
@@ -46,7 +48,7 @@ module.exports = function mountGedcom(app, deps) {
     const actor = `${IMPORT_BY}: ${actorName(w)}`;
     const batch = crypto.randomBytes(6).toString('hex');
     let seq = 0; const opId = () => `gx-${batch}-${++seq}`;
-    const out = { persons_created: 0, persons_filled: 0, events_added: 0, suggestions_queued: 0, relations_added: 0, relations_skipped: [] };
+    const out = { persons_created: 0, persons_filled: 0, events_added: 0, stories_added: 0, suggestions_queued: 0, relations_added: 0, relations_skipped: [] };
     for (const pp of plan.persons) {
       const fields = { ...pp.fill };
       if (Object.keys(fields).length) {
@@ -59,6 +61,10 @@ module.exports = function mountGedcom(app, deps) {
       for (const ev of pp.events) {
         await EV.insertEvent(q, f.id, pp.id, ev, actor);
         out.events_added++;
+      }
+      for (const st of pp.stories) {
+        await EV.upsertStory(q, f.id, pp.id, { kind: st.kind, title: st.title, body: st.body }, actor);
+        out.stories_added++;
       }
       if (pp.conflicts.length) {
         const changes = Object.fromEntries(pp.conflicts.map((c) => [c.field, c.incoming]));

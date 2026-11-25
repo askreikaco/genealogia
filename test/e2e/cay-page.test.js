@@ -19,7 +19,7 @@ const skip = !DB_URL ? 'set GP_TEST_DATABASE_URL (scratch DB) to run'
   : !/scratch|e2e|giapha_ci/.test(DB_URL) ? 'GP_TEST_DATABASE_URL must name a scratch database (contains "scratch", "e2e" or giapha_ci)'
   : !chromium ? 'playwright not installed (NODE_PATH)' : false;
 
-const KB = 'cay-kha-ben'; const KS = 'cay-kha-song'; const PG = 'cay-phan-go'; const PV = 'cay-kin-kin';
+const KB = 'cay-kha-ben'; const KS = 'cay-kha-song'; const PG = 'cay-phan-go'; const PV = 'cay-kin-kin'; const HV = 'cay-hoang-vn'; const HJ = 'cay-hoang-jp';
 const MEMBER = 'cay.member@example.test';
 let base, pool, srv, browser, iso;
 const { isolatedDb } = require('./_isolated-db');
@@ -37,6 +37,8 @@ test.before(async () => {
   const fam = (id, name, place, vis, han) => pool.query('insert into families (id, slug, name, han, place, visibility) values ($1,$1,$2,$3,$4,$5) on conflict do nothing', [id, name, han, place, vis]);
   await fam(KB, 'Họ Kha Bến Thử', 'Bến Thử', 'public', '柯'); await fam(KS, 'Họ Kha Sông Thử', 'Sông Mây', 'public', '柯');
   await fam(PG, 'Họ Phan Gò Thử', 'Gò Trúc', 'public', '潘'); await fam(PV, 'Họ Kín Thử', 'Kín', 'private', '金');
+  // a Vietnamese Họ Hoàng and a Japanese reference tree of the same surname text: the JP row never links to the clan
+  await pool.query("insert into families (id, slug, name, place, visibility, country) values ($1,$1,'Họ Hoàng Thử','Thử','public','VN'), ($2,$2,'Hoàng tộc Nhật Bản (tham khảo)','','public','JP') on conflict do nothing", [HV, HJ]);
   await pool.query("insert into members (email, name, family_id, role, status) values ($1,'Thành viên e2e',$2,'member','active') on conflict (family_id, email) do nothing", [MEMBER, KB]);
   srv = app.listen(0, '127.0.0.1');
   await new Promise((r) => srv.on('listening', r));
@@ -81,13 +83,19 @@ test('old #tim-dong-ho redirects to the all-families tree; sections, search, pre
     await page.goto(`${base}/#tim-dong-ho`);
     await page.waitForFunction(() => location.hash === '#/tat-ca/tree', null, { timeout: 10000 });
     await settle(page, ['Kha Bến', 'Phan Gò']);
+    // the family list is redrawn on every store sync: wait for the sync to settle before counting (count() does not wait)
+    await page.waitForFunction(() => document.querySelector('#sync')?.textContent.includes('Đã đồng bộ'), null, { timeout: 15000 });
+    await page.locator('#flist .cay-h', { hasText: 'Khám phá · công khai' }).first().waitFor({ state: 'visible' });
     // guest: nothing followed here, so the public families are in "Khám phá"; the private one is not listed
     assert.ok(await page.locator('#flist .cay-h', { hasText: 'Khám phá · công khai' }).count() === 1, await page.locator('#flist').innerText());
     assert.equal(await page.locator('#flist').getByText('Kín', { exact: false }).count(), 0, 'private family not listed to a guest');
-    assert.equal(await rows(page, 'Khám phá').count(), 3);
+    assert.equal(await rows(page, 'Khám phá').count(), 5);
     // one clan link for the surname (shown once, under its first row); none for Phan
     assert.equal(await page.locator('#flist a.cay-clan[href="#ho/kha"]').count(), 1);
     assert.equal(await page.locator('#flist a.cay-clan[href="#ho/phan"]').count(), 0);
+    // Hoàng: the VN family is alone in its clan (no link); the JP family is never in it (no link)
+    assert.equal(await page.locator('#flist a.cay-clan[href="#ho/hoang"]').count(), 0);
+    assert.equal(await page.locator('#flist .cay-item', { hasText: 'Hoàng tộc' }).locator('a.cay-clan').count(), 0);
     assert.equal(await page.locator('#flist').getByRole('link', { name: 'Xem trước' }).count(), 0);
     assert.equal(await page.locator('#flist').getByRole('link', { name: 'Mở', exact: true }).count(), 0);
     // search filters both sections

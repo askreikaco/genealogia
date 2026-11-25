@@ -25,7 +25,7 @@ const PERSONS = [
   P('R', { name: 'Dương Văn Tổ', sex: 'm', gen: 1, born: '1850', died: '1910' }),
   P('A', { name: 'Vương Văn Lyh', sex: 'm', gen: 2, parent: 'R', order: 2, born: '1880', died: '1950' }),
   P('B', { name: 'Dương Văn Bình', sex: 'm', gen: 2, parent: 'R', order: 1, born: '1878', died: '1940', sid: SID_B }),
-  P('A1', { name: 'Dương Văn Cường', sex: 'm', gen: 3, parent: 'A', order: 1, born: '1905', died: '1970' }),
+  P('A1', { name: 'Giả Văn An', sex: 'm', gen: 3, parent: 'A', order: 1, born: '1905', died: '1970' }),
   P('A2', { name: 'Vương Thị Lan', sex: 'f', gen: 3, parent: 'A', order: 2, born: '1908', died: '1990', sid: SID_A2 }),
   P('A3', { name: 'Dương Chưa Rõ', gen: 3, parent: 'A', order: 3, born: '1910', died: '1960' }),
   P('W', { name: 'Lê Thị Vợ', sex: 'f', gen: 1, spouse_of: 'R', spouse_n: 1, died: '1915' }),
@@ -105,7 +105,7 @@ test('Tìm: exact code and prefix', { skip }, async () => {
       await page.waitForSelector('.cards', { timeout: 8000 });
       const names = (await page.locator('.cards .card b').allInnerTexts()).map((t) => t.trim());
       assert.equal(names.length, 3, names.join(' | '));
-      for (const n of ['Dương Văn Cường', 'Vương Thị Lan', 'Dương Chưa Rõ']) assert.ok(names.some((x) => x.includes(n)), n);
+      for (const n of ['Giả Văn An', 'Vương Thị Lan', 'Dương Chưa Rõ']) assert.ok(names.some((x) => x.includes(n)), n);
       assert.match(await page.locator('.cards .card').first().innerText(), /D-3\.2\.1 ·/, 'the code leads line 2 for a code search');
       if (SHOT_DIR) await page.screenshot({ path: path.join(SHOT_DIR, `codes-search-390-${scheme}.png`) });
       assert.deepStrictEqual(errors, []);

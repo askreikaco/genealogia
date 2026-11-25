@@ -30,8 +30,8 @@ function mount(app, d) {
     const ver = await version();
     const hit = cache.get(slug);
     if (hit && hit.ver === ver && Date.now() - hit.at < TTL) return hit.base;
-    const all = (await pool.query('select id, slug, name, han, short_name, founder_person_id, origin_place, place, visibility from families')).rows;
-    const fams = all.filter((f) => C.clanSlug(C.familySurname(f.name)) === slug);
+    const all = (await pool.query('select id, slug, name, han, short_name, founder_person_id, origin_place, place, visibility, country from families')).rows;
+    const fams = all.filter((f) => C.inClan(f.name, f.country) && C.clanSlug(C.familySurname(f.name)) === slug);
     let base = null;
     if (fams.length) {
       const ids = fams.map((f) => f.id);
@@ -81,15 +81,23 @@ function mount(app, d) {
       const show = f.founder && (f.founder.dead || member(f));
       const year = show ? (f.founder.born ?? f.founder.died) : null;
       return { id: f.id, slug: f.slug || f.id, label: f.short_name || f.name, han: f.han || '', origin: f.origin_place || f.place || '',
-        people: f.people, year, founder: show ? { name: f.founder.name, born: f.founder.born, died: f.founder.died } : null };
+        people: f.people, year, country: f.country || '', founder: show ? { name: f.founder.name, born: f.founder.born, died: f.founder.died } : null };
     });
-    const grouped = C.groupTrees(trees, base.edges);
+    // Quốc gia level: counts over the trees this viewer may see (private trees never add to a country), and an
+    // optional ?country=XX (or NONE: no country set) filter for the clan page chips.
+    const qc = typeof req.query.country === 'string' ? req.query.country.trim().toUpperCase() : '';
+    if (qc && !/^([A-Z]{2}|NONE)$/.test(qc)) throw new HttpError(400, 'Quốc gia không hợp lệ.');
+    const cc = new Map(); for (const t of trees) { const k = t.country || 'NONE'; cc.set(k, (cc.get(k) || 0) + 1); }
+    const countries = cc.size && [...cc.keys()].some((k) => k !== 'NONE')
+      ? [...cc.entries()].map(([code, n]) => ({ code, trees: n })).sort((a, b) => (a.code === 'NONE') - (b.code === 'NONE') || b.trees - a.trees || a.code.localeCompare(b.code)) : [];
+    const shown = qc ? trees.filter((t) => (qc === 'NONE' ? !t.country : t.country === qc)) : trees;
+    const grouped = C.groupTrees(shown, base.edges);
     const out = C.pageOf(grouped, req.query.page, PAGE);
     res.set('Cache-Control', 'no-store');
     res.json({
       surname: base.surname, han: base.han, slug,
       kpis: { groups: grouped.groups.length, trees: trees.length, people: trees.reduce((n, t) => n + t.people, 0) },
-      private_count: base.fams.length - vis.length,
+      private_count: base.fams.length - vis.length, countries, country: qc,
       ...out,
     });
   }));

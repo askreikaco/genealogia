@@ -47,6 +47,8 @@ const T = {
   layoutSummary: ['Tóm tắt', 'Summary'],
   hideLiving: ['Ẩn người còn sống', 'Hide living people'],
   living2: ['Người còn sống', 'Living person'],
+  showCodes: ['Hiện mã người', 'Show person codes'],
+  codeLabel: ['Mã', 'Code'],
   language: ['Ngôn ngữ', 'Language'],
   paper: ['Khổ', 'Page'], landscape: ['Ngang', 'Landscape'], portrait: ['Dọc', 'Portrait'],
   langVi: ['Tiếng Việt', 'Vietnamese'],

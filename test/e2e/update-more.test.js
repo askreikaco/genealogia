@@ -63,10 +63,11 @@ async function open(browser, { width = 390, hash = '/duong/more', role = st.role
   await page.waitForTimeout(300);
   return { page, ctx, errors };
 }
-// A new build is live: the page is told by its next version check (visibility change), as the app does every few minutes.
+// A new build is live: the page is told by its next version check (the app asks at most once a day, so the test
+// clears that day first, as if a day had passed, then the page comes back to the foreground).
 async function announceNewBuild(page) {
   st.serverV = NEXT; st.bump = true;
-  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.evaluate(() => { try { localStorage.removeItem('gp-upd-checked'); } catch {} document.dispatchEvent(new Event('visibilitychange')); });
 }
 async function reset() { st.serverV = CUR; st.bump = false; st.role = 'member'; }
 
@@ -120,6 +121,29 @@ test('update: an idle app applies a new build by itself when it comes back to th
   } finally { await b.close(); await reset(); }
 });
 
+test('update: a dialog open keeps the page; once closed, the next navigation applies the waiting build', { skip }, async () => {
+  await reset();
+  const b = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
+  try {
+    const { page, ctx, errors } = await open(b, { hash: '/duong/tree', role: 'guest' });
+    await page.waitForFunction(() => navigator.serviceWorker?.controller, null, { timeout: 8000 });
+    await page.click('#swbtn');
+    await announceNewBuild(page);
+    await page.waitForSelector('#updnote', { timeout: 15000 });
+    await page.evaluate(() => { window.__m = 'before-nav'; });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    assert.strictEqual(await page.evaluate(() => window.__m), 'before-nav', 'still not reloaded after the dialog closed');
+    await page.evaluate(() => { location.hash = '#/duong/more'; });
+    await page.waitForFunction(() => window.__m === undefined, null, { timeout: 15000 });
+    await page.waitForSelector('#chkupd');
+    assert.ok((await page.textContent('#chkupd')).includes('Phiên bản ' + NEXT.slice(3)), 'the page after navigation runs the new build');
+    assert.strictEqual(await page.locator('#updnote').count(), 0);
+    assert.deepStrictEqual(errors, []);
+    await ctx.close();
+  } finally { await b.close(); await reset(); }
+});
+
 test('update: a form with unsaved changes keeps the page; the notice waits', { skip }, async () => {
   await reset();
   const b = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
@@ -159,7 +183,7 @@ test('Thêm: every row sits in a group card; the account block is last; the vers
       assert.match(await page.textContent('#chkupd'), /Phiên bản dev.*Kiểm tra cập nhật/);
       await page.click('#chkupd');
       await page.waitForSelector('.toast:not([hidden])', { timeout: 5000 });
-      assert.match(await page.textContent('.toast'), /Đang dùng bản mới nhất/);
+      assert.match(await page.textContent('.toast'), /Đã là bản mới nhất/);
       if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `more-${role}-390.png`), fullPage: true });
       assert.deepStrictEqual(errors, []);
       await ctx.close();

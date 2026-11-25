@@ -41,8 +41,8 @@ test('cycle: a person who is their own ancestor is rejected with a message namin
   const path = R.cyclePath(ix, 'P007', 'P001');
   assert.deepEqual(path, ['P007', 'P004', 'P001']);
   const msg = R.cycleMessage(path, (id) => NAME[id]);
-  assert.match(msg, /Dương Văn Cường đã là tổ tiên của Dương Minh Quân/);
-  assert.match(msg, /Dương Minh Quân là con của Dương Văn Tâm/);
+  assert.match(msg, /Giả Văn An đã là tổ tiên của Giả Công Trí/);
+  assert.match(msg, /Giả Công Trí là con của Giả Quang Nghĩa/);
   assert.equal(R.cyclePath(ix, 'P001', 'P007'), null, 'the reverse direction is fine');
 });
 

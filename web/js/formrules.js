@@ -107,3 +107,13 @@ export function suggestThu({ parentId, selfId = null, year, people, base = 1 }) 
   const before = sibs.filter((p) => { const y = yearOfData(p.data); return y != null && y <= year; }).length;
   return base + before;
 }
+
+// Tên chữ Hán (name_han): Han characters and spaces only, at most 40 characters. Same rule as server/core.js (hanNameError).
+export const MAX_HAN = 40;
+export function hanNameError(v) {
+  const t = String(v ?? '').trim();
+  if (!t) return null;
+  if (Array.from(t).length > MAX_HAN) return `Tối đa ${MAX_HAN} ký tự.`;
+  if (!/^[\p{Script=Han}\s]+$/u.test(t)) return 'Chỉ nhập chữ Hán và dấu cách, ví dụ 阮文.';
+  return null;
+}

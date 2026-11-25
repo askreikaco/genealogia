@@ -45,7 +45,8 @@ export function parseIso(s) {
 const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
 export function daysIn(m, y) { return m ? [31, isLeap(y) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1] : 31; }
 const DAY = 864e5;
-const dayNum = (y, m, d) => Math.round(Date.UTC(y, (m || 1) - 1, d || 1) / DAY);
+// Day number (UTC) of a date, exact for years 0–99 and BCE: Date.UTC maps 0–99 to 1900–1999, so set the year explicitly.
+export const dayNum = (y, m, d) => { const t = new Date(0); t.setUTCFullYear(y, (m || 1) - 1, d || 1); return Math.round(t.getTime() / DAY); };
 // First and last day a partial date can cover.
 export function startDays(iso) { const p = parseIso(iso); return p ? dayNum(p.y, p.m, p.d) : null; }
 export function endDays(iso) { const p = parseIso(iso); return p ? dayNum(p.y, p.m || 12, p.d || daysIn(p.m || 12, p.y)) : null; }
@@ -73,6 +74,7 @@ export function sortEvents(list) {
     if (da === null && db !== null) return 1;
     if (db === null && da !== null) return -1;
     if (da !== db) return (da ?? 0) - (db ?? 0);
+    if (!!a.band !== !!b.band) return a.band ? -1 : 1; // an era that starts at the birth year comes first
     if (a.is_preferred !== b.is_preferred) return a.is_preferred ? -1 : 1;
     return String(a.id).localeCompare(String(b.id));
   });
@@ -124,7 +126,13 @@ export function birthIso(d) {
   if (!d) return null;
   const p = parseEventDate(d.birth_date || '');
   if ((p.kind === 'exact' || p.kind === 'about') && p.from && startDays(p.from) !== null) return p.from;
-  return /^\d{4}$/.test(String(d.born || '')) ? String(d.born) : null;
+  return yearField(d.born);
+}
+// A year typed in a plain field: "941", "1963", "khoảng 901", "~941" -> ISO year padded to 4 digits ("0941", "0901"); else null.
+// Years before 1000 are common in the reference trees, so 1–4 digits are accepted here.
+export function yearField(s) {
+  const m = /^\s*(?:~|khoảng chừng|khoảng|khoang|chừng|vd\.?)?\s*(\d{1,4})\s*$/i.exec(String(s || ''));
+  return m ? m[1].padStart(4, '0') : null;
 }
 // Age at an event. Both dates full: whole years. Otherwise years by the year numbers, approx: true.
 export function ageAt(birth, ev) {
@@ -147,7 +155,7 @@ export const stageOf = (age) => (STAGES.find(([a, b]) => age >= a && age <= b) |
 export function isoOfDied(s) {
   const p = parseEventDate(s || '');
   if ((p.kind === 'exact' || p.kind === 'about') && p.from) return p.from;
-  return /^\d{4}$/.test(String(s || '')) ? String(s) : null;
+  return yearField(s);
 }
 
 // ---- privacy: by person. A living person's events are shown to members only; a deceased person's to anyone who can read the family ----

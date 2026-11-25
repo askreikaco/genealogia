@@ -13,7 +13,11 @@ export function familySurname(name) {
   if (w.length >= 2 && SURNAME_HAN[w[0] + ' ' + w[1]]) return w[0] + ' ' + w[1];
   return w[0] || '';
 }
-export const clanHref = (familyName) => { const s = familySurname(familyName); return s ? '#ho/' + clanSlug(s) : ''; };
+// Clan membership: a family is in the clan of its surname if its name starts with "Họ " (a Vietnamese clan keeps its
+// diaspora branches, whatever their country), or if its country is VN or unset. "Hoàng tộc Nhật Bản" (JP) is not in hoang.
+export const inClan = (familyName, country) => /^họ\s/i.test(String(familyName || '').normalize('NFC').trim())
+  || !country || String(country).trim().toUpperCase() === 'VN';
+export const clanHref = (familyName, country) => { if (!inClan(familyName, country)) return ''; const s = familySurname(familyName); return s ? '#ho/' + clanSlug(s) : ''; };
 
 // Oldest founder first: founder year (unknown last), then the tree's label.
 const byFounder = (a, b) => ((a.year ?? Infinity) - (b.year ?? Infinity)) || String(a.label).localeCompare(String(b.label), 'vi');
