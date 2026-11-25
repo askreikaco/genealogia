@@ -163,7 +163,7 @@ test('two families named Họ Dương: chips on the combined Giỗ page say "Dư
   try {
     const s = await open(b, { roles: { duong: 'member', anlac: 'member' }, hash: '/tat-ca/gio' });
     await s.page.waitForFunction(() => document.querySelectorAll('.gior').length === 2);
-    const chips = await s.page.locator('.gior .fchip-n').allTextContents();
+    const chips = await s.page.locator('.gior .tag-n').allTextContents();
     assert.deepEqual([...chips].sort(), ['Dương · An Lạc', 'Dương · Phú Mỹ']);
     if (SHOTS) await s.page.screenshot({ path: path.join(SHOTS, 'clan-chips-390.png') });
     assert.deepStrictEqual(s.errors, []);

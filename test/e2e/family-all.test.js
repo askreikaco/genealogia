@@ -114,9 +114,9 @@ test('giỗ combines both families with a chip on every row, sorted by date', { 
     await page.waitForFunction(() => document.querySelector('#sync')?.textContent.includes('Đã đồng bộ'), null, { timeout: 15000 });
     const rows = await page.locator('.gior').count();
     assert.equal(rows, 3); // Dương Văn Cha (10/3), Nguyễn Văn Xa (5/8), Nguyễn Thị Hoa (20/1)
-    await page.locator('.gior .fchip-n').first().waitFor({ state: 'visible' });
-    assert.equal(await page.locator('.gior .fchip-n').count(), rows);
-    const names = await page.locator('.gior .fchip-n').allTextContents();
+    await page.locator('.gior .tag-n').first().waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.gior .tag-n').count(), rows);
+    const names = await page.locator('.gior .tag-n').allTextContents();
     assert.ok(names.includes('Dương') || names.some((x) => /Dương/.test(x)));
     assert.ok(names.some((x) => /Nguyễn/.test(x)));
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'gio-390.png'), fullPage: false });
@@ -135,17 +135,17 @@ test('phone: Dòng họ filter in the sheet, active tag removes it; person links
     assert.match(href, /^#\/(duong|dong-a)\/person\//);
     await page.click('[data-fp]');
     await page.selectOption('#ffamp', 'dong-a');
-    await page.waitForSelector('.ltags .tagx');
-    assert.match(await page.textContent('.ltags .tagx'), /Dòng họ: Nguyễn/);
+    await page.waitForSelector('.ltags .tag.remove');
+    assert.match(await page.textContent('.ltags .tag.remove'), /Dòng họ: Nguyễn/);
     assert.equal(await page.locator('.cards .pi-card').count(), 2);
     if (SHOTS) {
       await page.click('[data-fp]'); await page.selectOption('#ffamp', 'dong-a');
       await page.click('[data-fp]'); await page.screenshot({ path: path.join(SHOTS, 'list-filter-sheet-390.png') });
       await page.keyboard.press('Escape');
     }
-    await page.click('.ltags .tagx');
+    await page.click('.ltags .tag.remove');
     await page.waitForFunction(() => document.querySelectorAll('.cards .pi-card').length === 5);
-    assert.equal(await page.locator('.ltags .tagx').count(), 0);
+    assert.equal(await page.locator('.ltags .tag.remove').count(), 0);
     assert.deepStrictEqual(errors, []);
     await ctx.close();
   } finally { await b.close(); }
@@ -187,8 +187,8 @@ test('"Tất cả" stats show the per-family breakdown; map legend colours each 
     await s.page.waitForSelector('text=Theo dòng họ');
     await s.ctx.close();
     const m = await open(b, { roles: BOTH, width: 1280, hash: '/tat-ca/map' });
-    await m.page.waitForSelector('.legend .fchip-n');
-    assert.equal(await m.page.locator('.legend .fchip-n').count(), 3); // two families and "Nhiều dòng họ" (mixed clusters)
+    await m.page.waitForSelector('.legend .tag-n');
+    assert.equal(await m.page.locator('.legend .tag-n').count(), 3); // two families and "Nhiều dòng họ" (mixed clusters)
     if (SHOTS) await m.page.screenshot({ path: path.join(SHOTS, 'map-1280.png') });
     assert.deepStrictEqual(m.errors, []);
     await m.ctx.close();
@@ -234,7 +234,7 @@ test('single family: no chips, no Dòng họ filter, no "Tất cả" entry (unch
   try {
     const { ctx, page, errors } = await open(b, { roles: { duong: 'member' }, width: 390, hash: '/duong/list' });
     await page.waitForSelector('.cards .pi-card');
-    assert.equal(await page.locator('.fchip').count(), 0);
+    assert.equal(await page.locator('.tag.family').count(), 0);
     assert.equal(await page.locator('#ffamp').count(), 0);
     await openSwitcher(page);
     assert.equal(await page.locator('dialog.csw .famr:not(.add)').count(), 1);
@@ -245,7 +245,7 @@ test('single family: no chips, no Dòng họ filter, no "Tất cả" entry (unch
     const d = await open(b, { roles: { duong: 'member' }, width: 1280, hash: '/duong/list' });
     await d.page.waitForSelector('tbody tr');
     assert.equal(await d.page.locator('#ffam').count(), 0);
-    assert.equal(await d.page.locator('.fchip').count(), 0);
+    assert.equal(await d.page.locator('.tag.family').count(), 0);
     await d.ctx.close();
   } finally { await b.close(); }
 });

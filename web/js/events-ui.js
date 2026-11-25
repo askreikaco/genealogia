@@ -110,10 +110,10 @@ export function tlApplyUntag(f, key) {
 // The ListToolbar of the timeline: search, the filter button, the primary switches inline on desktop (tags and count follow the bar).
 export function tlToolbar(f, wide) {
   const active = tlTags(f).length;
-  const quick = `<button type="button" class="chipb${f.fam ? ' on' : ''}" data-tl-f="fam" aria-pressed="${f.fam}">${evIcon('fam', 16)}Gia đình</button>`
-    + `<button type="button" class="chipb${f.desc ? ' on' : ''}" data-tl-f="desc" aria-pressed="${f.desc}">Con cháu</button>`
-    + `<button type="button" class="chipb${f.hist ? ' on' : ''}" data-tl-f="hist" aria-pressed="${f.hist}">Lịch sử</button>`
-    + `<button type="button" class="chipb${f.source ? ' on' : ''}" data-tl-f="source" aria-pressed="${f.source}">Có nguồn</button>`;
+  const quick = tag(`${evIcon('fam', 16)}Gia đình`, { kind: 'chip', on: !!f.fam, attrs: 'data-tl-f="fam"' })
+    + tag('Con cháu', { kind: 'chip', on: !!f.desc, attrs: 'data-tl-f="desc"' })
+    + tag('Lịch sử', { kind: 'chip', on: !!f.hist, attrs: 'data-tl-f="hist"' })
+    + tag('Có nguồn', { kind: 'chip', on: !!f.source, attrs: 'data-tl-f="source"' });
   return toolbar({ id: 'tlq', ph: 'Tìm trong dòng đời', val: f.q, active: active, quick: wide ? quick : '', add: addBtn('data-ev-add', 'Thêm sự kiện') });
 }
 // The one compact approximate value: "~" on screen, "khoảng …" for screen readers (role img + aria-label).
@@ -252,7 +252,7 @@ export function evEditorHtml(item = {}, { people = [], persons = [], id = '', pa
     <div class="row end evx-acts${page ? ' fp-bar' : ''}"><button type="button" class="btn gh" data-evx-cancel>Hủy</button><button type="button" class="btn" data-evx-save>Lưu sự kiện</button></div>
   </div>`;
 }
-const personChip = (pid, persons) => { const p = persons.find((x) => x.id === pid); return `<span class="pchip" data-pid="${esc(pid)}">${esc(p ? p.name : pid)}<button type="button" class="pchip-x" data-pchip-x aria-label="Bỏ người này">×</button></span>`; };
+const personChip = (pid, persons) => { const p = persons.find((x) => x.id === pid); return tag(esc(p ? p.name : pid), { kind: 'person', x: true, attrs: `data-pid="${esc(pid)}"` }); };
 // One source as a card: name, link and quality, each full width on a phone, side by side when there is room.
 const sourceRow = (s = {}) => `<div class="srow" data-src><div class="srow-h"><span class="sub">Nguồn</span><button type="button" class="linkbtn" data-src-del aria-label="Bỏ nguồn">×</button></div>`
   + `<label class="fld">Tên nguồn<input data-sf="title" value="${esc(s.title || '')}" placeholder="vd Gia phả viết tay 1950" maxlength="300" aria-label="Tên nguồn" autocomplete="off"></label>`

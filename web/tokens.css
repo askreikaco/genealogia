@@ -3,6 +3,9 @@
    Colours here are light-dark(light, dark) or aliases of --cds-*: the page's color-scheme (system, or data-theme on <html>) picks one. */
 @import url("vendor/reika-ds/tokens.css");
 @import url("vendor/reika-ds/fonts/fonts.css");
+/* Layout switch (the one breakpoint definition): <html data-layout> = phone | tablet | desk | wide, set by the script in
+   index.html and read by ui.js layoutAtLeast(). Phone < 672 px, tablet 672-1023, desk 1024-1055, wide >= 1056. Width rules in
+   app.css are written :where(html[data-layout=...]) so they keep their old specificity. No width @media elsewhere. */
 :root{
   --sp-1:2px;--sp-2:4px;--sp-3:8px;--sp-4:12px;--sp-5:16px;--sp-6:24px;--sp-7:32px;--sp-8:48px;
   --sz-touch:44px;--tree-indent:20px;--bw-strong:3px;--sz-field:48px;--sz-field-min:168px;--sn-w:256px;--sn-rail:48px;--hd-btn:#292929;--hd-rule:#393939;

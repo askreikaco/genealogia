@@ -2,7 +2,7 @@
 // links (⇄), oldest founder first, 50 entries a page (server: clan-routes.js; rules: clan-core.js). Read only.
 // Trees the viewer cannot see are a count only. Online only: the page needs the server.
 import { esc } from './model.js';
-import { calmRow, surnameTile, surnameTileOf } from './ui.js';
+import { calmRow, surnameTile, surnameTileOf, tag } from './ui.js';
 import { clanHref, familySurname, inClan } from './clan-core.js';
 import { countryName } from './countries.js';
 
@@ -102,7 +102,7 @@ export async function clanPage(main, slug, { page = 1, country = '' } = {}) {
     ${j.page < j.pages ? `<a class="btn ter sm" href="#ho/${esc(slug)}?trang=${j.page + 1}${j.country ? '&qg=' + esc(j.country) : ''}">Trang sau ›</a>` : '<span></span>'}</nav>` : '';
   // Quốc gia: one chip per country (trees the viewer may see), "Chưa rõ" last; the chip filters the groups.
   const total = (j.countries || []).reduce((n, c) => n + c.trees, 0);
-  const chip = (code, label, n) => `<a class="chipb${(j.country || '') === code ? ' on' : ''}" href="#ho/${esc(slug)}${code ? '?qg=' + esc(code) : ''}" aria-current="${(j.country || '') === code ? 'true' : 'false'}">${esc(label)} <span class="sub">${num(n)}</span></a>`;
+  const chip = (code, label, n) => tag(`${esc(label)} <span class="sub">${num(n)}</span>`, { kind: 'chip', on: (j.country || '') === code, href: `#ho/${esc(slug)}${code ? '?qg=' + esc(code) : ''}` });
   const chips = j.countries?.length ? `<nav class="clan-qg" aria-label="Quốc gia">${chip('', 'Tất cả', total)}${j.countries.map((c) => chip(c.code, c.code === 'NONE' ? 'Chưa rõ' : countryName(c.code), c.trees)).join('')}</nav>` : '';
   const unlinked = j.unlinked.length || (j.page === j.pages && j.private_count) ? `<section class="cd clan-clu clan-un" aria-label="Cây chưa liên kết">
     <b class="clan-h">Cây chưa liên kết</b><span class="sub">Chưa có người nào được hai cây xác nhận là cùng một người.</span>

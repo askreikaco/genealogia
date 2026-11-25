@@ -155,8 +155,8 @@ test('combined inbox: both families\' items with chips; the status and Dòng h�
     const st = fresh();
     const { ctx, page, errors } = await open(b, { st, width: 390, hash: '/tat-ca/review' });
     // a sync redraws the page: wait for the settled list (both families' chips and the count)
-    await stable(page, () => document.querySelectorAll('#rlist .rv .fchip-n').length === 2);
-    const chips = await page.locator('#rlist .rv .fchip-n').allTextContents();
+    await stable(page, () => document.querySelectorAll('#rlist .rv .tag-n').length === 2);
+    const chips = await page.locator('#rlist .rv .tag-n').allTextContents();
     assert.deepStrictEqual(chips.sort(), ['Dương', 'Nguyễn']);
     await shot(page, 'duyet-tatca-390.png');
     // Dòng họ filter in the sheet (phone): only the Nguyễn card remains; the tag removes it
@@ -165,10 +165,10 @@ test('combined inbox: both families\' items with chips; the status and Dòng h�
     await page.waitForFunction(() => document.querySelectorAll('#rlist .rv').length === 1);
     assert.match(await page.textContent('.ltags'), /Dòng họ: Nguyễn/);
     await page.keyboard.press('Escape');
-    await page.click('.ltags .tagx');
+    await page.click('.ltags .tag.remove');
     await page.waitForFunction(() => document.querySelectorAll('#rlist .rv').length === 2);
     // approve the Nguyễn suggestion: the request names its own suggestion (201), the card leaves the pending list
-    const card = page.locator('#rlist .rv', { has: page.locator('.fchip-n', { hasText: 'Nguyễn' }) });
+    const card = page.locator('#rlist .rv', { has: page.locator('.tag-n', { hasText: 'Nguyễn' }) });
     await card.locator('[data-rv="approve"]').click();
     await page.waitForFunction(() => document.querySelectorAll('#rlist .rv').length === 1);
     const approved = st.calls.filter((c) => /approve$/.test(c.path));
@@ -197,12 +197,12 @@ test('combined members: pending and members of both families with chips; approve
     const st = fresh();
     const { ctx, page, errors } = await open(b, { st, width: 390, hash: '/tat-ca/members' });
     await page.waitForFunction(() => document.querySelectorAll('.mem-list .mrow').length === 2 && document.querySelectorAll('.msec .pq').length === 2);
-    const pendChips = await page.locator('.msec .pq .fchip-n').allTextContents();
+    const pendChips = await page.locator('.msec .pq .tag-n').allTextContents();
     assert.deepStrictEqual(pendChips.sort(), ['Dương', 'Nguyễn']);
-    assert.equal(await page.locator('.mem-list .mrow .fchip-n').count(), 2);
+    assert.equal(await page.locator('.mem-list .mrow .tag-n').count(), 2);
     await shot(page, 'thanh-vien-tatca-390.png');
     // approve the Nguyễn join request: POST /api/members/2002/approve?family=dong-a
-    const nguyen = page.locator('.msec .pq', { has: page.locator('.fchip-n', { hasText: 'Nguyễn' }) });
+    const nguyen = page.locator('.msec .pq', { has: page.locator('.tag-n', { hasText: 'Nguyễn' }) });
     await nguyen.locator('[data-mact="approve"]').click();
     await page.waitForFunction(() => document.querySelectorAll('.msec .pq').length === 1);
     const ap = st.calls.filter((c) => /approve$/.test(c.path));
@@ -223,7 +223,7 @@ test('members: the role change of a Nguyễn member is sent to dong-a', { skip }
     const st = fresh();
     const { ctx, page, errors } = await open(b, { st, width: 1280, hash: '/tat-ca/members' });
     await page.waitForSelector('.mem-list .mrow');
-    const row = page.locator('.mem-list .mrow', { has: page.locator('.fchip-n', { hasText: 'Nguyễn' }) });
+    const row = page.locator('.mem-list .mrow', { has: page.locator('.tag-n', { hasText: 'Nguyễn' }) });
     await row.locator('[data-mmenu]').click();
     await page.click('text=Đổi vai trò');
     await page.selectOption('#mrs', 'member');

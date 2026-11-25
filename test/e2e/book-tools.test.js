@@ -123,8 +123,8 @@ test('Filters: a status filter changes the count line and its tag; the tag clear
     const [dead, total2] = await count();
     assert.equal(total2, total, 'the total is the same');
     assert.ok(dead < total, 'the count shrinks with the filter: ' + dead + ' of ' + total);
-    assert.ok(await page.$('#tbar .tagx[data-untag="status"]'), 'the status tag shows');
-    await Promise.all([page.waitForURL((u) => !u.searchParams.has('status')), page.click('#tbar .tagx[data-untag="status"]')]);
+    assert.ok(await page.$('#tbar .tag.remove[data-untag="status"]'), 'the status tag shows');
+    await Promise.all([page.waitForURL((u) => !u.searchParams.has('status')), page.click('#tbar .tag.remove[data-untag="status"]')]);
     const [back] = await count();
     assert.equal(back, total, 'clearing the tag restores the family');
   } finally { await ctx.close(); }

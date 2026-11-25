@@ -49,7 +49,7 @@ const paras = (s) => esc(s || '').split(/\n+/).filter(Boolean).map((x) => `<p>${
 const badges = (p) => `${p.pinned ? ' <span class="tag sm">Ghim</span>' : ''}${p.status === 'held' ? ' <span class="tag sm yellow">Chờ duyệt</span>' : ''}${p.status === 'hidden' ? ' <span class="tag sm yellow">Bị ẩn</span>' : ''}`;
 
 export const chipsHtml = () => `<div class="chips" role="group" aria-label="Lọc lịch">${[['all', 'Tất cả'], ['gio', 'Giỗ'], ['gath', 'Họp mặt']]
-  .map(([k, l]) => `<button type="button" class="chip${kindSel === k ? ' on' : ''}" data-lk="${k}" aria-pressed="${kindSel === k}">${l}</button>`).join('')}</div>`;
+  .map(([k, l]) => tag(l, { kind: 'chip', on: kindSel === k, attrs: `data-lk="${k}"` })).join('')}</div>`;
 
 // Lịch rows for gatherings (a .gior row, so the search box and the chips filter it).
 export const gatheringRow = (p, hf, today, hidden = false) => {

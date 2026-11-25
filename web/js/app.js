@@ -13,7 +13,7 @@ import { nextAnniversary } from './lunar.js';
 import { locate } from './geo.js';
 import { chartLayout, chartSvg } from './treechart.js';
 import { emblemField, bindEmblem } from './emblem.js';
-import { isWide, isDesk, emptyState, cic, iconButton, toolbar, addBtn, ltags, fpanel, fsheet, sheet, closeSheets, setUntag, deviceNote, toast, fmtTime, fmtDate, fieldDiff, frow, accItem, accToggle, confirmModal, famChip, familyCrest, calmRow, calmAct, surnameTile, surnameTileOf, popMenu, closeMenu, sexMark, sexClass, SEX_LABEL, tag, section } from './ui.js';
+import { isWide, isDesk, layoutAtLeast, emptyState, cic, iconButton, toolbar, addBtn, ltags, fpanel, fsheet, sheet, closeSheets, setUntag, deviceNote, toast, fmtTime, fmtDate, fieldDiff, frow, accItem, accToggle, confirmModal, famChip, familyCrest, calmRow, calmAct, surnameTile, surnameTileOf, popMenu, closeMenu, sexMark, sexClass, SEX_LABEL, tag, section } from './ui.js';
 import { BUILD, BUILD_DATE, createUpdater, updateNotice, buildLabel } from './update.js';
 import { searchPeople } from './fuzzy.js';
 import { nameHit, listPrefill, gioPrefill, eventPrefill } from './prefill.js';
@@ -175,8 +175,8 @@ const isDark = () => (document.documentElement.dataset.theme || (matchMedia('(pr
 function setTheme(t) { S.setPrefs({ theme: t }); if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; document.querySelector('meta[name=theme-color]')?.setAttribute('content', '#161616'); render(); }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!themePref()) render(); });
 // Side nav: rail (icons) or expanded. A stored choice wins ('1' rail, '0' expanded); with none, desktop (>= 66rem) starts
-// expanded and tablet (42-65.98rem) starts as rail.
-const railPref = () => { const v = localStorageGet('gp_rail'); return v === '1' || (v !== '0' && !matchMedia('(min-width:1056px)').matches); };
+// expanded and tablet (42-65.98rem) starts as rail. Same rule as the app shell.
+const railPref = () => { const v = localStorageGet('gp_rail'); return v === '1' || (v !== '0' && !layoutAtLeast('wide')); };
 function applyRail() { document.body.classList.toggle('rail', railPref()); }
 const icon = (n) => { if (!IC[n]) console.warn('giapha: no icon for key', n); return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n] || ''}</svg>`; };
 // [route, long label, short label, icon, group]
@@ -515,7 +515,7 @@ function listView(arg) {
    ${arg && !rows.length ? `<p class="sub lempty">Không thấy “${esc(String(arg).trim())}”. Bấm + để thêm người này.</p>` : ''}
    ${fpanel(`${multiFam() ? `<label>Dòng họ${famSelect('ffamp', F.fam)}</label>` : ''}<label>Chi<select id="fchi"><option value="">Mọi chi</option>${branches.map((b) => `<option value="${b.id}" ${F.chi === b.id ? 'selected' : ''}>Chi ${esc(chiName(b.data.name))}</option>`).join('')}</select></label>
    <label>Đời<select id="fgen"><option value="">Mọi đời</option>${gens.map((g) => `<option ${String(g) === F.gen ? 'selected' : ''}>${g}</option>`).join('')}</select></label>
-   <div class="row wrap"><button type="button" class="chip ${F.living ? 'on' : ''}" id="fliv" aria-pressed="${F.living}">Còn sống</button><button type="button" class="chip ${F.flag ? 'on' : ''}" id="fflag" aria-pressed="${F.flag}">Cần xác minh</button></div>`)}
+   <div class="row wrap">${tag('Còn sống', { kind: 'chip', on: F.living, attrs: 'id="fliv"' })}${tag('Cần xác minh', { kind: 'chip', on: F.flag, attrs: 'id="fflag"' })}</div>`)}
    ${isWide() ? `<div class="kpis lk">${[['Tổng số', M.all.length, 'ia'], ['Nam / Nữ', M.all.filter((p) => p.data.sex !== 'f').length + ' / ' + M.all.filter((p) => p.data.sex === 'f').length, 'c2'], ['Có ngày giỗ', M.all.filter((p) => gioOf(p.data)).length, 'c3'], ['Cần xác minh', M.all.filter((p) => p.data.verify).length, 'warn']].map(([l, v, c]) => `<div class="kpi" style="border-top-color:var(--${c})"><span class="sub">${l}</span><b>${v}</b></div>`).join('')}</div>` : ''}
    ${!isWide() ? `<div class="cards">${rows.slice(0, 400).map((p) => { const d = p.data; return personItem({ rank: rank(d), name: d.name, sex: d.sex }, { variant: 'card', href: ph(p, `person/${p.id}`), flag: !!d.verify, badge: famChipIf(p), sub: `${sidHits.length && d.sid ? esc(formatSid(d.sid)) + ' · ' : cq && codeOf(M, p.id) ? esc(codeOf(M, p.id)) + ' · ' : ''}${gd ? `Giỗ ${esc(gioOf(d).label)} ÂL` : `Đời ${genOf(M, p) || '?'}${years(d) ? ' · ' + yearsHtml(d) : ''}${d.place ? ' · ' + esc(d.place) : ''}`}`, foot: d.verify ? `${tag(`${esc(d.verify)}`, { tone: 'yellow', sm: true })}` : '', action: iconButton({ icon: 'more', label: 'Thao tác', attrs: `data-menu="${p.id}" aria-haspopup="menu"` }) }); }).join('')}</div>` : `<div class="scroll"><table class="tb"><thead><tr><th></th><th>Đời</th><th>Họ tên</th><th>Cha/Mẹ</th><th>Sinh</th><th>Mất</th><th>Giỗ ÂL</th><th>Nơi sống</th><th>Cần xác minh</th><th>Thao tác</th></tr></thead><tbody>
    ${rows.map((p) => { const d = p.data; const par = M.byId.get(d.parent); return `<tr class="${d.verify ? 'flag' : ''}"><td>${sexMark(d.sex)}</td><td class="num">${genOf(M, p) || ''}</td>
@@ -860,7 +860,7 @@ function contactCard(d, id, fam) {
     : !S.signedIn() ? '<p class="sub">Thông tin liên hệ chỉ hiện cho người trong họ đã đăng nhập.</p><p><button type="button" class="btn sm" data-acct="in">Đăng nhập</button></p>'
     : '<p class="sub">Bạn cần được thêm vào dòng họ để xem liên hệ.</p>';
   const edit = S.isEditor() && id ? `<p><button type="button" class="btn ter sm" data-ct-edit="${esc(id)}">${items.length ? 'Sửa liên hệ' : 'Thêm liên hệ'}</button></p>` : '';
-  return body || edit ? `<section class="grpsec consec" aria-label="Liên hệ"><div class="relhead"><h2>Liên hệ</h2></div>${body}${edit}</section>` : '';
+  return body || edit ? section('Liên hệ', `${body}${edit}`, { variant: 'card', label: 'Liên hệ', cls: 'consec' }) : '';
 }
 // Câu chuyện đời on Thông tin (after the facts and contact, before Quan hệ): the events are loaded for this tab too.
 function storiesOnInfo(p) {
@@ -1274,7 +1274,7 @@ function map() {
   main.innerHTML = `<h1>Bản đồ nơi sống</h1><div id="mtop" class="stk"></div>
    <p class="sub lcount" id="mcount"></p><div id="mqhits"></div>
    <div class="mapw"><div id="mapc" class="mapc" role="region" aria-label="Bản đồ"></div><div class="cd mlist" id="maplist"></div></div>
-   ${multiFam() ? `<div class="legend" aria-label="Màu theo dòng họ">${S.scopeFams().map((f, i) => `<span class="fchip"><i class="dot" style="background:${FAM_PAL[i % FAM_PAL.length]}"></i><span class="fchip-n">${esc(S.familyName(f))}</span></span>`).join('')}<span class="fchip"><i class="dot" style="background:${NEUTRAL}"></i><span class="fchip-n">Nhiều dòng họ</span></span></div>`
+   ${multiFam() ? `<div class="legend" aria-label="Màu theo dòng họ">${S.scopeFams().map((f, i) => tag(esc(S.familyName(f)), { kind: 'family', lead: `<i class="dot" style="background:${FAM_PAL[i % FAM_PAL.length]}"></i>` })).join('')}${tag('Nhiều dòng họ', { kind: 'family', lead: `<i class="dot" style="background:${NEUTRAL}"></i>` })}</div>`
      : '<div class="legend"><span class="dot" style="background:var(--c-accent)"></span>Đúng xã/ấp <span class="dot" style="background:var(--c1)"></span>Gần đúng <span class="dot" style="background:var(--c-border-strong)"></span>Chỉ tỉnh/nước</div>'}`;
   mapTop();
   $('#mqhits').onclick = (e) => { const b = e.target.closest('[data-pick]'); if (b) mapPick(b.dataset.pick); };
@@ -2947,7 +2947,7 @@ document.addEventListener('mousedown', (e) => {
 // The rail (tablet and up) opens over the page while focus is in it: Esc or a nav item tap gives the focus back to the page.
 addEventListener('keydown', (e) => { const a = document.activeElement; if (e.key === 'Escape' && a?.closest?.('#nav')) a.blur(); });
 addEventListener('hashchange', acHide); addEventListener('resize', () => acShow());
-for (const q of ['(min-width:672px)', '(min-width:1024px)']) matchMedia(q).addEventListener('change', () => render()); addEventListener('scroll', () => { if (ac.box && !ac.box.hidden) acShow(); }, true);
+addEventListener('layoutchange', () => render()); addEventListener('scroll', () => { if (ac.box && !ac.box.hidden) acShow(); }, true);
 
 // Giỗ page search: filter rows in place
 document.addEventListener('input', (e) => {

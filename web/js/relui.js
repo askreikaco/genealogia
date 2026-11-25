@@ -4,7 +4,7 @@ import * as S from './store.js';
 import { esc, rank, years, isDead } from './model.js';
 import { index, siblingsOf, descendantLevels, pedigreeRows, ancestorChain, coupleNotes, PC_LABEL, CP_LABEL, PC_KINDS, CP_KINDS } from './relgraph.js';
 import { kinPath, lineDesc, term as kinTerm, resolveRegion, KIN_REGION_KEY } from './kin/index.js';
-import { calmRow, calmAct, popMenu, cic, surnameTile, surnameOf, ghostRow, moreFold, toolbar, ltags, fpanel, addBtn, setUntag, sheet as openDialog, KEEP } from './ui.js';
+import { calmRow, calmAct, popMenu, cic, surnameTile, surnameOf, ghostRow, moreFold, toolbar, ltags, fpanel, addBtn, setUntag, section, sheet as openDialog, KEEP } from './ui.js';
 import { relPrefill, nextOrder } from './prefill.js';
 import { personItem } from './person-item.js';
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger, undoToast, restoreTrash } from './danger.js';
@@ -100,8 +100,8 @@ export function relSection(M, p, ctx = {}) {
   RLAST = { M, p, ctx };
   setUntag(relUntag);
   const note = relsOf(M).source !== 'table' ? '<p class="sub">Quan hệ hiện theo dữ liệu cũ. Quản trị cần chạy chuyển dữ liệu quan hệ để sửa ở đây.</p>' : '';
-  return `<section class="relsec" aria-label="Quan hệ"><div class="relhead"><h2>Quan hệ</h2></div>${ctx.links || ''}${note}
-    <div id="reltb" class="stk">${relToolbar(M, p)}</div>${relSheet(M, p)}<div id="relbody">${relBody(M, p, ctx)}</div></section>`;
+  return section('Quan hệ', `${ctx.links || ''}${note}
+    <div id="reltb" class="stk">${relToolbar(M, p)}</div>${relSheet(M, p)}<div id="relbody">${relBody(M, p, ctx)}</div>`, { variant: 'card', label: 'Quan hệ', cls: 'relsec' });
 }
 function relBody(M, p, ctx) {
   const id = p.id; const { parents, partners, kids, sibs, ix } = rowsFor(M, id);
@@ -190,7 +190,7 @@ export function pedigreeHtml(M, id, shown = 4, ctx = {}) {
     const own = it.ghost ? `<li class="ped-fold" style="--d:${it.ghost.d}">${ghostRow({ closed: `Họ ${surnameOf(nameOf(it.ghost.root))} · ${it.ghost.n} đời`, tiles: it.ghost.tiles.map((x) => surnameOf(nameOf(x))), body: `<ul class="ped ped-hid">${list(it.ghost.items)}</ul>` })}</li>` : '';
     return row(it) + own;
   }).join('');
-  return `<section class="relsec" aria-label="Tổ tiên"><h2>Tổ tiên</h2><ul class="ped">${list(items)}</ul></section>`;
+  return section('Tổ tiên', `<ul class="ped">${list(items)}</ul>`, { variant: 'card', label: 'Tổ tiên', cls: 'relsec' });
 }
 
 // ---------- sheets ----------

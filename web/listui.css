@@ -12,14 +12,14 @@
 .fbtn:hover{background:var(--c-field-tint-2)}.fbtn:focus-visible{outline:2px solid var(--c-accent);outline-offset:-2px;background:var(--c-field-tint-2)}
 .fbadge{position:absolute;top:6px;right:6px;min-width:16px;height:16px;padding:0 var(--sp-2);border-radius:8px;background:var(--c-accent);color:var(--c-on-color);font-size:11px;line-height:var(--lh-1);text-align:center}
 .ltags{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center}
-.tagx{height:24px;padding:0 var(--sp-3);border:0;border-radius:12px;background:var(--blue-b);color:var(--blue-f);font:inherit;font-size:var(--fs-1);cursor:pointer}
+.tag.remove{height:24px;padding:0 var(--sp-3);border:0;border-radius:var(--r-round);background:var(--blue-b);color:var(--blue-f);font:inherit;font-size:var(--fs-1);cursor:pointer}
 
 .lcount{margin:0;font-size:var(--fs-1);color:var(--c-text-2);display:block}
 dialog.fpanel{position:fixed;inset:auto 0 0 0;margin:0;padding:0;border:0;width:100%;max-width:100%;max-height:85vh;overflow:hidden;background:var(--c-layer);color:var(--c-text)}
 /* flex only when open: a closed dialog stays display:none */
 dialog.fpanel[open]{display:flex;flex-direction:column}
 dialog.fpanel::backdrop{background:var(--c-scrim)}
-@media (min-width:672px){dialog.fpanel{inset:0;margin:18vh auto auto;width:472px;max-width:calc(100vw - 32px);height:auto;max-height:70vh}}
+:where(html:not([data-layout=phone])) dialog.fpanel{inset:0;margin:18vh auto auto;width:472px;max-width:calc(100vw - 32px);height:auto;max-height:70vh}
 /* the footer is pinned: only the body scrolls */
 .fp-foot{flex:none;display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:var(--sp-3);padding:var(--sp-3) var(--sp-5) max(var(--sp-4),env(safe-area-inset-bottom));border-top:1px solid var(--c-border);background:var(--c-layer)}
 .fp-foot .btn{min-height:48px}
@@ -67,7 +67,7 @@ dialog.fpanel::backdrop{background:var(--c-scrim)}
    (sticky is bounded by its parent). On the profile the tab bar sticks too and toolbars stick just below it. */
 .lbar,.stk{position:sticky;top:var(--sticky-top);z-index:var(--z-sticky);background:var(--stk-bg,var(--c-bg))}
 .stk .lbar{position:static;background:none}
-.cd,.relsec,.grpsec,.mg-g{--stk-bg:var(--c-layer)}
+.cd,.sec-card,.mg-g{--stk-bg:var(--c-layer)}
 .lbar[data-stuck],.stk[data-stuck],.ptabs[data-stuck]{box-shadow:0 1px 0 var(--c-border)}
 .ptabs{position:sticky;top:var(--topbar-h);z-index:var(--z-sticky);background:var(--c-bg)}
 .ptabs~*{--sticky-top:calc(var(--topbar-h) + var(--tabs-h))}

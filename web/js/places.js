@@ -3,7 +3,7 @@
 // the provinces / districts it belonged to, and the people of this family linked to it. Links are fetched per person
 // when a profile is drawn (small request, cached for a minute) and are not part of the offline store.
 import { esc } from './model.js';
-import { toast, calmRow, tag } from './ui.js';
+import { toast, calmRow, tag, section } from './ui.js';
 
 // Person fields that can point to a place. Address stays free text (it is contact data).
 export const PLACE_FIELDS = { place: 'Nơi sống', birth_place: 'Nơi sinh', burial: 'An táng' };
@@ -151,10 +151,10 @@ export async function placePage(main, id, { fam, personOf, personHref, nameOf })
   }
   main.innerHTML = `<div class="row wrap">${tag(`${esc(KIND[p.kind] || 'Địa danh')}`, { tone: 'gray' })}${p.status === 'pending' ? '<span class="tag gray">chưa xác minh</span>' : ''}</div>
     <h1 class="big keep">${esc(p.name || '')}</h1>${p.label && p.label !== p.name ? `<p class="sub">${esc(p.label.split(', ').slice(1).join(', '))}</p>` : ''}
-    <section class="grpsec pl-sec" aria-label="Tên qua các thời kỳ"><div class="relhead"><h2>Tên qua các thời kỳ</h2></div><ol class="tl2">${nameRows}</ol></section>
-    ${parentRows ? `<section class="grpsec pl-sec" aria-label="Thuộc đơn vị"><div class="relhead"><h2>Thuộc đơn vị</h2></div><ol class="tl2">${parentRows}</ol></section>` : ''}
-    ${eventRows ? `<section class="grpsec pl-sec" aria-label="Thay đổi"><div class="relhead"><h2>Thay đổi</h2></div><ol class="tl2">${eventRows}</ol></section>` : ''}
-    <section class="grpsec pl-sec" aria-label="Người trong họ"><div class="relhead"><h2>Người trong họ${rows.length ? ` · ${rows.length}` : ''}</h2></div>${rows.length ? `<div class="calm-list">${rows.join('')}</div>` : '<p class="sub">Chưa có ai trong họ gắn với địa danh này.</p>'}</section>
+    ${section(`Tên qua các thời kỳ`, `<ol class="tl2">${nameRows}</ol>`, { variant: 'card', label: 'Tên qua các thời kỳ', cls: 'pl-sec' })}
+    ${parentRows ? `${section(`Thuộc đơn vị`, `<ol class="tl2">${parentRows}</ol>`, { variant: 'card', label: 'Thuộc đơn vị', cls: 'pl-sec' })}` : ''}
+    ${eventRows ? `${section(`Thay đổi`, `<ol class="tl2">${eventRows}</ol>`, { variant: 'card', label: 'Thay đổi', cls: 'pl-sec' })}` : ''}
+    ${section(`Người trong họ${rows.length ? ` · ${rows.length}` : ''}`, `${rows.length ? `<div class="calm-list">${rows.join('')}</div>` : '<p class="sub">Chưa có ai trong họ gắn với địa danh này.</p>'}`, { variant: 'card', label: 'Người trong họ', cls: 'pl-sec' })}
     ${p.wikidata_id ? `<p class="sub pl-ext"><a href="https://www.wikidata.org/wiki/${esc(p.wikidata_id)}" target="_blank" rel="noopener">Wikidata ${esc(p.wikidata_id)}</a></p>` : ''}
     ${(p.attribution || []).map((a) => `<p class="sub pl-attr">Một phần dữ liệu: <a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.text)}</a></p>`).join('')}`;
 }

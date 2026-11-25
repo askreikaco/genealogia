@@ -83,14 +83,14 @@ test('clan page: one chip per country, "Chưa rõ" last; a chip filters the tree
     const { page, ctx, errors, asked } = await open('ho/duong', { scheme });
     try {
       await page.waitForSelector('.clan-qg', { timeout: 8000 });
-      const chips = (await page.locator('.clan-qg .chipb').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+      const chips = (await page.locator('.clan-qg .tag.chip').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
       assert.deepStrictEqual(chips, ['Tất cả 12', 'Việt Nam 9', 'Hoa Kỳ 2', 'Chưa rõ 1']);
-      await page.locator('.clan-qg .chipb', { hasText: 'Hoa Kỳ' }).click();
+      await page.locator('.clan-qg .tag.chip', { hasText: 'Hoa Kỳ' }).click();
       await page.waitForFunction(() => /qg=US/.test(location.hash), null, { timeout: 5000 });
       await page.waitForFunction(() => document.querySelectorAll('[data-clan-tree]').length === 1, null, { timeout: 5000 });
       assert.match(await page.locator('[data-clan-tree]').first().innerText(), /Bên Kia.*Hoa Kỳ/s);
       assert.ok(asked.some((q) => /country=US/.test(q)), 'the API was asked for US');
-      assert.equal(await page.locator('.clan-qg .chipb[aria-current="true"]').innerText().then((t) => t.replace(/\s+/g, ' ').trim()), 'Hoa Kỳ 2');
+      assert.equal(await page.locator('.clan-qg .tag.chip[aria-current="true"]').innerText().then((t) => t.replace(/\s+/g, ' ').trim()), 'Hoa Kỳ 2');
       if (SHOT_DIR) await page.screenshot({ path: path.join(SHOT_DIR, `nation-clan-390-${scheme}.png`) });
       assert.deepStrictEqual(errors, []);
     } finally { await ctx.close(); }
