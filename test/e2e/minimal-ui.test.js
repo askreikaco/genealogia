@@ -106,7 +106,10 @@ test('person header: one Sửa for every role; the profile ⋯ repeats nothing o
     await page.locator('[data-menu="PA"]').click();
     const menu = page.locator('.menu');
     assert.ok(await menu.locator('[data-act="treeview"]').count() === 1, '⋯ has Xem trên cây');
-    for (const k of ['view', 'edit', 'suggest', 'parent', 'child', 'spouse', 'sibling']) assert.equal(await menu.locator(`[data-act="${k}"]`).count(), 0, `profile ⋯ has no ${k} (it repeats an on-page action)`);
+    // the fixture family is legacy-relations: Quan hệ is read-only there, so the ⋯ adds relatives through the search-first
+    // flow (#121). The items that repeat the page (view, edit, suggest, spouse) stay out.
+    for (const k of ['view', 'edit', 'suggest', 'spouse']) assert.equal(await menu.locator(`[data-act="${k}"]`).count(), 0, `profile ⋯ has no ${k} (it repeats an on-page action)`);
+    for (const k of ['parent', 'child', 'sibling']) assert.equal(await menu.locator(`[data-act="${k}"]`).count(), 1, `legacy family: profile ⋯ adds ${k} (#121)`);
     assert.equal(await page.locator('button[data-ptab="rel"]').count(), 0, 'no Quan hệ tab: relations are on Thông tin');
     assert.ok(await page.locator('section.relsec').count() >= 1, 'the Quan hệ section is on the Thông tin tab');
     const g = await openPage(b, 'guest', '#/duong/person/PA');
