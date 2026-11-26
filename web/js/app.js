@@ -1,5 +1,5 @@
 import * as S from './store.js';
-import { nameOf } from './hidden.js';
+import { nameOf, noticeNeeded, noticeHtml } from './hidden.js';
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger, undoToast, restoreTrash } from './danger.js';
 import * as TR from './trash-ui.js';
 import * as CN from './council.js';
@@ -223,6 +223,19 @@ function refreshLichBadge() {
   if (fam === S.ALL_FAMS || !S.isMember()) { if (lichN) { lichN = 0; chrome(); } return; }
   NW.loadPosts(fam).then(() => { const n = NW.badgeFor(fam, S.getPrefs); if (n !== lichN) { lichN = n; chrome(); } }, () => {});
 }
+// P1c: the members-only notice under the top bar (#pnote, index.html). Shown only to a non-member, and only where the
+// view can hold a hidden living person. Not dismissible. The stripe is fixed below the top bar; body.has-pnote pads the shell.
+function privNote(view, arg) {
+  const el = $('#pnote'); if (!el) return;
+  const on = noticeNeeded({ view, arg, member: S.isMember(), all: S.isAll(), M });
+  document.body.classList.toggle('has-pnote', on);
+  el.hidden = !on;
+  if (!on) { el.innerHTML = ''; return; }
+  const fam = S.curFamily();
+  el.innerHTML = noticeHtml({ signedIn: S.signedIn(), joinHref: hf('join'), loginHref: `/api/auth/google?next=${fam === 'duong' ? 'join' : `/${fam}/join`}` });
+  el.style.setProperty('--pnote-h', el.offsetHeight + 'px');
+}
+addEventListener('resize', () => { const el = $('#pnote'); if (el && !el.hidden) el.style.setProperty('--pnote-h', el.offsetHeight + 'px'); });
 function chrome() {
   const r = route().view;
   const cur = r === 'person' ? 'list' : (r === 'mine' || r === 'review') ? 'gop-y' : r;
@@ -327,7 +340,7 @@ function render() {
   if (fam === S.ALL_FAMS && (view === 'person' || view === 'sua')) { const pp = S.get(arg); if (pp?.fam) { location.replace(`#/${pp.fam}/${view}/${arg}`); return; } } // a person lives in one family
   if (fam !== S.ALL_FAMS && !NO_FAM.includes(view) && (S.getPrefs().fam_used || [])[0] !== fam) S.setPrefs({ fam_used: [fam, ...(S.getPrefs().fam_used || []).filter((x) => x !== fam)].slice(0, 8) });
   S.setFamily(fam);
-  M = build(); chrome(); refreshSugCount(); refreshFams(); refreshLichBadge();
+  M = build(); chrome(); privNote(view, arg); refreshSugCount(); refreshFams(); refreshLichBadge();
   const key = mountKey(view, arg, fam);
   const kept = !!key && key === mounted && keptNode(view);
   // same page drawn again (a sync, families arriving): the focused text field gets its focus and caret back after

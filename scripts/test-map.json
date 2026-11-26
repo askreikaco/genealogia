@@ -1,5 +1,17 @@
 {
   "modules": {
+    "privacy-notice": {
+      "paths": [
+        "web/js/hidden.js",
+        "web/js/privacy-copy-vi.js",
+        "web/index.html",
+        "web/app.css"
+      ],
+      "e2e": [
+        "test/e2e/privacy-notice-*.test.js",
+        "test/e2e/hidden-profile-*.test.js"
+      ]
+    },
     "text-size": {
       "paths": [
         "web/tokens.css",

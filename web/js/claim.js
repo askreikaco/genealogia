@@ -45,7 +45,7 @@ export function bannerHtml(st, fam) {
   const lines = [];
   if (st.notice) lines.push(`<p class="cl-line"><b>Đang góp ý công khai</b> · còn ${st.notice.days_left} ngày. Ai biết về dòng họ này có thể góp ý. Sau đó quản trị ứng dụng sẽ duyệt đơn nhận quản lý.</p>`);
   if (st.state === 'owned') return lines.length ? `<div class="ntc claim-banner" role="status">${lines.join('')}</div>` : '';
-  lines.push(`<p class="cl-line"><b>${esc(STATE_TXT[st.state] || '')}.</b> Cây này chỉ để xem; quản trị ứng dụng chăm sóc. Bạn có thể nhận quản lý khi có bằng chứng.</p>`);
+  lines.push(`<p class="cl-line">${STATE_TXT[st.state] ? `<b>${esc(STATE_TXT[st.state])}.</b> ` : ''}Cây này chỉ để xem; quản trị ứng dụng chăm sóc. Bạn có thể nhận quản lý khi có bằng chứng.</p>`);
   const acts = [];
   if (st.my_claim) {
     lines.push(`<p class="cl-line">Đơn của bạn đang góp ý đến ${DATE_VN(st.my_claim.notice_until)}.</p>`);

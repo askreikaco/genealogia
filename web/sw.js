@@ -69,6 +69,7 @@ const SHELL = [
   '/js/ui.js',
   '/js/person-item.js',
   '/js/hidden.js',
+  '/js/privacy-copy-vi.js',
   '/js/links.js',
   '/js/branch-trees.js',
   '/js/contacts-import.js',
