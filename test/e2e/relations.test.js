@@ -83,6 +83,11 @@ test('profile: Quan hệ section at phone width, no horizontal scroll, no Hán o
   const { ctx, page } = await ownerPage(390);
   try {
     await openProfile(page, 'P001');
+    // names render after the section appears (a read can catch "(chưa có tên)"): wait for them first
+    await page.waitForFunction(() => {
+      const m = document.querySelector('#main')?.innerText || '';
+      return /Giả Ngọc Giao/.test(m) && /Giả Thanh Huệ/.test(m) && /Vợ thứ 2/.test(m);
+    }, null, { timeout: 10000 });
     const t = await txt(page);
     assert.match(t, /Giả Ngọc Giao/); assert.match(t, /Giả Thanh Huệ/); assert.match(t, /Vợ thứ 2/);
     const sw = await page.evaluate(() => document.documentElement.scrollWidth);

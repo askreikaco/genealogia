@@ -237,6 +237,13 @@ test('the three choices: one row of three equal buttons, no wrap at 360 and 390 
         // the owner (pending) votes Đồng ý: the button fills, the others stay outlined
         await o.page.click(`[data-dec-yes="${id}"]`);
         await o.page.waitForFunction((cid) => document.querySelector(`[data-dec-yes="${cid}"]`)?.classList.contains('on'), id, { timeout: 15000 });
+        // the card can be re-rendered right after the click: wait until the row exists and exactly one choice is filled
+        await o.page.waitForFunction((cid) => {
+          const c = document.querySelector(`.vcard:has([data-dec-yes="${cid}"])`);
+          if (!c) return false;
+          const btns = [...c.querySelectorAll('.vc-row .vc-ch')];
+          return btns.length === 3 && btns.filter((b) => b.classList.contains('on')).length === 1;
+        }, id, { timeout: 15000 });
         const after = await o.page.evaluate((cid) => [...document.querySelectorAll(`.vcard:has([data-dec-yes="${cid}"]) .vc-row .vc-ch`)].map((b) => b.classList.contains('on')), id);
         assert.deepStrictEqual(after, [true, false, false], 'only the chosen one is filled');
         await cardShot(o.page, id, `vote-card-after-${tag}.png`);
