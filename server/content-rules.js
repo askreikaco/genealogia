@@ -22,5 +22,5 @@ function holdReasons(text, { allowLink = false } = {}) {
   if (WORDS.some((re) => re.test(s))) out.push('word');
   return out;
 }
-const REASON_VI = { link: 'có liên kết', phone: 'có số điện thoại', account: 'có dãy số giống số tài khoản', word: 'có từ bị chặn' };
+const REASON_VI = { link: 'có liên kết', phone: 'có số điện thoại', account: 'có dãy số giống số tài khoản', word: 'có từ không phù hợp' };
 module.exports = { holdReasons, REASON_VI, BLOCK };

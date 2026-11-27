@@ -9,7 +9,7 @@ const q = (fam) => `family=${encodeURIComponent(fam)}`;
 async function api(method, url, body) {
   const r = await fetch(url, { method, cache: 'no-store', headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(j.error || 'Lỗi ' + r.status); e.status = r.status; throw e; }
+  if (!r.ok) { const e = new Error(j.error || 'Chưa làm được: ' + r.status); e.status = r.status; throw e; }
   return j;
 }
 const FIELDS = [['name', 'Tên'], ['sex', 'Giới tính'], ['born', 'Năm sinh'], ['died', 'Năm mất'], ['place', 'Nơi ở'], ['birth_place', 'Nơi sinh'],

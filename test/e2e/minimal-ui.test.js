@@ -63,7 +63,7 @@ test('Cài đặt dòng họ: the succession block is on its own sub-page; one c
   try {
     const o = await openPage(b, 'owner', '#/duong/cai-dat-dong-ho');
     const t = await mainText(o.page);
-    for (const gone of ['Người được ủy thác', 'Báo Chủ họ đã mất', 'Thời hạn không đăng nhập', 'Tôi vẫn giữ quyền']) assert.ok(!t.includes(gone), `"${gone}" is not on Cài đặt dòng họ`);
+    for (const gone of ['Người được ủy thác', 'Báo tin Chủ họ đã khuất', 'Thời hạn không đăng nhập', 'Tôi vẫn giữ quyền']) assert.ok(!t.includes(gone), `"${gone}" is not on Cài đặt dòng họ`);
     assert.equal(await o.page.locator('#succ-settings').count(), 0, 'no succession block on the settings page');
     const row = o.page.locator('a.calm[href="#nguoi-ke-nhiem"]');
     assert.equal(await row.count(), 1, 'one calm row to Người kế nhiệm');

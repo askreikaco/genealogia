@@ -16,7 +16,7 @@ const withFam = (url) => { const q = famQ(); return q ? url + (url.includes('?')
 async function call(method, url, body) {
   const r = await fetch(url, { method, cache: 'no-store', headers: body !== undefined ? { 'content-type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(j.error || 'Có lỗi, thử lại.'); e.status = r.status; throw e; }
+  if (!r.ok) { const e = new Error(j.error || 'Có trục trặc, vui lòng thử lại.'); e.status = r.status; throw e; }
   return j;
 }
 const fail = (d, msg) => { const box = d.querySelector('.err') || d.querySelector('.rel-body').appendChild(Object.assign(document.createElement('p'), { className: 'err' })); box.textContent = msg; };

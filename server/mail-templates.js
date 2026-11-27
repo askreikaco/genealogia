@@ -34,7 +34,7 @@ function build(title, paras, button, footer) {
 function trustedInvite({ family, inviter, name, url, days = 14 }) {
   const title = `Mời bạn làm Người được ủy thác của ${family}`;
   const paras = [`${name ? 'Chào ' + name + '. ' : 'Xin chào. '}${inviter || 'Chủ họ'} mời bạn làm Người được ủy thác của ${family}.`,
-    'Người được ủy thác là người đầu tiên được báo khi Chủ họ lâu không đăng nhập, hoặc khi có báo đã mất. Bạn không cần làm gì khác ngoài việc chấp nhận bằng tài khoản Google có địa chỉ email này.',
+    'Người được ủy thác là người đầu tiên được báo khi Chủ họ lâu không đăng nhập, hoặc khi có báo đã khuất. Bạn không cần làm gì khác ngoài việc chấp nhận bằng tài khoản Google có địa chỉ email này.',
     `Lời mời có hiệu lực trong ${days} ngày.`];
   const button = { label: 'Xem và chấp nhận lời mời', url };
   return { subject: title, ...build(title, paras, button) };
@@ -56,7 +56,7 @@ function ownerReminder({ family, stage, url, months }) {
 function handoverNotice({ family, deadline, url, reason }) {
   const title = `${family} sẽ chuyển quyền Chủ họ sau 14 ngày`;
   const why = reason === 'deceased'
-    ? 'Có người báo Chủ họ đã mất và một người được ủy thác đã xác nhận.'
+    ? 'Có người báo Chủ họ đã khuất và một người được ủy thác đã xác nhận.'
     : 'Chủ họ chưa đăng nhập đủ lâu theo thời hạn đã đặt.';
   const paras = [why, `Để hủy, hãy đăng nhập trước ${vnTime(deadline)} (giờ Việt Nam). Chỉ cần đăng nhập, không cần làm gì thêm.`,
     'Sau thời hạn này, quyền Chủ họ được mời lần lượt cho từng người trong danh sách, mỗi người có 14 ngày để nhận hoặc từ chối.'];
@@ -84,7 +84,7 @@ function handoverCode({ family, code, minutes = 15 }) {
 // To the trusted contacts or admins: a death report needs one confirmation.
 function confirmRequest({ family, url }) {
   const title = `Cần xác nhận một báo cáo ở ${family}`;
-  const paras = ['Một thành viên đã báo Chủ họ đã mất, kèm thông tin đính kèm.',
+  const paras = ['Một thành viên đã báo Chủ họ đã khuất, kèm thông tin đính kèm.',
     'Nếu bạn xác nhận, dòng họ bắt đầu thời hạn 14 ngày. Trong thời hạn đó, Chủ họ có thể đăng nhập để hủy.'];
   const button = { label: 'Xem và xác nhận', url };
   return { subject: title, ...build(title, paras, button) };
@@ -167,7 +167,7 @@ function trashNotice({ family, title, paras = [], url }) {
 // its approval or rejection (to the claimant and the other owners). The notice runs until `until`.
 function treeClaimOpened({ family, claimant, abandoned, until, url }) {
   const title = `Có người xin nhận quản lý ${family}`;
-  const paras = [`${claimant || 'Một người'} đã nộp đơn xin nhận quản lý dòng họ này${abandoned ? ' vì các Chủ họ hiện có đã lâu không đăng nhập hoặc đã mất' : ''}.`,
+  const paras = [`${claimant || 'Một người'} đã nộp đơn xin nhận quản lý dòng họ này${abandoned ? ' vì các Chủ họ hiện có đã lâu không đăng nhập hoặc đã khuất' : ''}.`,
     `Đơn được công khai góp ý đến ${vnTime(until)} (giờ Việt Nam). Sau đó quản trị ứng dụng sẽ xem xét. Nếu bạn vẫn quản lý dòng họ, hãy đăng nhập để góp ý hoặc phản đối.`];
   return { subject: title, ...build(title, paras, { label: 'Xem dòng họ', url }) };
 }

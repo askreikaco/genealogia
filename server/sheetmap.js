@@ -9,6 +9,8 @@ const { contactsOf, checkItem, MAX_ITEMS } = require('./contact-rules');
 const enumMap = (pairs) => ({ toSheet: Object.fromEntries(pairs), fromSheet: Object.fromEntries(pairs.map(([a, b]) => [b.toLowerCase(), a])) });
 const SEX = enumMap([['m', 'Nam'], ['f', 'Nữ']]);
 const LIVING = enumMap([['living', 'Còn sống'], ['dead', 'Đã mất'], ['unknown', 'Chưa rõ']]);
+LIVING.fromSheet['đang sống'] = 'living';
+LIVING.fromSheet['đã khuất'] = 'dead';
 const PUBLIC = enumMap([['yes', 'Có'], ['no', 'Không']]);
 
 // [header, field, kind]; kind: text | int | enum map | 'id' | 'parentName' (derived, write-only) | 'updated' (write-only) | 'deleted'

@@ -488,7 +488,7 @@ export function newId() { return 'N' + crypto.randomUUID().slice(0, 13); }
 export async function login(code) {
   const before = me.acct;
   const r = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
-  const b = await r.json(); if (!r.ok) throw new Error(b.error || 'Đăng nhập lỗi');
+  const b = await r.json(); if (!r.ok) throw new Error(b.error || 'Chưa đăng nhập được');
   await refreshMe();
   if (me.acct !== before) { forgetAccount(); location.reload(); return b.name; } // another account's device data opens after a reload
   cursors = {}; pulled = new Set(); denied = new Set(); await sync(); await loadAccounts(); emit(); return b.name;   // re-pull: members and editors also get private fields
@@ -570,7 +570,7 @@ async function adoptLegacy() {
 const jfetch = async (url, method = 'GET', body) => {
   const r = await fetch(url, { method, cache: 'no-store', headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'Lỗi ' + r.status);
+  if (!r.ok) throw new Error(j.error || 'Chưa làm được: ' + r.status);
   return j;
 };
 // Admin calls take the family they are about (default: the family on screen), so "Tất cả" can act on each family's rows.

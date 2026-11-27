@@ -85,7 +85,7 @@ export function addBasic({ fam, prefill = {}, title = 'Thêm người', name = '
       <label class="fld">Tên<input name="name" autocomplete="off" value="${esc(val.name)}" required></label>
       <label class="fld">Giới tính<select name="sex"><option value="">Chưa rõ</option>${sexOpt('m', 'Nam')}${sexOpt('f', 'Nữ')}</select></label>
       <label class="fld">Sinh<input name="birth" inputmode="numeric" autocomplete="off" placeholder="1963 hoặc 5/3/1963" value="${esc(val.birth)}"></label>
-      <label class="fld">Mất<input name="death" inputmode="numeric" autocomplete="off" placeholder="để trống nếu còn sống" value="${esc(val.death)}"></label>
+      <label class="fld">Mất<input name="death" inputmode="numeric" autocomplete="off" placeholder="để trống nếu chưa có" value="${esc(val.death)}"></label>
       <p class="err" role="alert" hidden></p>
       <div class="rel-foot"><button class="btn ter" type="button" data-x>Huỷ</button><button class="btn" type="submit">Lưu</button></div>
     </form>`);

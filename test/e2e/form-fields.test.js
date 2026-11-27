@@ -79,14 +79,14 @@ test('5/3/1963 shows âm lịch and saves the full date', { skip }, async () => 
   } finally { await browser.close(); }
 });
 
-test('Đã mất shows the death fields; death before birth is an inline error and opens Mất', { skip }, async () => {
+test('Đã khuất shows the death fields; death before birth is an inline error and opens Mất', { skip }, async () => {
   const browser = await launch();
   try {
     const s = await open(browser, { role: 'editor', path: '#sua/K2' });
     await expand(s.page, 'mat');
     assert.equal(await s.page.locator('.fp-death').isVisible(), false, 'hidden when alive');
     await s.page.locator('input[name=dead]').check({ force: true });
-    assert.equal(await s.page.locator('.fp-death').isVisible(), true, 'shown when Đã mất is on');
+    assert.equal(await s.page.locator('.fp-death').isVisible(), true, 'shown when Đã khuất is on');
     await expand(s.page, 'sinh');
     await s.page.fill('input[name=birth_smart]', '1955');
     await s.page.fill('input[name=death_smart]', '1940');

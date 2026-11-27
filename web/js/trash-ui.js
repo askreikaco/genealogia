@@ -8,7 +8,7 @@ const q = (fam) => `family=${encodeURIComponent(fam)}`;
 async function api(method, url, body) {
   const r = await fetch(url, { method, cache: 'no-store', headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'Lỗi ' + r.status);
+  if (!r.ok) throw new Error(j.error || 'Chưa làm được: ' + r.status);
   return j;
 }
 

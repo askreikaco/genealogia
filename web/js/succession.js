@@ -34,8 +34,8 @@ const STATUS = { invited: 'Chờ chấp nhận', accepted: 'Đã chấp nhận',
 const STAGE_TXT = {
   inactive: { notice: (w) => `Chủ họ chưa đăng nhập đủ lâu. Dòng họ sẽ chuyển quyền sau ${w}, trừ khi Chủ họ đăng nhập để hủy.`,
     offer: () => 'Dòng họ đang mời người kế tiếp nhận quyền Chủ họ.' },
-  deceased: { reported: () => 'Có báo cáo Chủ họ đã mất. Đang chờ Người được ủy thác xác nhận.',
-    notice: (w) => `Đã xác nhận báo đã mất. Quyền Chủ họ chuyển sau ${w}, trừ khi Chủ họ đăng nhập để hủy.`,
+  deceased: { reported: () => 'Có báo cáo Chủ họ đã khuất. Đang chờ Người được ủy thác xác nhận.',
+    notice: (w) => `Đã xác nhận báo đã khuất. Quyền Chủ họ chuyển sau ${w}, trừ khi Chủ họ đăng nhập để hủy.`,
     offer: () => 'Dòng họ đang mời người kế tiếp nhận quyền Chủ họ.' },
   claim: { backing: (w) => `Có người xin nhận quyền Chủ họ. Cần đủ người ủng hộ trước ${w}.`,
     objection: (w) => `Đã đủ người ủng hộ. Quyền Chủ họ chuyển sau ${w}, trừ khi có người phản đối hoặc Chủ họ đăng nhập để từ chối.` },
@@ -65,8 +65,8 @@ const contactRow = (c, i, n, owner) => `<div class="succ-row">
 
 function actionRows(st) {
   const h = st.handover; const out = [];
-  if (st.can_report) out.push(`<button type="button" class="btn ter sm dng-t" data-succ="report">Báo Chủ họ đã mất</button>`);
-  if (st.can_confirm) out.push(`<button type="button" class="btn sm" data-succ="confirm" data-id="${h.id}">Xác nhận đã mất</button>`);
+  if (st.can_report) out.push(`<button type="button" class="btn ter sm dng-t" data-succ="report">Báo tin Chủ họ đã khuất</button>`);
+  if (st.can_confirm) out.push(`<button type="button" class="btn sm" data-succ="confirm" data-id="${h.id}">Xác nhận đã khuất</button>`);
   if (st.can_cancel) out.push(`<button type="button" class="btn sm" data-succ="cancel">Tôi vẫn giữ quyền, hủy việc chuyển</button>`);
   if (st.can_object) out.push(`<button type="button" class="btn ter sm dng-t" data-succ="object" data-id="${h.id}">Phản đối việc nhận quyền</button>`);
   if (st.can_back) out.push(`<button type="button" class="btn sm" data-succ="back" data-id="${h.id}">Ủng hộ người xin nhận quyền</button>`);
@@ -124,12 +124,12 @@ async function act(fam, kind, id) {
     return deps.confirm('Xin nhận quyền Chủ họ?', 'Chỉ làm được khi dòng họ không còn ai để trao quyền. Các thành viên khác sẽ được hỏi ủng hộ. Trong 30 ngày, Chủ họ có thể đăng nhập để từ chối.', 'Xin nhận quyền', () => go('claim', 'Đã gửi yêu cầu nhận quyền'));
   }
   if (kind === 'back') return api('POST', `/api/handover/${Number(id)}/back`).then((r) => { drop(fam); toast(r.owner ? 'Đủ người ủng hộ. Quyền Chủ họ đã chuyển.' : `Đã ủng hộ (${r.backers})`); });
-  if (kind === 'confirm') return deps.confirm('Xác nhận Chủ họ đã mất?', 'Dòng họ sẽ bắt đầu thời hạn 14 ngày. Trong thời hạn đó, Chủ họ có thể đăng nhập để hủy.', 'Xác nhận', () => api('POST', `/api/handover/${Number(id)}/confirm`).then(() => { drop(fam); toast('Đã xác nhận'); }));
+  if (kind === 'confirm') return deps.confirm('Xác nhận Chủ họ đã khuất?', 'Dòng họ sẽ bắt đầu thời hạn 14 ngày. Trong thời hạn đó, Chủ họ có thể đăng nhập để hủy.', 'Xác nhận', () => api('POST', `/api/handover/${Number(id)}/confirm`).then(() => { drop(fam); toast('Đã xác nhận'); }));
   if (kind === 'reclaim') return deps.confirm('Lấy lại quyền Chủ họ?', 'Chủ họ hiện tại sẽ thành Quản trị.', 'Lấy lại', () => api('POST', `/api/families/${enc(fam)}/reclaim`).then(async () => { drop(fam); await deps.S.refreshMe(); toast('Bạn đã là Chủ họ'); }));
   if (kind === 'report') return reportDialog(fam);
 }
 function reportDialog(fam) {
-  deps.dialog(`<h2>Báo Chủ họ đã mất</h2>
+  deps.dialog(`<h2>Báo tin Chủ họ đã khuất</h2>
     <p class="sub">Một Người được ủy thác (hoặc Quản trị, nếu chưa có) cần xác nhận. Sau đó dòng họ có 14 ngày trước khi chuyển quyền.</p>
     <label class="fld">Thông tin kèm theo (không bắt buộc)<textarea name="evidence" rows="3" maxlength="1000"></textarea></label>
     <label class="fld">Đường dẫn ảnh giấy báo (không bắt buộc)<input name="photo_link" type="url" maxlength="500" placeholder="https://"></label>
@@ -229,7 +229,7 @@ export async function trustedView(token) {
   if (info.expired) return page(`<h1 class="keep">Lời mời đã hết hạn</h1><p class="sub">Nhờ Chủ họ của ${esc(info.family)} gửi lại lời mời.</p>`);
   const signed = deps.S.signedIn();
   page(`<h1 class="keep">Mời làm Người được ủy thác</h1>
-    <p>${esc(info.family)} mời bạn làm Người được ủy thác. Đây là người đầu tiên được báo khi Chủ họ lâu không đăng nhập, hoặc khi có báo đã mất.</p>
+    <p>${esc(info.family)} mời bạn làm Người được ủy thác. Đây là người đầu tiên được báo khi Chủ họ lâu không đăng nhập, hoặc khi có báo đã khuất.</p>
     ${signed ? `<div class="row end"><button class="btn" id="tr-accept">Chấp nhận</button></div>`
       : `<p class="succ-note">Đăng nhập bằng Google với email ${esc(info.email)} để chấp nhận.</p><p><a class="btn" href="${esc(deps.googleUrl(deps.hashNext()))}">Đăng nhập bằng Google</a></p>`}
     <p class="err" id="tr-err" hidden></p>`);

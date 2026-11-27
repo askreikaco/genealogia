@@ -34,7 +34,7 @@ export async function twoStepPage(main) {
       const r = await fetch('/api/auth/2fa/verify', { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
       const j = await r.json().catch(() => ({}));
       if (r.ok) { location.href = j.to || '/'; return; }
-      err.textContent = j.error || 'Lỗi máy chủ, thử lại sau.'; err.hidden = false;
+      err.textContent = j.error || 'Có trục trặc, vui lòng thử lại sau.'; err.hidden = false;
       if (r.status === 401 && /hết hạn/.test(err.textContent)) btn.disabled = true; else btn.disabled = false;
       if (r.status !== 429) inp.select();
     } catch { err.textContent = 'Không kết nối được. Kiểm tra mạng rồi thử lại.'; err.hidden = false; btn.disabled = false; }

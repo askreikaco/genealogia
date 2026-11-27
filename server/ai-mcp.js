@@ -36,7 +36,7 @@ async function run(name, fn) {
     return { content: [{ type: 'text', text: JSON.stringify(out) }] };
   } catch (e) {
     if (!e.status) console.error('ai tool', name, e && e.message);
-    const body = e.status ? { error: e.message, ...(e.extra || {}) } : { error: 'Lỗi máy chủ. Thử lại sau.' };
+    const body = e.status ? { error: e.message, ...(e.extra || {}) } : { error: 'Có trục trặc, vui lòng thử lại sau.' };
     return { isError: true, content: [{ type: 'text', text: JSON.stringify(body) }] };
   }
 }
@@ -71,7 +71,7 @@ function buildServer({ deps, tok, base }) {
   reg('search_people', 'Tìm người', 'Tìm người theo tên (không dấu cũng được).',
     { query: z.string().min(1).max(100), limit: z.number().int().min(1).max(25).optional() },
     (a) => T.searchPeople(ctx, a));
-  reg('get_person', 'Chi tiết người', 'Một người. Người còn sống: chỉ thành viên thấy đầy đủ, khách thấy năm sinh.',
+  reg('get_person', 'Chi tiết người', 'Một người. Hồ sơ riêng tư: chỉ thành viên thấy đầy đủ.',
     { person_id: ID }, (a) => T.getPerson(ctx, a));
   reg('get_relatives', 'Quan hệ', 'Cha mẹ, con, vợ/chồng, anh chị em của một người.', { person_id: ID }, (a) => T.getRelatives(ctx, a));
   reg('get_timeline', 'Sự kiện', 'Sự kiện và câu chuyện của một người.', { person_id: ID }, (a) => T.getTimeline(ctx, a));
@@ -138,7 +138,7 @@ function mountMcp(app, deps) {
       if (s.tokenId !== tok.id) return bad(res, 403, -32000, 'Phiên này thuộc mã khác.');
       s.last = Date.now();
       if (req.method === 'DELETE') { sessions.delete(String(sid)); await s.transport.close().catch(() => {}); return res.status(200).end(); }
-      try { return await s.transport.handleRequest(req, res, req.body); } catch (e) { console.error('mcp', e.message); if (!res.headersSent) bad(res, 500, -32603, 'Lỗi máy chủ.'); return undefined; }
+      try { return await s.transport.handleRequest(req, res, req.body); } catch (e) { console.error('mcp', e.message); if (!res.headersSent) bad(res, 500, -32603, 'Có trục trặc, vui lòng thử lại sau.'); return undefined; }
     }
     if (req.method !== 'POST' || !(req.body && req.body.method === 'initialize')) return bad(res, 400, -32000, 'Bắt đầu bằng initialize.');
     deps.pool.query('update ai_tokens set last_used_at = now() where id = $1', [tok.id]).catch(() => {});
@@ -151,7 +151,7 @@ function mountMcp(app, deps) {
       await transport.handleRequest(req, res, req.body);
     } catch (e) {
       console.error('mcp', e.message);
-      if (!res.headersSent) bad(res, 500, -32603, 'Lỗi máy chủ.');
+      if (!res.headersSent) bad(res, 500, -32603, 'Có trục trặc, vui lòng thử lại sau.');
     }
   });
 }

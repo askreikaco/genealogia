@@ -10,7 +10,7 @@ const q = (fam) => `family=${encodeURIComponent(fam)}`;
 async function api(method, url, body) {
   const r = await fetch(url, { method, cache: 'no-store', headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'Lỗi ' + r.status);
+  if (!r.ok) throw new Error(j.error || 'Chưa làm được: ' + r.status);
   return j;
 }
 const WHY = { 'not-mine': 'Chỉ người tạo hồ sơ mới dùng được.', 'too-old': 'Chỉ dùng được trong 24 giờ sau khi tạo hồ sơ.', 'has-links': 'Hồ sơ đã có quan hệ, sự kiện hoặc câu chuyện.' };
@@ -204,7 +204,7 @@ export function voteRuleCard(isOwner) {
     <span><b>${esc(o.label)}</b><span class="sub">${esc(o.help)}</span></span></label>`).join('');
   return section('Biểu quyết', `
     <fieldset class="vrule"><legend>Ai được biểu quyết gỡ người khỏi gia phả</legend>${opts}</fieldset>
-    <p class="sub">Mỗi người bỏ một phiếu, phiếu bằng nhau. Chỉ người đang hoạt động (đăng nhập trong 180 ngày, chưa đánh dấu đã mất) được biểu quyết.</p>
+    <p class="sub">Mỗi người bỏ một phiếu, phiếu bằng nhau. Chỉ người đang hoạt động (đăng nhập trong 180 ngày, chưa đánh dấu đã khuất) được biểu quyết.</p>
     ${isOwner ? '' : '<p class="sub">Chỉ Chủ họ đổi được.</p>'}`, { variant: 'card', attrs: 'id="vrule"' });
 }
 async function decorateSettings(main, fam) {

@@ -16,7 +16,7 @@ export const setOnChange = (fn) => { onChange = fn; };
 async function api(url, opts = {}) {
   const r = await fetch(url, { cache: 'no-store', headers: { 'content-type': 'application/json' }, ...opts });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'Lỗi ' + r.status);
+  if (!r.ok) throw new Error(j.error || 'Chưa làm được: ' + r.status);
   return j;
 }
 const famQ = (fam) => `family=${encodeURIComponent(fam)}`;

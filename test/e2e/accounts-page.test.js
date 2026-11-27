@@ -1,7 +1,7 @@
 // E2E: Thêm › Tài khoản (#tai-khoan) and the account sheet (390 px). Real server + own schema e2e_accounts_page.
 // Checks: the sheet opens with focus on its heading (no ring on the close button) and links to the page; the main page is a
 // header card and one list of summary rows ("Cách đăng nhập", "Thiết bị đang đăng nhập", "Dòng họ của tôi", "Bảo mật"), a
-// "Đăng xuất" button and a quiet "Vùng nguy hiểm" link; each row opens its subpage (#tai-khoan/<sub>) with a back button.
+// "Đăng xuất" button and a quiet "Thao tác cần cẩn trọng" link; each row opens its subpage (#tai-khoan/<sub>) with a back button.
 // Every capability is still reachable from a subpage: add and remove an email, unlink Google (menu), a passkey row, sign out
 // other devices, sign out. Signed out shows a sign-in button, not a bare error. A stale sign-in asks to confirm first.
 // Invented names only.

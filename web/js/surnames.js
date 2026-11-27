@@ -68,7 +68,7 @@ export function bindSurnames(main, id, d, { edit }) {
     if (add) { const slot = main.querySelector('#surn-slot'); if (slot) slot.innerHTML = surnameForm(); return; }
     if (del) {
       const i = Number(del.dataset.surnDel); const e = list()[i]; if (!e) return;
-      confirmDanger({ title: `Xóa mốc họ “${e.surname}”?`, lose: 'Mốc này sẽ mất khỏi hồ sơ người này.', restore: 'Có thể thêm lại sau.', confirm: 'Xóa mốc',
+      confirmDanger({ title: `Xóa mốc họ “${e.surname}”?`, lose: 'Mốc này sẽ được gỡ khỏi hồ sơ người này.', restore: 'Có thể thêm lại sau.', confirm: 'Xóa mốc',
         onConfirm: () => edit(id, { names: list().filter((_, j) => j !== i) }) });
     }
   };

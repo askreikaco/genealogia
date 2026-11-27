@@ -15,7 +15,7 @@ export const VI = {
   "rule_born_after_mother_death": "Con sinh sau khi mẹ mất",
   "rule_born_after_father_death": "Con sinh hơn 1 năm sau khi cha mất",
   "rule_married_too_young": "Kết hôn trước 12 tuổi",
-  "rule_probably_deceased": "Trên 110 tuổi, có thể đã mất",
+  "rule_probably_deceased": "Trên 110 tuổi, chưa ghi năm mất",
   "rule_event_before_birth": "Sự kiện trước ngày sinh",
   "rule_event_after_death": "Sự kiện sau ngày mất",
   "rule_same_name_sibling": "Anh chị em trùng tên, cùng năm sinh (có thể trùng lặp)",

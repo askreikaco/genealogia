@@ -11,7 +11,7 @@ import { dangerButton, dangerZone, confirmDanger, dangerLabel } from './danger.j
 import { topNews, badgeCount, dayMs } from './lich-merge.js';
 
 const SEEN_KEY = 'news_seen';
-const HOLD_VI = { link: 'có liên kết', phone: 'có số điện thoại', account: 'có dãy số giống số tài khoản', word: 'có từ bị chặn' };
+const HOLD_VI = { link: 'có liên kết', phone: 'có số điện thoại', account: 'có dãy số giống số tài khoản', word: 'có từ không phù hợp' };
 let kindSel = 'all'; // Lịch filter chip: all | gio | gath (kept while the app runs)
 const cache = new Map(); // family -> { at, posts, can_post, is_admin, posters }
 const TTL = 15000;
@@ -19,7 +19,7 @@ const TTL = 15000;
 async function api(method, url, body) {
   const r = await fetch(url, { method, cache: 'no-store', headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'Lỗi ' + r.status);
+  if (!r.ok) throw new Error(j.error || 'Chưa làm được: ' + r.status);
   return j;
 }
 const q = (fam) => `family=${encodeURIComponent(fam)}`;
@@ -77,7 +77,7 @@ export function postersCard(isOwner) {
     <fieldset class="vrule"><legend>Ai được đăng tin</legend>
       ${opt('admin', 'Chủ họ và Quản trị', 'Mặc định. Biên tập viên và thành viên góp ý qua Góp ý.')}
       ${opt('editor', 'Thêm Biên tập viên', 'Biên tập viên cũng đăng được tin.')}</fieldset>
-    <p class="sub">Tin có liên kết, số điện thoại, số tài khoản hoặc từ bị chặn chờ chủ họ hoặc quản trị duyệt. Mọi thay đổi ghi vào lịch sử.</p>
+    <p class="sub">Tin có liên kết, số điện thoại, số tài khoản hoặc từ không phù hợp chờ chủ họ hoặc quản trị duyệt. Mọi thay đổi ghi vào lịch sử.</p>
     ${isOwner ? '' : '<p class="sub">Chỉ Chủ họ đổi được.</p>'}`, { variant: 'card', attrs: 'id="ptrule"' });
 }
 // Cài đặt dòng họ hook: binds the posting radios (called from council.js decorate for the settings page).
@@ -289,7 +289,7 @@ export async function editorPage(main, { fam, hf, id = '', kind = 'notice' }) {
         <label class="radio"><input type="radio" name="kind" value="gathering" ${k === 'gathering' ? 'checked' : ''}> Họp mặt</label>
         <p class="sub">Có ngày, giờ, địa điểm. Mọi người trả lời Đi, Không đi hoặc Chưa biết và được nhắc trước 3 ngày và 1 ngày.</p>
       </fieldset>
-      <p class="sub wide">Tin có liên kết, số điện thoại, dãy số giống số tài khoản hoặc từ bị chặn sẽ chờ chủ họ duyệt trước khi được đăng.</p>
+      <p class="sub wide">Tin có liên kết, số điện thoại, dãy số giống số tài khoản hoặc từ không phù hợp sẽ chờ chủ họ duyệt trước khi được đăng.</p>
       <label class="fld wide">Tiêu đề<input name="title" required maxlength="200" value="${v('title')}"></label>
       <label class="fld wide">Nội dung<textarea name="body" rows="6" maxlength="5000">${v('body')}</textarea></label>
       <fieldset class="fset wide" id="gfields"><legend>Chi tiết họp mặt</legend>

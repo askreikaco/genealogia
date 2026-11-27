@@ -90,7 +90,7 @@ function relSheet(M, p) {
   const sel = (k, label, opts) => `<label>${label}<select data-relf="${k}"><option value="">Tất cả</option>${opts.map(([v, l]) => `<option value="${esc(v)}" ${RF[k] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
   const lv = descendantLevels(relsOf(M).ix, p.id);
   const brs = [...new Set((lv[1] || []).map((x) => x.parent))].map((x) => [x, pname(M, x)]);
-  return fpanel(sel('lv', 'Mức', RLV) + sel('liv', 'Tình trạng', [['song', 'Còn sống'], ['mat', 'Đã mất']]) + sel('sex', 'Giới tính', [['m', 'Nam'], ['f', 'Nữ']])
+  return fpanel(sel('lv', 'Mức', RLV) + sel('liv', 'Tình trạng', [['song', 'Đang sống'], ['mat', 'Đã khuất']]) + sel('sex', 'Giới tính', [['m', 'Nam'], ['f', 'Nữ']])
     + (brs.length ? sel('br', 'Nhánh (con của …)', brs) : ''));
 }
 
@@ -157,7 +157,7 @@ function relBody(M, p, ctx) {
   const farHtml = far.length ? moreFold(`Xem thêm ${far.length} đời · ${farN} người (${far.map((g) => gTitle(g, region)).join(', ')})`, far.map(levelGroup).join(''), filtering) : '';
   const counted = (t, n) => `${t} · ${n} người`;
   const lvName = Object.fromEntries(RLV); const brName = RF.br ? pname(M, RF.br) : '';
-  const tags = [RF.lv && ['lv', lvName[RF.lv]], RF.liv && ['liv', RF.liv === 'mat' ? 'Đã mất' : 'Còn sống'], RF.sex && ['sex', RF.sex === 'f' ? 'Nữ' : 'Nam'], RF.br && ['br', 'Nhánh ' + brName]].filter(Boolean);
+  const tags = [RF.lv && ['lv', lvName[RF.lv]], RF.liv && ['liv', RF.liv === 'mat' ? 'Đã khuất' : 'Đang sống'], RF.sex && ['sex', RF.sex === 'f' ? 'Nữ' : 'Nam'], RF.br && ['br', 'Nhánh ' + brName]].filter(Boolean);
   const body = group('Cha mẹ', pRows) + group('Vợ/chồng', cRows) + group('Anh chị em (tự tính)', sRows) + group(counted(gTitle(1, region), kidsF.length), kRows) +
     group(counted(gTitle(2, region), cháu.length), cháuRows) + farHtml;
   // a search that found no one: say so, and point at "+" (only when this viewer has the "+")

@@ -12,7 +12,7 @@ export function init(d) { Object.assign(deps, d); }
 const MAX_FILE = 700 * 1024; // raw bytes; the server refuses more (claim-rules.js MAX_FILE_BYTES)
 const enc = encodeURIComponent;
 const DATE_VN = (ms) => new Date(ms).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric' });
-const STATE_TXT = { unowned: 'Chưa có Chủ họ quản lý', abandoned: 'Các Chủ họ hiện có đã lâu không đăng nhập hoặc đã mất', owned: 'Đã có Chủ họ' };
+const STATE_TXT = { unowned: 'Chưa có Chủ họ quản lý', abandoned: 'Các Chủ họ hiện có đã lâu không đăng nhập hoặc đã khuất', owned: 'Đã có Chủ họ' };
 
 async function api(method, url, body) {
   const r = await fetch(url, { method, cache: 'no-store', headers: body === undefined ? {} : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });

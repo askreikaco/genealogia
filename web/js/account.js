@@ -11,7 +11,7 @@ import { addPasskey, canAddPasskey } from './passkey.js';
 async function api(url, { method = 'GET', body } = {}) {
   const r = await fetch(url, { method, cache: 'no-store', headers: body !== undefined ? { 'content-type': 'application/json' } : {}, body: body !== undefined ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error || 'Lỗi máy chủ, thử lại sau.'), { status: r.status, reauth: !!j.reauth });
+  if (!r.ok) throw Object.assign(new Error(j.error || 'Có trục trặc, vui lòng thử lại sau.'), { status: r.status, reauth: !!j.reauth });
   return j;
 }
 const googleUrl = (mode) => `/api/auth/google?mode=${mode}&next=tai-khoan`;
@@ -68,7 +68,7 @@ function mainPage(a) {
   rows.push(calmRow({ href: '#tai-khoan/bao-mat', icon: tileOf('shield'), title: 'Bảo mật', subtitle: esc(a.totp?.enabled ? 'Xác minh 2 bước đang bật' : 'Xác minh 2 bước chưa bật'), dense: true }));
   return `<h1>Tài khoản</h1>${head(a)}<section class="mg"><div class="mg-g">${rows.join('')}</div></section>`
     + `<div class="acc-foot"><button type="button" class="acc-signout" id="logout">${ICON('logout')}Đăng xuất</button>`
-    + `<a class="acc-quiet" href="#tai-khoan/vung-nguy-hiem">${ICON('warning')}Vùng nguy hiểm</a></div>`;
+    + `<a class="acc-quiet" href="#tai-khoan/vung-nguy-hiem">${ICON('warning')}Thao tác cần cẩn trọng</a></div>`;
 }
 
 // ---- subpages ----
@@ -144,13 +144,13 @@ function recoveryPage(a) {
   const t = a.totp || {};
   if (!t.enabled) return '<h1>Mã khôi phục</h1><section class="mg acc-out"><p>Bật xác minh 2 bước trước để có mã khôi phục.</p><a class="btn" href="#tai-khoan/xac-minh">Bật xác minh 2 bước</a></section>';
   if (codes) return `<h1>Mã khôi phục</h1>${codesView()}`;
-  return `<h1>Mã khôi phục</h1><section class="mg acc-out"><p>Còn ${t.recovery_left} mã chưa dùng. Mã chỉ hiện một lần: nếu đã mất, tạo mã mới. Mã cũ sẽ không dùng được nữa.</p>`
+  return `<h1>Mã khôi phục</h1><section class="mg acc-out"><p>Còn ${t.recovery_left} mã chưa dùng. Mã chỉ hiện một lần: nếu làm mất mã, tạo mã mới. Mã cũ sẽ không dùng được nữa.</p>`
     + '<button type="button" class="btn" data-totp-regen>Tạo mã mới</button></section>';
 }
 function dangerPage() {
-  return `<h1>Vùng nguy hiểm</h1>` + group('Xóa tài khoản', [soon(dangerLabel('Xóa tài khoản'), 'Cần chuyển quyền Chủ họ trước')]);
+  return `<h1>Thao tác cần cẩn trọng</h1>` + group('Xóa tài khoản', [soon(dangerLabel('Xóa tài khoản'), 'Cần chuyển quyền Chủ họ trước')]);
 }
-const TITLE = { 'dang-nhap': 'Cách đăng nhập', 'thiet-bi': 'Thiết bị đang đăng nhập', 'dong-ho': 'Dòng họ của tôi', 'bao-mat': 'Bảo mật', 'xac-minh': 'Xác minh 2 bước', 'ma-khoi-phuc': 'Mã khôi phục', 'vung-nguy-hiem': 'Vùng nguy hiểm' };
+const TITLE = { 'dang-nhap': 'Cách đăng nhập', 'thiet-bi': 'Thiết bị đang đăng nhập', 'dong-ho': 'Dòng họ của tôi', 'bao-mat': 'Bảo mật', 'xac-minh': 'Xác minh 2 bước', 'ma-khoi-phuc': 'Mã khôi phục', 'vung-nguy-hiem': 'Thao tác cần cẩn trọng' };
 const SUB = { 'dang-nhap': signInPage, 'thiet-bi': devicesPage, 'dong-ho': familiesPage, 'bao-mat': securityPage, 'xac-minh': twoStepPage, 'ma-khoi-phuc': recoveryPage, 'vung-nguy-hiem': dangerPage };
 function page(a, which) { return `<div class="acc-root">${(SUB[which] || mainPage)(a)}</div>`; }
 function signedOut() {

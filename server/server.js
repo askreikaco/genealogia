@@ -124,9 +124,9 @@ const acctKey = (acc) => (acc.k === 'c' ? 'code' : acc.k === 'd' ? 'd-' + acc.id
 // Same-site guard for account changes: a cross-site page cannot make the browser send these (SameSite=Lax + this check).
 function sameSite(req, res, next) {
   const site = req.get('sec-fetch-site');
-  if (site && site !== 'same-origin' && site !== 'none') return res.status(403).json({ error: 'Yêu cầu từ trang khác bị chặn.' });
+  if (site && site !== 'same-origin' && site !== 'none') return res.status(403).json({ error: 'Yêu cầu không hợp lệ.' });
   const origin = req.get('origin');
-  if (origin) { let host = ''; try { host = new URL(origin).host; } catch {} if (host !== req.get('host')) return res.status(403).json({ error: 'Yêu cầu từ trang khác bị chặn.' }); }
+  if (origin) { let host = ''; try { host = new URL(origin).host; } catch {} if (host !== req.get('host')) return res.status(403).json({ error: 'Yêu cầu không hợp lệ.' }); }
   if (!req.is('application/json')) return res.status(415).json({ error: 'Gửi dữ liệu dạng JSON.' });
   next();
 }
@@ -310,7 +310,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
     if (!added) await ACC.revoke(pool, [sid]);
     if (!added) return fail(MAX_MSG);
     res.redirect(to);
-  } catch (e) { console.error('google login', e.message); fail('Lỗi đăng nhập Google.'); }
+  } catch (e) { console.error('google login', e.message); fail('Chưa đăng nhập Google được.'); }
 });
 
 // Account page modes of the Google callback. reauth: the Google account must belong to the signed-in account; the
@@ -1585,7 +1585,7 @@ app.get(/^\/(?!api\/).*/, (_req, res) => { res.setHeader('X-Frame-Options', 'SAM
 app.use((err, _req, res, _next) => {
   if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
   if (err.expose && err.status >= 400 && err.status < 500) return res.status(err.status).json({ error: 'Dữ liệu gửi lên không hợp lệ.' }); // e.g. body too large
-  console.error(err); res.status(500).json({ error: 'Lỗi máy chủ.' });
+  console.error(err); res.status(500).json({ error: 'Có trục trặc, vui lòng thử lại sau.' });
 });
 
 if (require.main === module) {

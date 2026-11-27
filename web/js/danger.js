@@ -1,7 +1,7 @@
 // Destructive actions: ONE component for every delete / remove / leave / sign-out-all in the app.
 // Delete cannot be undone, so it is never a primary button and never next to Save:
 //   dangerButton(label, attrs, { size })  red outline button, marked data-danger (the guard test looks for it)
-//   dangerZone(buttons, { title, note })  a separated "Vùng nguy hiểm" section at the bottom of a page or sheet
+//   dangerZone(buttons, { title, note })  a separated "Thao tác cần cẩn trọng" section at the bottom of a page or sheet
 //   dangerItem(label, fn, attrs)          a ⋯ menu item: red, last, a divider above it; fn must call confirmDanger
 //   dangerLabel(label)                    marks a destructive label that is passed on to a menu helper
 //   confirmDanger({ ... })                the one confirm dialog: says what will be lost, whether it can be
@@ -18,7 +18,7 @@ export function dangerButton(label, attrs = '', { size = '' } = {}) {
   return `<button type="button" class="btn dng-o${size ? ' ' + size : ''}" data-danger ${attrs}>${esc(label)}</button>`;
 }
 
-export function dangerZone(buttons, { title = 'Vùng nguy hiểm', note = '' } = {}) {
+export function dangerZone(buttons, { title = 'Thao tác cần cẩn trọng', note = '' } = {}) {
   const list = (Array.isArray(buttons) ? buttons : [buttons]).filter(Boolean);
   if (!list.length) return '';
   return `<section class="dzone" aria-label="${esc(title)}"><h2 class="dzone-h">${esc(title)}</h2>`

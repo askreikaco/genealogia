@@ -1,4 +1,4 @@
-// E2E (owner 2026-11-24): the event editor is a page, not a sheet; delete is apart from Save, in "Vùng nguy hiểm",
+// E2E (owner 2026-11-24): the event editor is a page, not a sheet; delete is apart from Save, in "Thao tác cần cẩn trọng",
 // and always goes through the shared destructive confirm (Escape cancels, focus on its heading, red "Xóa vĩnh viễn"
 // is never the default); deleting a person asks to type the name. Own family (slug dz-<tag>).
 // Needs a SCRATCH database: GP_TEST_DATABASE_URL=postgres://.../<scratch> NODE_PATH=<dir with playwright>.
@@ -108,7 +108,7 @@ test('event edit is a page with back and a sticky Hủy · Lưu bar; delete is i
       assert.ok(await page.locator('.evx-src [data-src-add].btn').isVisible(), '+ Thêm nguồn is an outlined button');
       await shot(page, `event-page-390-${scheme}.png`);
       const del = page.locator('.dzone [data-evp-del]');
-      assert.equal(await page.textContent('.dzone .dzone-h'), 'Vùng nguy hiểm');
+      assert.equal(await page.textContent('.dzone .dzone-h'), 'Thao tác cần cẩn trọng');
       await del.scrollIntoViewIfNeeded();
       await shot(page, `danger-zone-390-${scheme}.png`);
       await del.click();

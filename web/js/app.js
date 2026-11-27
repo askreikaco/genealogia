@@ -255,7 +255,7 @@ function chrome() {
   { const b = $('#topsearch'); b.innerHTML = cic('search', 20); }
   { const b = $('#thm'); const d = isDark(); b.innerHTML = cic(d ? 'sun' : 'moon', 20); b.setAttribute('aria-label', d ? 'Chuyển sang nền sáng' : 'Chuyển sang nền tối'); b.title = b.getAttribute('aria-label'); }
   const st = S.status;
-  const label = st.state === 'syncing' ? 'Đang đồng bộ' : st.state === 'offline' ? `Offline${st.pending ? ' · ' + st.pending + ' chờ gửi' : ''}` : st.state === 'error' ? 'Lỗi đồng bộ' : st.pending ? `${st.pending} chờ gửi` : 'Đã đồng bộ';
+  const label = st.state === 'syncing' ? 'Đang đồng bộ' : st.state === 'offline' ? `Offline${st.pending ? ' · ' + st.pending + ' chờ gửi' : ''}` : st.state === 'error' ? 'Chưa đồng bộ được' : st.pending ? `${st.pending} chờ gửi` : 'Đã đồng bộ';
   $('#sync').innerHTML = `<i class="${st.state === 'error' ? 'red' : st.state === 'offline' || st.pending ? 'yellow' : st.state === 'syncing' ? 'blue' : 'green'}"></i><span>${label}</span>`;
   $('#sync').title = st.error || label;
   if (restoreY != null) restoreWhenDrawn(restoreY); // Back returns to where the list was
@@ -505,7 +505,7 @@ main.addEventListener('click', (e) => {
 // A search that matched no name, alias or place becomes the name; everything stays editable until Lưu / Gửi góp ý.
 function addFromBar(kind) {
   const hit = (q) => nameHit(M.all.flatMap((p) => [p.data.name, p.data.alias || '', p.data.place || '']), q);
-  if (kind === 'gio') { const q = $('#gq')?.value || ''; const prefill = gioPrefill({ q, qMatched: hit(q) }); return startAdd({ prefill, title: 'Thêm người đã mất', q: prefill.gio_lunar ? '' : q }); }
+  if (kind === 'gio') { const q = $('#gq')?.value || ''; const prefill = gioPrefill({ q, qMatched: hit(q) }); return startAdd({ prefill, title: 'Thêm người đã khuất', q: prefill.gio_lunar ? '' : q }); }
   if (kind === 'map') { const q = MF.qRaw || ''; return startAdd({ prefill: listPrefill({ gen: MF.gen, living: MF.living, place: mapSel || '', q, qMatched: hit(q) }), q }); }
   const F = listView.f || {}; const q = $('#q')?.value || '';
   return startAdd({ prefill: listPrefill({ gen: F.gen, living: F.living, q, qMatched: hit(q) }), q });
@@ -534,12 +534,12 @@ function listView(arg) {
   const branches = branchesOf(M);
   main.innerHTML = `<h1>Tìm</h1>
    ${toolbar({ id: 'q', ph: 'Tìm tên, tên khác, nơi sống, mã', val: arg, active: [F.chi, F.gen, F.living, F.flag, F.fam].filter(Boolean).length, quick: multiFam() ? famSelect('ffam', F.fam) : '', add: addBtn('data-add="list"', 'Thêm người') })}
-   ${ltags([F.fam && ['fam', 'Dòng họ: ' + S.familyLabel(F.fam)], F.chi && ['chi', 'Chi ' + (M.byId.get(F.chi)?.data.name || '')], F.gen && ['gen', 'Đời ' + F.gen], F.living && ['living', 'Còn sống'], F.flag && ['flag', 'Cần xác minh']].filter(Boolean))}
+   ${ltags([F.fam && ['fam', 'Dòng họ: ' + S.familyLabel(F.fam)], F.chi && ['chi', 'Chi ' + (M.byId.get(F.chi)?.data.name || '')], F.gen && ['gen', 'Đời ' + F.gen], F.living && ['living', 'Đang sống'], F.flag && ['flag', 'Cần xác minh']].filter(Boolean))}
    <p class="sub lcount">${rows.length} / ${M.all.length} người</p>
    ${arg && !rows.length ? `<p class="sub lempty">Không thấy “${esc(String(arg).trim())}”. Bấm + để thêm người này.</p>` : ''}
    ${fpanel(`${multiFam() ? `<label>Dòng họ${famSelect('ffamp', F.fam)}</label>` : ''}<label>Chi<select id="fchi"><option value="">Mọi chi</option>${branches.map((b) => `<option value="${b.id}" ${F.chi === b.id ? 'selected' : ''}>Chi ${esc(chiName(b.data.name))}</option>`).join('')}</select></label>
    <label>Đời<select id="fgen"><option value="">Mọi đời</option>${gens.map((g) => `<option ${String(g) === F.gen ? 'selected' : ''}>${g}</option>`).join('')}</select></label>
-   <div class="row wrap">${tag('Còn sống', { kind: 'chip', on: F.living, attrs: 'id="fliv"' })}${tag('Cần xác minh', { kind: 'chip', on: F.flag, attrs: 'id="fflag"' })}</div>`)}
+   <div class="row wrap">${tag('Đang sống', { kind: 'chip', on: F.living, attrs: 'id="fliv"' })}${tag('Cần xác minh', { kind: 'chip', on: F.flag, attrs: 'id="fflag"' })}</div>`)}
    ${isWide() ? `<div class="kpis lk">${[['Tổng số', M.all.length, 'ia'], ['Nam / Nữ', M.all.filter((p) => p.data.sex !== 'f').length + ' / ' + M.all.filter((p) => p.data.sex === 'f').length, 'c2'], ['Có ngày giỗ', M.all.filter((p) => gioOf(p.data)).length, 'c3'], ['Cần xác minh', M.all.filter((p) => p.data.verify).length, 'warn']].map(([l, v, c]) => `<div class="kpi" style="border-top-color:var(--${c})"><span class="sub">${l}</span><b>${v}</b></div>`).join('')}</div>` : ''}
    ${!isWide() ? `<div class="cards">${rows.slice(0, 400).map((p) => { const d = p.data; return personItem({ rank: isLabelOnly(d) ? '' : rank(d), name: nameOf(d), sex: d.sex }, { variant: 'card', href: ph(p, `person/${p.id}`), flag: !!d.verify, badge: famChipIf(p), sub: `${sidHits.length && d.sid ? esc(formatSid(d.sid)) + ' · ' : cq && codeOf(M, p.id) ? esc(codeOf(M, p.id)) + ' · ' : ''}${gd ? `Giỗ ${esc(gioOf(d).label)} ÂL` : `${d.hidden_living && !genOf(M, p) ? '' : `Đời ${genOf(M, p) || '?'}`}${years(d) ? ' · ' + yearsHtml(d) : ''}${d.place ? ' · ' + esc(d.place) : ''}`}`, foot: d.verify ? `${tag(`${esc(d.verify)}`, { tone: 'yellow', sm: true })}` : '', action: iconButton({ icon: 'more', label: 'Thao tác', attrs: `data-menu="${p.id}" aria-haspopup="menu"` }) }); }).join('')}</div>` : `<div class="scroll"><table class="tb"><thead><tr><th></th><th>Đời</th><th>Họ tên</th><th>Cha/Mẹ</th><th>Sinh</th><th>Mất</th><th>Giỗ ÂL</th><th>Nơi sống</th><th>Cần xác minh</th><th>Thao tác</th></tr></thead><tbody>
    ${rows.map((p) => { const d = p.data; const par = M.byId.get(d.parent); return `<tr class="${d.verify ? 'flag' : ''}"><td>${sexMark(d.sex)}</td><td class="num">${genOf(M, p) || ''}</td>
@@ -672,7 +672,7 @@ const evInvalidate = (fam, pid) => EVD.delete(evKey(fam, pid));
 async function evApi(method, url, body) {
   const r = await fetch(url, { method, headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'Lỗi ' + r.status);
+  if (!r.ok) throw new Error(j.error || 'Chưa làm được: ' + r.status);
   return j;
 }
 const evOpId = () => 'ev-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -1129,7 +1129,7 @@ function gio() {
   setUntag(() => setGioAll('1'));
   main.innerHTML = `<h1>Lịch</h1>${soonBanner()}
   ${feed ? NW.topCardsHtml(fam, hf, S.getPrefs) : ''}
-  ${toolbar({ id: 'gq', ph: 'Tìm tên hoặc ngày (ví dụ 3/8)', active: mine ? 1 : 0, quick: `<select id="gallq" aria-label="Hiển thị"><option value="0" ${mine ? 'selected' : ''} ${f.length ? '' : 'disabled'}>★ Người tôi theo dõi (${f.length})</option><option value="1" ${mine ? '' : 'selected'}>Cả họ</option></select>`, add: addBtn('data-add="gio"', 'Thêm người đã mất') })}
+  ${toolbar({ id: 'gq', ph: 'Tìm tên hoặc ngày (ví dụ 3/8)', active: mine ? 1 : 0, quick: `<select id="gallq" aria-label="Hiển thị"><option value="0" ${mine ? 'selected' : ''} ${f.length ? '' : 'disabled'}>★ Người tôi theo dõi (${f.length})</option><option value="1" ${mine ? '' : 'selected'}>Cả họ</option></select>`, add: addBtn('data-add="gio"', 'Thêm người đã khuất') })}
   ${NW.chipsHtml()}
   ${ltags(mine ? [['mine', '★ Người tôi theo dõi (' + f.length + ')']] : [])}
   ${fpanel(`<fieldset class="fset"><legend>Hiển thị</legend><label class="radio"><input type="radio" name="gall" data-gioall="0" ${mine ? 'checked' : ''} ${f.length ? '' : 'disabled'}> ★ Người tôi theo dõi (${f.length})</label><label class="radio"><input type="radio" name="gall" data-gioall="1" ${mine ? '' : 'checked'}> Cả họ</label></fieldset>`)}
@@ -1210,7 +1210,7 @@ function mapFilterOpts() {
 }
 function mapTop() {
   const { chi: chiOpts, gen: genOpts } = mapOpts();
-  const LIV = { living: 'Còn sống', dead: 'Đã mất' };
+  const LIV = { living: 'Đang sống', dead: 'Đã khuất' };
   const tags = [MF.fam && ['fam', 'Dòng họ: ' + S.familyLabel(MF.fam)], MF.chi && ['chi', 'Chi ' + (M.byId.get(MF.chi)?.data.name || '')], MF.gen && ['gen', 'Đời ' + MF.gen], MF.living && ['living', LIV[MF.living]]].filter(Boolean);
   $('#mtop').innerHTML = `${toolbar({ id: 'mq', ph: 'Tìm tên, tên khác, nơi sống', val: MF.qRaw, active: tags.length, quick: multiFam() ? famSelect('mfam', MF.fam) : '', add: addBtn('data-add="map"', 'Thêm người') })}${ltags(tags)}
     ${fpanel(`${multiFam() ? `<label>Dòng họ${famSelect('mfamp', MF.fam)}</label>` : ''}<label>Chi<select id="mchi">${chiOpts}</select></label>
@@ -1318,7 +1318,7 @@ function exportView() {
   main.innerHTML = `<h1>Tải về</h1>
   ${card(`<button class="btn" id="xcsv">Tải file Excel (.csv)</button><span class="sub">Mỗi người một dòng. Mở bằng Excel hoặc Google Sheets.</span>`)}
   ${card(`${calmRow({ attrs: 'id="xsvg"', title: 'Cây gia phả (SVG)', subtitle: 'Phóng to không vỡ', dense: true })}${calmRow({ href: '/book', title: 'Sách PDF', subtitle: 'Mở Sách, bấm In rồi chọn "Lưu dưới dạng PDF"', dense: true })}`)}
-  <p class="sub">Liên hệ người còn sống chỉ có trong file khi họ cho phép công khai.</p>`;
+  <p class="sub">Liên hệ chỉ có trong file khi người đó cho phép công khai.</p>`;
   $('#xcsv').onclick = () => {
     const cols = ['id', 'gen', 'thu', 'name', 'sex', 'parent', 'spouse', 'born', 'died', 'death_lunar', 'gio_lunar', 'place', 'alias', 'job', 'religion', 'burial', 'phone', 'email', 'zalo', 'facebook', 'note', 'verify', 'source'];
     const head = ['ID', 'Đời', 'Thứ', 'Họ tên', 'Giới tính', 'Cha/Mẹ (ID)', 'Vợ/Chồng', 'Năm sinh', 'Năm mất', 'Ngày mất (ÂL)', 'Ngày giỗ (ÂL)', 'Nơi sống', 'Tên khác', 'Nghề', 'Tôn giáo', 'An táng', 'Điện thoại', 'Email', 'Zalo', 'Facebook', 'Ghi chú', 'Cần xác minh', 'Nguồn'];
@@ -1529,7 +1529,7 @@ main.addEventListener('change', (e) => {
 // ---------- members & roles (owner + admin) ----------
 const ROLE_LBL = { owner: 'Chủ họ', admin: 'Quản trị', editor: 'Biên tập', member: 'Thành viên', guest: 'Khách' };
 const ROLE_TAG = { owner: 'purple', admin: 'blue', editor: 'green', member: 'gray', guest: 'magenta' };
-const ROLE_DESC = [['owner', 'Toàn quyền, giao quyền.'], ['admin', 'Sửa trực tiếp, duyệt đóng góp, mời người.'], ['editor', 'Sửa trực tiếp, có lịch sử và hoàn tác.'], ['member', 'Xem thông tin riêng tư. Sửa = đề xuất chờ duyệt.'], ['guest', 'Chỉ xem năm sinh và người đã mất. Đề xuất chờ duyệt.']];
+const ROLE_DESC = [['owner', 'Toàn quyền, giao quyền.'], ['admin', 'Sửa trực tiếp, duyệt đóng góp, mời người.'], ['editor', 'Sửa trực tiếp, có lịch sử và hoàn tác.'], ['member', 'Xem thông tin riêng tư. Sửa = đề xuất chờ duyệt.'], ['guest', 'Chỉ xem được hồ sơ công khai. Đề xuất chờ duyệt.']];
 const roleTag = (r) => tag(ROLE_LBL[r] || r, { tone: ROLE_TAG[r] || 'gray' });
 // Roles the current user may hand out: only the owner sees Quản trị / Chủ họ.
 const roleChoices = (f = S.curFamily()) => (S.roleIn(f) === 'owner' ? ['owner', 'admin', 'editor', 'member'] : ['editor', 'member']);
@@ -1649,7 +1649,7 @@ function join() {
   }
   if (a.status === 'pending') {
     main.innerHTML = `<h1>Tham gia dòng họ</h1>${card(`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-      <h2>Đã gửi, chờ Quản trị duyệt</h2><p class="sub">Quản trị sẽ xem và duyệt yêu cầu. Quay lại trang này để xem kết quả. Trong lúc chờ, bạn xem được năm sinh và người đã mất.</p>`, { tag: 'section', cls: 'pstate', attrs: `aria-live="polite"` })}
+      <h2>Đã gửi, chờ Quản trị duyệt</h2><p class="sub">Quản trị sẽ xem và duyệt yêu cầu. Quay lại trang này để xem kết quả. Trong lúc chờ, bạn xem được hồ sơ công khai.</p>`, { tag: 'section', cls: 'pstate', attrs: `aria-live="polite"` })}
       <div class="form-stack">${idCard(a)}
         <div class="row btw fs-lead"><button type="button" class="btn gh" id="jback">Quay lại</button><button type="button" class="btn ter" id="jcancel">Huỷ yêu cầu</button></div></div>`;
     $('#jcancel').onclick = async () => { try { await S.cancelJoin(); await S.refreshMe(); render(); } catch (e) { alert(e.message); } };
@@ -1710,10 +1710,10 @@ function stats() {
   const alive = ps.filter((p) => !isDead(p.data)).length;
   const places = new Map(); for (const p of ps) { const l = locate(p.data); if (l && l.key) places.set(l.key, (places.get(l.key) || 0) + 1); }
   const top = [...places].sort((x, y) => y[1] - x[1]).slice(0, 8); const pmax = top[0]?.[1] || 1;
-  const kpi = [['Tổng số', ps.length], ['Số đời', gens.length], ['Còn sống / chưa rõ', alive], ['Đã mất', ps.length - alive], ['Nam / Nữ', ps.filter((p) => p.data.sex !== 'f').length + ' / ' + ps.filter((p) => p.data.sex === 'f').length], ['Có nơi sống', ps.filter((p) => locate(p.data)).length]];
+  const kpi = [['Tổng số', ps.length], ['Số đời', gens.length], ['Đang sống hoặc chưa rõ', alive], ['Đã khuất', ps.length - alive], ['Nam / Nữ', ps.filter((p) => p.data.sex !== 'f').length + ' / ' + ps.filter((p) => p.data.sex === 'f').length], ['Có nơi sống', ps.filter((p) => locate(p.data)).length]];
   main.innerHTML = `<h1>Thống kê</h1>
    <div class="kpis">${kpi.map(([l, v]) => `<div class="kpi"><span class="sub">${l}</span><b>${esc(v)}</b></div>`).join('')}</div>
-   ${multiFam() ? `<h2>Theo dòng họ</h2>${card(`${S.scopeFams().map((f) => { const fp = ps.filter((p) => p.fam === f); const al = fp.filter((p) => !isDead(p.data)).length; return `<div class="li"><span class="grow">${famChip(S.familyName(f), S.familyHan(f), S.familyMeta(f))}</span><span class="sub">${fp.length} người · ${al} còn sống / chưa rõ · ${fp.length - al} đã mất</span></div>`; }).join('')}`)}` : ''}
+   ${multiFam() ? `<h2>Theo dòng họ</h2>${card(`${S.scopeFams().map((f) => { const fp = ps.filter((p) => p.fam === f); const al = fp.filter((p) => !isDead(p.data)).length; return `<div class="li"><span class="grow">${famChip(S.familyName(f), S.familyHan(f), S.familyMeta(f))}</span><span class="sub">${fp.length} người · ${al} đang sống hoặc chưa rõ · ${fp.length - al} đã khuất</span></div>`; }).join('')}`)}` : ''}
    ${card(`${calmRow({ href: hf('doi-chi'), title: 'Theo đời và chi', subtitle: `${gens.length} đời · ${chis.length} chi`, dense: true })}`)}
    <h2>Nơi sống nhiều nhất</h2>
    <div class="gbars">${top.length ? top.map(([k, n]) => `<div class="gb"><span class="gl wide">${esc(k)}</span><span class="gt"><i style="width:${(n / pmax) * 100}%;background:var(--c-accent)"></i></span><b>${n}</b></div>`).join('') : '<p class="sub">Chưa có nơi sống.</p>'}</div>
@@ -1977,7 +1977,7 @@ function fpGroupClick(e) {
     if (x.mode === 'patch') { const s = (MINE.rows || []).find((r) => r.id === x.patchId); if (s) mineEdit(s, true); else toast('Góp ý này không còn trên máy chủ.'); return; }
     const p = x.personId !== 'new' ? M.byId.get(x.personId) : null;
     goForm(p ? { kind: 'sua', p, autoDraft: true } : { kind: 'them', autoDraft: true });
-  } else if (drop) { const k = drop.dataset.drDrop; confirmDanger({ title: 'Bỏ bản nháp này?', lose: 'Các thay đổi chưa gửi trong bản nháp sẽ mất.', confirm: 'Bỏ nháp', onConfirm: async () => { await S.draftDelete(k); toast('Đã bỏ bản nháp'); loadMine(); } }); }
+  } else if (drop) { const k = drop.dataset.drDrop; confirmDanger({ title: 'Bỏ bản nháp này?', lose: 'Các thay đổi chưa gửi trong bản nháp sẽ không được lưu.', confirm: 'Bỏ nháp', onConfirm: async () => { await S.draftDelete(k); toast('Đã bỏ bản nháp'); loadMine(); } }); }
 }
 function mineCard(s) {
   const [, label, tone] = mineStat(s.status); const pend = s.status === 'pending';
@@ -2039,7 +2039,7 @@ function loginDialog() {
   fetch('/api/me').then((r) => r.json()).then((j) => { if (j.google) document.querySelectorAll('.gsep').forEach((e) => { e.hidden = false; }); }).catch(() => {});
 }
 const F = [['name', 'Họ tên'], ['name_han', 'Tên chữ Hán'], ['thu', 'Thứ (2, 3… hoặc Út)'], ['sex', 'Giới tính', [['m', 'Nam'], ['f', 'Nữ']]], ['gen', 'Đời'], ['spouse', 'Vợ / chồng'], ['other_parent', 'Mẹ / cha (vợ hoặc chồng của cha mẹ)'], ['married', 'Năm cưới'],
-  ['born', 'Năm sinh'], ['birth_date', 'Ngày sinh (dd/mm/yyyy)'], ['birth_lunar', 'Ngày sinh âm lịch (dd/mm)'], ['died', 'Năm mất'], ['death_lunar', 'Ngày mất (ÂL, ví dụ 2/8)'], ['gio_lunar', 'Ngày giỗ (ÂL, nếu khác ngày mất)'], ['living', 'Tình trạng', [['', 'Chưa rõ'], ['living', 'Còn sống'], ['dead', 'Đã mất']]],
+  ['born', 'Năm sinh'], ['birth_date', 'Ngày sinh (dd/mm/yyyy)'], ['birth_lunar', 'Ngày sinh âm lịch (dd/mm)'], ['died', 'Năm mất'], ['death_lunar', 'Ngày mất (ÂL, ví dụ 2/8)'], ['gio_lunar', 'Ngày giỗ (ÂL, nếu khác ngày mất)'], ['living', 'Tình trạng', [['', 'Chưa rõ'], ['living', 'Đang sống'], ['dead', 'Đã khuất']]],
   ['place', 'Nơi sống'], ['alias', 'Tên khác'], ['title_name', 'Tên húy / tự / hiệu'], ['job', 'Nghề'], ['religion', 'Tôn giáo'], ['burial', 'An táng'], ['photo', 'Ảnh'],
   ['phone', 'Điện thoại'], ['email', 'Email'], ['zalo', 'Zalo'], ['facebook', 'Facebook'], ['address', 'Địa chỉ'], ['contact_public', 'Liên hệ công khai?', [['', 'Không'], ['yes', 'Có']]],
   ['note', 'Ghi chú'], ['verify', 'Cần xác minh'], ['source', 'Nguồn'], ['birth_place', 'Nơi sinh'], ['death_date', 'Ngày mất (dd/mm/yyyy)']];
@@ -2051,7 +2051,7 @@ async function uploadPhoto(file) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   const r = await fetch(`/api/photos?family=${encodeURIComponent(S.curFamily())}`, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data: c.toDataURL('image/jpeg', 0.82) }) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'Tải ảnh lỗi.');
+  if (!r.ok) throw new Error(j.error || 'Chưa tải được ảnh.');
   PHOTO_PREVIEW.set(j.url, c.toDataURL('image/jpeg', 0.82)); // shown from the device until it is saved with its record
   return j.url;
 }
@@ -2316,7 +2316,7 @@ function fpBody(st, id) {
   }
   if (id === 'mat') {
     const dead = v.dead === 'on';
-    return `<label class="fp-switch wide"><input type="checkbox" name="dead" role="switch" ${dead ? 'checked' : ''}><span>Đã mất</span></label>`
+    return `<label class="fp-switch wide"><input type="checkbox" name="dead" role="switch" ${dead ? 'checked' : ''}><span>Đã khuất</span></label>`
       + `<div class="fp-death wide" data-death data-on="${dead ? '1' : ''}">${dead ? fpDeath(st) : ''}</div>`;
   }
   if (id === 'noi') return fpIn('place', 'Nơi sống', v) + fpIn('job', 'Nghề', v) + fpIn('religion', 'Tôn giáo', v);
@@ -2582,7 +2582,7 @@ function fpSummaries(form, st, r) {
     ten: [v.name, v.alias || v.title_name].filter(Boolean).join(' · '),
     gd: [par ? 'Cha/mẹ ' + par.data.name : '', v.gen ? 'đời ' + v.gen : '', v.thu ? 'Thứ ' + v.thu : ''].filter(Boolean).join(' · '),
     sinh: [v.birth_date || v.born ? 'Sinh ' + (v.birth_date || v.born) : '', v.birth_place].filter(Boolean).join(' · '),
-    mat: r.dead ? ['Đã mất', year].filter(Boolean).join(' ') : '',
+    mat: r.dead ? ['Đã khuất', year].filter(Boolean).join(' ') : '',
     noi: [v.place, v.job].filter(Boolean).join(' · '),
     ghi: cnt(['photo', 'note', 'verify', 'source']) ? `${cnt(['photo', 'note', 'verify', 'source'])} mục` : '',
     su: evSumText(st),
@@ -2643,7 +2643,7 @@ async function fpCheckDraft(form, st) {
   form.insertAdjacentHTML('beforebegin', `<div class="fp-draft" role="status"><p>Có bản nháp chưa gửi lúc ${fmtTime(dr.saved)} — </p><span class="fp-draft-acts">${dangerButton('Bỏ nháp', 'data-dr-drop', { size: 'sm' })} <button type="button" class="btn sm" data-dr-go>Tiếp tục</button></span></div>`);
   const bar = form.parentElement.querySelector('.fp-draft');
   bar.querySelector('[data-dr-go]').onclick = () => { bar.remove(); fpRestore(form, st, dr); };
-  bar.querySelector('[data-dr-drop]').onclick = () => confirmDanger({ title: 'Bỏ bản nháp này?', lose: 'Các thay đổi chưa gửi trong bản nháp sẽ mất.', confirm: 'Bỏ nháp', onConfirm: async () => { bar.remove(); await S.draftDelete(st.draftKey); st.draftHold = false; fpStatus(''); } });
+  bar.querySelector('[data-dr-drop]').onclick = () => confirmDanger({ title: 'Bỏ bản nháp này?', lose: 'Các thay đổi chưa gửi trong bản nháp sẽ không được lưu.', confirm: 'Bỏ nháp', onConfirm: async () => { bar.remove(); await S.draftDelete(st.draftKey); st.draftHold = false; fpStatus(''); } });
 }
 function fpRestore(form, st, dr) {
   const changed = dr.changed || {};
