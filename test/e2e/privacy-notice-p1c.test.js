@@ -22,9 +22,19 @@ const MEMBER = { ...GUEST, role: 'member', status: 'active', email: 'm@test.loca
 const DEVICE = { ...GUEST, role: 'member', status: 'active', email: null, name: 'Bà Thử Hai', roles: { duong: 'member' } };
 const DEVICE_PERSONS = [PA, FULL_LIVE];
 let srv, base;
-const label = 'Người còn sống';
+let label, NOTE;
+// Expected copy comes from the modules, never typed here.
+const reEsc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, (c) => '\\' + c);
 
-test.before(async () => { if (skip) return; const w = await startWeb(); srv = w.srv; base = w.base; });
+test.before(async () => {
+  if (skip) return;
+  const w = await startWeb(); srv = w.srv; base = w.base;
+  const { pathToFileURL } = require('url');
+  const path = require('path');
+  const js = (f) => pathToFileURL(path.join(__dirname, '..', '..', 'web', 'js', f)).href;
+  NOTE = (await import(js('privacy-copy-vi.js'))).PRIVACY_NOTE_VI;
+  label = (await import(js('booktext.js'))).tx('privateLabel', 'vi');
+});
 test.after(() => { srv?.close(); });
 
 async function open({ width = 390, me, persons, hash, dark = false }) {
@@ -64,9 +74,9 @@ test('a guest (logged out) sees the notice on the list, the chart and a hidden p
     try {
       const n = await note(s.page);
       assert.ok(n, hash + ' at ' + width + ': notice shown');
-      assert.match(n.text, /chỉ hiện cho người trong họ/);
-      assert.match(n.text, /Bạn là người nhà\? Xin tham gia/, 'the join CTA shows its text when logged out');
-      assert.match(n.text, /Có thẻ đăng nhập\? Quét mã QR trên thẻ\./, 'the card hint is shown after the CTA');
+      assert.match(n.text, new RegExp(reEsc(NOTE.text)));
+      assert.match(n.text, new RegExp(reEsc(NOTE.cta)), 'the join CTA shows its text when logged out');
+      assert.match(n.text, new RegExp(reEsc(NOTE.card_hint)), 'the card hint is shown after the CTA');
       assert.equal(n.href, '/api/auth/google?next=join', 'logged out: CTA logs in and returns to join');
       assert.equal(n.buttons, 0, 'not dismissible: no button in the stripe');
       assert.ok(n.lines <= 2, hash + ' at ' + width + ': at most 2 lines, got ' + n.lines);
@@ -80,7 +90,7 @@ test('a signed-in non-member sees the notice, and its CTA opens the join request
   const s = await open({ width: 390, me: SIGNED_OUT_NON_MEMBER, persons: WITH_HIDDEN, hash: '#/duong/list' });
   try {
     const n = await s.page.evaluate(() => document.querySelector('#pnote a.pnote-cta')?.textContent.trim());
-    assert.equal(n, 'Bạn là người nhà? Xin tham gia');
+    assert.equal(n, NOTE.cta);
     const href = await s.page.evaluate(() => document.querySelector('#pnote a.pnote-cta').getAttribute('href'));
     assert.equal(href, '#join', 'signed in: the join request for this family');
     await s.page.click('#pnote a.pnote-cta');

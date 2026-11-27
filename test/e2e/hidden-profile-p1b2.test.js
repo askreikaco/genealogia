@@ -1,4 +1,4 @@
-// E2E (P1b-2): a guest opening the profile of a living person sees the shared label (booktext living2) and no data,
+// E2E (P1b-2): a guest opening the profile of a living person sees the shared label (booktext privateLabel) and no data,
 // and the label is still there after the network is idle. Mocked API, no database.
 //   NODE_PATH=<dir with playwright> [GP_E2E_CHROME=/usr/bin/google-chrome] node --test test/e2e/hidden-profile-p1b2.test.js
 'use strict';
@@ -21,7 +21,7 @@ test.before(async () => {
   if (skip) return;
   const w = await startWeb(); srv = w.srv; base = w.base;
   const { tx } = await import(pathToFileURL(path.join(__dirname, '..', '..', 'web', 'js', 'booktext.js')).href);
-  label = tx('living2', 'vi');
+  label = tx('privateLabel', 'vi');
 });
 test.after(() => { srv?.close(); });
 

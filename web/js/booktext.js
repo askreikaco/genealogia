@@ -47,6 +47,7 @@ const T = {
   layoutSummary: ['Tóm tắt', 'Summary'],
   hideLiving: ['Ẩn người còn sống', 'Hide living people'],
   living2: ['Người còn sống', 'Living person'],
+  privateLabel: ['Riêng tư', 'Private'],
   showCodes: ['Hiện mã người', 'Show person codes'],
   codeLabel: ['Mã', 'Code'],
   language: ['Ngôn ngữ', 'Language'],
