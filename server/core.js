@@ -29,11 +29,23 @@ function isDead(d) {
 // What an anonymous visitor sees. Contacts of living people stay private unless marked public.
 // opts.flag: when a living person's contacts are hidden, say so with has_contact: true (a boolean, never a value),
 // so the profile can show the Liên hệ card with a sign-in prompt. Only the persons API asks for it.
+// P1d: how a living person shows to non-members. 'private' = the placeholder (no name); 'names' = the name, sex and
+// generation only (dates, photo, places, events, stories, contacts and the relations' details stay hidden).
+// The person's own setting (self_visibility) wins unless it is 'inherit', then the family's (living_visibility).
+const LIVING_VIS = ['private', 'names'];
+const SELF_VIS = ['inherit', 'private', 'names'];
+function effectiveLiving(familyVis, selfVis) {
+  if (selfVis === 'private' || selfVis === 'names') return selfVis;
+  return familyVis === 'names' ? 'names' : 'private';
+}
+
+// opts.living: the effective visibility from effectiveLiving(); default 'private'. Dead people ignore it.
 function publicView(d, opts = {}) {
   // A living person (not isDead) is a placeholder for non-members: the tree shape stays (sex, generation and the links,
   // which come from the relation rows), but no name, years, photo, places, events, stories or contacts.
   if (!isDead(d)) { // name '' (not null): the book and labels read it as text; the client shows the label from hidden_living
-    const out = { name: '', hidden_living: true, sex: d.sex || '', gen: d.gen ?? null };
+    const named = opts.living === 'names';
+    const out = { name: named ? (d.name || '') : '', hidden_living: true, sex: d.sex || '', gen: d.gen ?? null };
     for (const k of ['parent', 'other_parent', 'spouse_of', 'spouse_n']) if (d[k] !== undefined) out[k] = d[k]; // the links stay (tree shape)
     return out;
   }
@@ -122,4 +134,4 @@ function mergeOp(row, op, now = Date.now()) {
   return { data, fieldTs, deleted, changes };
 }
 
-module.exports = { FIELDS, CONTACT, DELETE, MAX_HAN, HAN_RE, hanNameError, isDead, publicView, withContacts, validateValue, validateOp, mergeOp };
+module.exports = { FIELDS, CONTACT, DELETE, MAX_HAN, HAN_RE, hanNameError, isDead, publicView, effectiveLiving, LIVING_VIS, SELF_VIS, withContacts, validateValue, validateOp, mergeOp };

@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
 const { Pool } = require('pg');
-const { FIELDS, publicView, withContacts, validateOp, validateValue, mergeOp, DELETE, isDead } = require('./core');
+const { FIELDS, publicView, withContacts, validateOp, validateValue, mergeOp, DELETE, isDead, effectiveLiving, LIVING_VIS } = require('./core');
 const SR = require('./surname-rules');
 const REL = require('./relations');
 const BRN = require('./branch-routes'); // branch trees by reference (reads, ops and suggestions of a branch)
@@ -151,6 +151,8 @@ async function findFamily(ref) {
   const { rows } = await pool.query('select * from families where id=$1 or slug=$1 order by (id=$1) desc limit 1', [r]);
   return rows[0] || null;
 }
+// P1d: a family's living_visibility ('private' | 'names') by id (a branch reads its home tree's setting).
+async function famLivingOf(id) { const { rows } = await pool.query('select living_visibility from families where id = $1', [id]); return rows[0]?.living_visibility || 'private'; }
 // The family a request is about: ?family= (or body.family), id or slug; default 'duong' (old unscoped URLs).
 async function famOf(req) {
   if (req.fam) return req.fam;
@@ -495,19 +497,20 @@ app.get('/api/persons', H(async (req, res) => {
   // descendant added at home joins the branch at once), so `since` does not narrow it.
   const br = f.branch_home ? await BRN.scopeRead(pool, f, full) : null;
   const famId = br ? br.home : f.id;
+  const famLiv = await famLivingOf(famId);
   if (br) {
-    ({ rows } = await pool.query('select id, data, version, deleted, short_id from persons where family_id = $1 and id = any($2::text[]) order by version', [famId, br.set.size ? [...br.set] : ['']]));
+    ({ rows } = await pool.query('select id, data, version, deleted, short_id, self_visibility from persons where family_id = $1 and id = any($2::text[]) order by version', [famId, br.set.size ? [...br.set] : ['']]));
   } else if (typeof req.query.ids === 'string') {
     const ids = [...new Set(req.query.ids.split(',').filter(Boolean))];
     if (ids.length > 500 || !ids.every(isPersonId)) throw new HttpError(400, 'Danh sách mã người không hợp lệ.');
-    ({ rows } = await pool.query('select id, data, version, deleted, short_id from persons where family_id = $1 and id = any($2::text[]) order by version', [f.id, ids]));
+    ({ rows } = await pool.query('select id, data, version, deleted, short_id, self_visibility from persons where family_id = $1 and id = any($2::text[]) order by version', [f.id, ids]));
   } else {
     ({ rows } = await pool.query(
-      'select id, data, version, deleted, short_id from persons where family_id = $1 and version > $2 order by version limit 5000', [f.id, since]));
+      'select id, data, version, deleted, short_id, self_visibility from persons where family_id = $1 and version > $2 order by version limit 5000', [f.id, since]));
   }
   if (br && typeof req.query.ids === 'string') { const want = new Set(req.query.ids.split(',')); rows = rows.filter((r) => want.has(r.id)); }
   const rel = br ? br.rel : await readRel(pool, f.id, full);
-  const items = (await withRel(rel, rows, full)).map((r) => ({ id: r.id, v: Number(r.version), deleted: r.deleted, data: r.deleted ? null : withSid(full ? withContacts(r.data) : publicView(r.data, { flag: true }), r.short_id) }));
+  const items = (await withRel(rel, rows, full)).map((r) => ({ id: r.id, v: Number(r.version), deleted: r.deleted, data: r.deleted ? null : withSid(full ? withContacts(r.data) : publicView(r.data, { flag: true, living: effectiveLiving(famLiv, r.self_visibility) }), r.short_id) }));
   const next_since = items.length ? items[items.length - 1].v : since;
   res.set('Cache-Control', 'no-store');
   // rel: the family's relations as the viewer may see them; source 'legacy' = derived from the person fields (no backfill yet)
@@ -539,7 +542,8 @@ app.get('/api/book/outline', H(async (req, res) => {
   const optKey = [opts.root, opts.dir, opts.maxGen, opts.spouses ? 1 : 0, opts.daughters, opts.status, opts.layout, opts.orient].join('|');
   const view = await BRN.viewOf(pool, f, full); // a branch: its scope of the home tree
   const inView = (id) => !view.ids || view.ids.includes(id);
-  const { rows: allRows } = await pool.query('select id, data, version, deleted, short_id from persons where family_id = $1', [view.famId]);
+  const famLiv = await famLivingOf(view.famId);
+  const { rows: allRows } = await pool.query('select id, data, version, deleted, short_id, self_visibility from persons where family_id = $1', [view.famId]);
   const rows = allRows.filter((r) => inView(r.id));
   const ver = rows.reduce((m, r) => Math.max(m, Number(r.version)), 0);
   // the codes (mã người) are printed and sized by the plan, so a code change is a new plan too
@@ -558,7 +562,7 @@ app.get('/api/book/outline', H(async (req, res) => {
     for (const r of stRows) { if (!stOf.has(r.person_id)) stOf.set(r.person_id, []); stOf.get(r.person_id).push(r); }
     const all = (await withRel(rel, rows, full)).filter((r) => !r.deleted && r.data).map((r) => {
       const seen = R.canSeeEventsOf(r.data, { member: full, familyReadable: true });
-      return { id: r.id, data: withSid(full ? withContacts(r.data) : publicView(r.data), r.short_id), st: seen ? (stOf.get(r.id) || []).map((s) => ({ kind: s.kind, title: s.title, body: s.body })) : [] };
+      return { id: r.id, data: withSid(full ? withContacts(r.data) : publicView(r.data, { living: effectiveLiving(famLiv, r.self_visibility) }), r.short_id), st: seen ? (stOf.get(r.id) || []).map((s) => ({ kind: s.kind, title: s.title, body: s.body })) : [] };
     });
     const bm = lib.bookModel(all, { founder_person_id: f.founder_person_id || null });
     plan = lib.planBook(bm, opts);
@@ -1261,7 +1265,7 @@ const fuzzy = async () => fuzzyMod || (fuzzyMod = await import(require('url').pa
 // One family as the API shows it. $1 = the signed-in email (or null): my_role is that account's active role here.
 const FAM_SELECT = `select f.id, f.slug, f.name, f.han, f.place, f.color, f.visibility, f.updated_at,
     f.short_name, f.founder_person_id, f.origin_place, f.branch_gen, f.branch_order, f.country,
-    f.origin_surname, f.origin_surname_han, f.origin_year, f.origin_reason, f.origin_visibility,
+    f.origin_surname, f.origin_surname_han, f.origin_year, f.origin_reason, f.origin_visibility, f.living_visibility,
     (select count(*)::int from persons p where p.family_id = f.id and not p.deleted) as people,
     (select count(distinct p.data->>'gen')::int from persons p where p.family_id = f.id and not p.deleted and p.data ? 'gen') as generations,
     (select m.role from members m where m.family_id = f.id and m.email = $1 and m.status = 'active') as my_role
@@ -1349,10 +1353,17 @@ app.patch('/api/families/:ref', H(async (req, res) => {
     if (id && !(await pool.query('select 1 from persons where id = $1 and family_id = $2 and not deleted', [id, f.id])).rowCount) throw new HttpError(400, 'Thủy tổ phải là người trong dòng họ này.');
     set.founder_person_id = id || null;
   }
+  // P1d: how living people show to people outside the family (private = placeholder, names = name only). Owner or admin only,
+  // as above; a change is written to family_history, and every person's version moves so clients and the book refresh.
+  if (b.living_visibility !== undefined) { if (!LIVING_VIS.includes(b.living_visibility)) throw new HttpError(400, 'Hiển thị người còn sống không hợp lệ.'); set.living_visibility = b.living_visibility; }
   const keys = Object.keys(set);
   if (!keys.length) throw new HttpError(400, 'Không có gì để lưu.');
   const sql = `update families set ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')}, updated_at = now() where id = $1`;
   await pool.query(sql, [f.id, ...keys.map((k) => set[k])]);
+  if (set.living_visibility !== undefined && set.living_visibility !== f.living_visibility) {
+    await pool.query('insert into family_history (family_id, field, old_value, new_value, by_user) values ($1,$2,$3,$4,$5)', [f.id, 'living_visibility', f.living_visibility, set.living_visibility, w.email || '']);
+    await pool.query("update persons set version = nextval('persons_version') where family_id = $1", [f.id]);
+  }
   const { rows } = await pool.query(`${FAM_SELECT} where f.id = $2`, [w.email, f.id]);
   res.json({ ok: true, family: famView(rows[0]) });
 }));

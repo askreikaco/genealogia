@@ -1,5 +1,20 @@
 {
   "modules": {
+    "living-vis": {
+      "paths": [
+        "server/core.js",
+        "server/elder-rules.js",
+        "server/elder-routes.js",
+        "server/links-routes.js",
+        "server/clan-routes.js",
+        "server/migrations/040_living_visibility.sql",
+        "web/js/living-vis.js",
+        "web/js/living-vis-vi.js"
+      ],
+      "e2e": [
+        "test/e2e/living-vis-*.test.js"
+      ]
+    },
     "privacy-notice": {
       "paths": [
         "web/js/hidden.js",

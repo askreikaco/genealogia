@@ -3,6 +3,7 @@
 'use strict';
 const QR = require('qrcode');
 const R = require('./elder-rules');
+const { SELF_VIS } = require('./core');
 
 const isPid = (s) => /^P\d{3,6}$|^N[0-9a-z-]{6,40}$/.test(String(s || ''));
 const isEmail = (s) => /^[^\s@]{1,200}@[^\s@]{1,200}$/.test(String(s || ''));
@@ -187,6 +188,37 @@ function mount(app, d) {
     await log(fam, pid, 'approve', a.email, '2 of 2');
     await notifyOwners(fam, 'Đăng nhập cho người thân', `${person.name || pid}: ${a.email} vừa duyệt lần thứ hai.`);
     res.json({ status: 'approved' });
+  }));
+
+  // ---- P1d: a living person's own visibility to non-members (inherit | private | names). Only the linked account, its
+  // managers or the person's device may change it; family owners and admins may not (elder-rules.js canSetSelfVisibility).
+  const selfRow = async (req) => {
+    const pid = req.params.id;
+    if (!isPid(pid)) throw new HttpError(400, 'Mã người không hợp lệ.');
+    const { rows } = await pool.query('select id, family_id, data, self_visibility from persons where id=$1 and deleted=false', [pid]);
+    if (!rows[0]) throw new HttpError(404, 'Không tìm thấy người này.');
+    const fam = await famOf({ ...req, query: { family: rows[0].family_id }, body: {} });
+    return { row: rows[0], fam, actor: await actorIn(req, fam.id) };
+  };
+  app.get('/api/persons/:id/self-visibility', H(async (req, res) => {
+    const { row, fam, actor } = await selfRow(req);
+    res.set('Cache-Control', 'no-store');
+    res.json({ value: row.self_visibility, family_value: fam.living_visibility, can_set: R.canSetSelfVisibility(actor, row.id) });
+  }));
+  app.put('/api/persons/:id/self-visibility', sameSite, H(async (req, res) => {
+    const { row, actor } = await selfRow(req);
+    needActor(actor);
+    if (!R.canSetSelfVisibility(actor, row.id)) throw new HttpError(403, 'Chỉ người được liên kết, người quản lý hoặc thiết bị của người này mới đổi được.');
+    const v = req.body?.value;
+    if (!SELF_VIS.includes(v)) throw new HttpError(400, 'Lựa chọn không hợp lệ.');
+    const old = row.self_visibility;
+    if (old !== v) {
+      const by = actor.email || 'thiết bị của người này';
+      await pool.query("update persons set self_visibility=$2, version=nextval('persons_version') where id=$1", [row.id, v]);
+      await pool.query('insert into history (person_id, field, old_value, new_value, by_user) values ($1,$2,$3,$4,$5)', [row.id, 'self_visibility', JSON.stringify(old), JSON.stringify(v), by]); // history values are jsonb
+      await pool.query('update families set updated_at = now() where id = $1', [row.family_id]); // the clan cache reads families' clock
+    }
+    res.json({ value: v, can_set: true });
   }));
 
   // ---- 2. managers of a person ----

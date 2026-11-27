@@ -3,7 +3,7 @@
 'use strict';
 const L = require('./links-rules');
 const CR = require('./claim-rules');
-const { isDead } = require('./core');
+const { isDead, effectiveLiving } = require('./core');
 
 const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
 const yearOf = (v) => { const m = /(\d{4})/.exec(String(v || '')); return m ? m[1] : ''; };
@@ -156,11 +156,17 @@ function mount(app, d) {
     if (!canRead(f, w)) throw new HttpError(403, 'Bạn chưa xem được cây này.');
     const q = fold(req.query.q).slice(0, 60);
     if (q.length < 2) return res.json({ items: [] });
-    const { rows } = await pool.query("select id, data from persons where family_id=$1 and not deleted", [f.id]);
-    // a living person is not listed to a non-member at all: a name match would reveal that they exist (no placeholder here)
+    const { rows: fr } = await pool.query('select living_visibility from families where id=$1', [f.id]);
+    const famLiv = fr[0]?.living_visibility || 'private';
+    const { rows } = await pool.query("select id, data, self_visibility from persons where family_id=$1 and not deleted", [f.id]);
+    // P1d: a living person is listed to a non-member only when they show as name only ('names': their name, sex and
+    // generation; no years, no alias). A placeholder (private) is not listed: a name match would reveal that they exist.
     const member = ['owner', 'admin', 'editor', 'member'].includes(w.role);
-    const items = rows.filter((r) => (member || isDead(r.data)) && (fold(r.data.name).includes(q) || fold(r.data.alias).includes(q))).slice(0, 20)
-      .map((r) => ({ id: r.id, name: r.data.name || '', sex: r.data.sex || '', years: [yearOf(r.data.born || r.data.birth_date), yearOf(r.data.died)].filter(Boolean).join('–'), gen: r.data.gen || null }));
+    const named = (r) => !member && !isDead(r.data) && effectiveLiving(famLiv, r.self_visibility) === 'names';
+    const items = rows.filter((r) => (member || isDead(r.data) || named(r)) && (fold(r.data.name).includes(q) || (!named(r) && fold(r.data.alias).includes(q)))).slice(0, 20)
+      .map((r) => (named(r)
+        ? { id: r.id, name: r.data.name || '', sex: r.data.sex || '', years: '', gen: r.data.gen || null }
+        : { id: r.id, name: r.data.name || '', sex: r.data.sex || '', years: [yearOf(r.data.born || r.data.birth_date), yearOf(r.data.died)].filter(Boolean).join('–'), gen: r.data.gen || null }));
     res.json({ items });
   }));
   return { propose };

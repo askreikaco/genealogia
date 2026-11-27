@@ -45,17 +45,19 @@ async function readable(ctx) {
 }
 const personRow = async (ctx, famId, id) => {
   if (!isPersonId(id)) return null;
-  const { rows } = await ctx.deps.pool.query('select id, data, deleted, version from persons where id = $1 and family_id = $2', [id, famId]);
-  return rows[0] && !rows[0].deleted ? rows[0] : null;
+  const { rows } = await ctx.deps.pool.query('select id, data, deleted, version, self_visibility from persons where id = $1 and family_id = $2', [id, famId]);
+  if (!rows[0] || rows[0].deleted) return null;
+  const { rows: fr } = await ctx.deps.pool.query('select living_visibility from families where id = $1', [famId]); // P1d
+  return { ...rows[0], living: core.effectiveLiving(fr[0]?.living_visibility || 'private', rows[0].self_visibility) };
 };
 // What a viewer may see of a person: the web's view (publicView for non-members, the full record for members).
-function personView(data, full) {
-  const v = full ? { ...data } : core.publicView(data);
+function personView(data, full, living) {
+  const v = full ? { ...data } : core.publicView(data, { living });
   for (const k of HIDDEN_KEYS) delete v[k];
   return v;
 }
-const summaryOf = (id, data, full) => {
-  const v = personView(data, full); const out = { id };
+const summaryOf = (id, data, full, living) => {
+  const v = personView(data, full, living); const out = { id };
   for (const k of SUMMARY_KEYS) if (v[k] !== undefined && v[k] !== null && v[k] !== '') out[k] = v[k];
   return out;
 };
@@ -77,11 +79,13 @@ async function searchPeople(ctx, { query, limit = 10 }) {
   const { full, fam } = await readable(ctx);
   const words = fold(query).split(/\s+/).filter(Boolean);
   if (!words.length) throw new AiError(400, 'Nhập tên cần tìm.');
-  const { rows } = await ctx.deps.pool.query('select id, data from persons where family_id = $1 and not deleted order by id', [fam.id]);
+  const { rows } = await ctx.deps.pool.query('select id, data, self_visibility from persons where family_id = $1 and not deleted order by id', [fam.id]);
+  const { rows: fr } = await ctx.deps.pool.query('select living_visibility from families where id = $1', [fam.id]); // P1d
+  const famLiv = fr[0]?.living_visibility || 'private';
   const hits = [];
   for (const r of rows) {
     const hay = fold([r.data?.name, r.data?.alias, r.data?.thu, r.data?.title_name].join(' '));
-    if (words.every((w) => hay.includes(w))) hits.push(summaryOf(r.id, r.data, full));
+    if (words.every((w) => hay.includes(w))) hits.push(summaryOf(r.id, r.data, full, core.effectiveLiving(famLiv, r.self_visibility)));
     if (hits.length >= Math.min(Math.max(1, Number(limit) || 10), LIST_MAX)) break;
   }
   return { people: hits, count: hits.length };
@@ -90,7 +94,7 @@ async function getPerson(ctx, { person_id }) {
   const { full, fam } = await readable(ctx);
   const p = await personRow(ctx, fam.id, person_id);
   if (!p) throw new AiError(404, 'Không tìm thấy người này.');
-  return { person: { id: p.id, ...personView(p.data, full) } };
+  return { person: { id: p.id, ...personView(p.data, full, p.living) } };
 }
 async function getRelatives(ctx, { person_id }) {
   const { full, fam } = await readable(ctx);

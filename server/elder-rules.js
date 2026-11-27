@@ -30,6 +30,14 @@ function canManagePerson(actor, personId) {
   if (isTop(actor.familyRole)) return true;
   return actor.managedIds?.has(personId) || actor.selfIds?.has(personId) || false;
 }
+// P1d: who may set a living person's own visibility to non-members (self_visibility). Only the linked account (selfIds),
+// its managers (managedIds) or the person's own device. Family owners and admins are NOT included: they cannot change it.
+function canSetSelfVisibility(actor, personId) {
+  if (!actor) return false;
+  if (actor.device) return actor.personId === personId;
+  if (!actor.email) return false;
+  return !!(actor.managedIds?.has(personId) || actor.selfIds?.has(personId));
+}
 // State of a sign-in request at `now`: pending | approved | consumed | expired.
 function codeState(row, now) {
   if (!row) return 'expired';
@@ -71,6 +79,6 @@ function makeLimiter(max, windowMs, now = () => Date.now()) {
 }
 
 module.exports = {
-  CODE_TTL_MS, DEVICE_TTL_MS, isTop, approvalsNeeded, canApprove, secondApproverOk, canManagePerson,
+  CODE_TTL_MS, DEVICE_TTL_MS, isTop, approvalsNeeded, canApprove, secondApproverOk, canManagePerson, canSetSelfVisibility,
   codeState, newUserCode, sha256, newSecret, newDeviceId, isDeviceId, makeLimiter, deviceLabel,
 };

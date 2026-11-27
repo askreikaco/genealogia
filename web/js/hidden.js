@@ -5,7 +5,9 @@ import { PRIVACY_NOTE_VI } from './privacy-copy-vi.js';
 import { icon } from '../vendor/reika-ds/js/html.js';
 
 export const isHiddenLiving = (p) => !!(p && p.hidden_living);
-export const nameOf = (p, lang = 'vi') => (isHiddenLiving(p) ? tx('living2', lang) : (p && p.name) || '');
+// P1d: a living person shown as name only (names) keeps the name; a placeholder has none and shows the label.
+export const isLabelOnly = (p) => isHiddenLiving(p) && !(p && p.name);
+export const nameOf = (p, lang = 'vi') => (p && p.name) || (isHiddenLiving(p) ? tx('living2', lang) : '');
 
 // P1c: the members-only notice. Shown under the top bar to a non-member (logged out, or signed in without membership)
 // when the view can hold a hidden living person. M is the current family's structure (model.js build()).

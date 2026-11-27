@@ -7,7 +7,7 @@
 'use strict';
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { isDead } = require('./core');
+const { isDead, effectiveLiving } = require('./core');
 const SR = require('./surname-rules');
 
 let coreMod = null;
@@ -32,7 +32,7 @@ function mount(app, d) {
     const hit = cache.get(slug);
     if (hit && hit.ver === ver && Date.now() - hit.at < TTL) return hit.base;
     const all = (await pool.query(`select id, slug, name, han, short_name, founder_person_id, origin_place, place, visibility, country,
-      origin_surname, origin_surname_han, origin_year, origin_reason, origin_visibility from families`)).rows;
+      origin_surname, origin_surname_han, origin_year, origin_reason, origin_visibility, living_visibility from families`)).rows;
     // The trees of this surname, plus the trees that carried it as their họ gốc (carried: true). Which of them a viewer
     // may see is decided per request (origin_visibility), never here: the cache is shared by all viewers.
     const primary = all.filter((f) => C.inClan(f.name, f.country) && C.clanSlug(C.familySurname(f.name)) === slug);
@@ -46,10 +46,10 @@ function mount(app, d) {
         'select family_id, count(*)::int n from persons where family_id = any($1) and not deleted group by family_id', [ids])).rows.map((r) => [r.family_id, r.n]));
       const set = fams.filter((f) => f.founder_person_id).map((f) => f.founder_person_id);
       const chosen = new Map((await pool.query(
-        'select id, family_id, data from persons where id = any($1) and not deleted', [set])).rows.map((r) => [r.family_id, r]));
+        'select id, family_id, data, self_visibility from persons where id = any($1) and not deleted', [set])).rows.map((r) => [r.family_id, r]));
       // Automatic founder: the earliest generation of the family's own line (not married-in), then the earliest year.
       const auto = new Map((await pool.query(
-        `select distinct on (family_id) family_id, id, data from persons
+        `select distinct on (family_id) family_id, id, data, self_visibility from persons
           where family_id = any($1) and not deleted and coalesce(data->>'spouse_of', '') = ''
           order by family_id, (case when data->>'gen' ~ '^[0-9]+$' then (data->>'gen')::int end) nulls last,
             (substring(coalesce(nullif(data->>'born', ''), data->>'died', '') from '[0-9]{4}'))::int nulls last, id`, [ids])).rows.map((r) => [r.family_id, r]));
@@ -64,7 +64,7 @@ function mount(app, d) {
         fams: fams.map((f) => {
           const p = (f.founder_person_id && chosen.get(f.id)) || auto.get(f.id) || null;
           return { ...f, people: counts.get(f.id) || 0,
-            founder: p ? { name: p.data.name || '', born: yearOf(p.data.born), died: yearOf(p.data.died), dead: isDead(p.data) } : null };
+            founder: p ? { name: p.data.name || '', born: yearOf(p.data.born), died: yearOf(p.data.died), dead: isDead(p.data), names: !isDead(p.data) && effectiveLiving(f.living_visibility, p.self_visibility) === 'names' } : null };
         }),
         edges,
       };
@@ -91,11 +91,13 @@ function mount(app, d) {
     const seen = base.fams.filter((f) => !f.carried || originOk(f));
     const trees = vis.map((f) => {
       const show = f.founder && (f.founder.dead || member(f));
+      // P1d: a living founder shown as name only (names): the name, no years
+      const named = !show && f.founder && f.founder.names;
       const year = show ? (f.founder.born ?? f.founder.died) : null;
       const change = originOk(f) ? { from: f.origin_surname, han: f.origin_surname_han || '', year: f.origin_year || '', reason: f.origin_reason || '',
         now: C.familySurname(f.name), carried: !!f.carried } : null;
       return { id: f.id, slug: f.slug || f.id, label: f.short_name || f.name, han: f.han || '', origin: f.origin_place || f.place || '',
-        people: f.people, year, country: f.country || '', founder: show ? { name: f.founder.name, born: f.founder.born, died: f.founder.died } : null, change };
+        people: f.people, year, country: f.country || '', founder: show ? { name: f.founder.name, born: f.founder.born, died: f.founder.died } : named ? { name: f.founder.name, born: null, died: null } : null, change };
     });
     // Quốc gia level: counts over the trees this viewer may see (private trees never add to a country), and an
     // optional ?country=XX (or NONE: no country set) filter for the clan page chips.
