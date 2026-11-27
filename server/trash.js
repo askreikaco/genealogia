@@ -28,10 +28,10 @@ const LIVING_SQL = `(t.kind in ('person','event','story') and exists (select 1 f
   and (p.data->>'living' = 'living' or coalesce(substring(coalesce(nullif(p.data->>'born',''), p.data->>'birth_date', '') from '[0-9]{4}')::int > extract(year from now())::int - 110, false)), false)))`;
 const limitHour = () => Math.max(1, Number(process.env.GP_DELETE_LIMIT_HOUR) || 10);
 const approvalRels = () => Math.max(1, Number(process.env.GP_DELETE_APPROVAL_RELS) || 4);
-const TABLE = { event: 'events', story: 'stories', parent_child: 'parent_child', couple: 'couple', place_link: 'person_places', person_link: 'person_links' };
-const KIND_VI = { person: 'Người', event: 'Sự kiện', story: 'Câu chuyện', parent_child: 'Quan hệ cha mẹ – con', couple: 'Quan hệ vợ chồng', place_link: 'Gắn địa danh', person_link: 'Liên kết với cây khác' };
+const TABLE = { event: 'events', story: 'stories', parent_child: 'parent_child', couple: 'couple', place_link: 'person_places', person_link: 'person_links', photo: 'person_photos' };
+const KIND_VI = { person: 'Người', event: 'Sự kiện', story: 'Câu chuyện', parent_child: 'Quan hệ cha mẹ – con', couple: 'Quan hệ vợ chồng', place_link: 'Gắn địa danh', person_link: 'Liên kết với cây khác', photo: 'Ảnh' };
 // who may restore from the trash: the role that could delete it
-const RESTORE_ROLE = { person: 'editor', event: 'editor', story: 'editor', parent_child: 'editor', couple: 'editor', place_link: 'editor', person_link: 'admin' };
+const RESTORE_ROLE = { person: 'editor', event: 'editor', story: 'editor', parent_child: 'editor', couple: 'editor', place_link: 'editor', person_link: 'admin', photo: 'editor' };
 
 let D = null; // { pool, mail, T, HttpError, ROLE_RANK, mirrorLegacy, isTable, publicUrl }
 function init(d) { D = d; }
@@ -195,6 +195,8 @@ async function restoreRows(q, t) {
     }
     if ((t.kind === 'parent_child' || t.kind === 'couple') && await D.isTable(q, t.family_id)) await D.mirrorLegacy(q, t.family_id, t.kind === 'parent_child' ? [row.parent_id, row.child_id] : [row.a_id, row.b_id]);
   }
+  // a gallery photo that was the profile photo takes the profile back (gallery.js)
+  if (t.kind === 'photo') for (const row of p.rows || []) await require('./gallery').afterRestore(q, t.family_id, row, t.restored_by);
 }
 
 // Runs pending person deletes whose 24 h delay is over (one-admin families).

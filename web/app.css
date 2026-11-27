@@ -1075,3 +1075,11 @@ dialog.dlg.contact-import::backdrop{background:var(--c-scrim)}
 body.has-pnote .shell{padding-top:calc(var(--topbar-h) + var(--pnote-h, 48px))}
 html[data-layout=phone] #pnote{padding:var(--sp-2) var(--sp-4)}
 html[data-layout=phone] #pnote .pnote-ic{display:none}
+/* Gallery per person (G1, gallery-ui.js): thumbnails reuse .stry-ph (96 px tiles); the viewer and the editor's row. */
+.gal-th{padding:0;border:0;background:none;cursor:pointer;display:block}
+.gal-th img{display:block}
+.gal-tools{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-3);margin-top:var(--sp-3)}
+.gal-fig{margin:0;display:grid;gap:var(--sp-2)}
+.gal-big{display:block;width:100%;height:auto;max-height:60vh;object-fit:contain}
+.gal-nav{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);margin-top:var(--sp-3)}
+.gal-ed{display:grid;gap:var(--sp-3);margin-top:var(--sp-4)}

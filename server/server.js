@@ -694,6 +694,8 @@ async function applyOp(client, op, byUser, famId) {
       await client.query('insert into history (person_id, field, old_value, new_value, by_user) values ($1,$2,$3,$4,$5)',
         [op.id, c.field, JSON.stringify(c.old), JSON.stringify(c.new), byUser]);
     }
+    // the photo field goes through the gallery (gallery.js): it becomes the profile photo, data.photo follows it
+    if (m.changes.some((c) => c.field === 'photo')) await require('./gallery').syncPhotoField(client, famId, op.id, m.data.photo, byUser);
   }
   return { changes: m.changes };
 }
@@ -765,7 +767,11 @@ app.post('/api/ops', opsGate, async (req, res, next) => {
         await applyOp(client, op, req.actAs ? `${actorName(w)} · thay mặt ${req.actAs.name}` : actorName(w), f.id);
         await client.query('commit');
         applied.push(op.op_id);
-      } catch (e) { await client.query('rollback'); throw e; }
+      } catch (e) {
+        await client.query('rollback');
+        if (e.status === 400 && e.message) { rejected.push({ op_id: op.op_id, reason: e.message }); continue; } // e.g. the 20-photo limit
+        throw e;
+      }
     }
     res.json({ applied, rejected });
   } catch (e) { next(e); } finally { client.release(); }
@@ -1468,6 +1474,8 @@ mountOAuth(app, aiDeps);
 mountMcp(app, aiDeps);
 // GEDCOM export and import (gedcom-routes.js): same gates as the rest of the API.
 mountGedcom(app, { pool, need, famOf, who, HttpError, applyOp, actorName, clearBookCache: () => bookCache.clear() });
+// Gallery per person (G1, gallery-routes.js): up to 20 photos with captions and years; one is the profile photo.
+require('./gallery-routes')(app, { pool, need, famOf, who, canRead, canSeePrivate, HttpError, actorName, TRASH, EV });
 
 // ---- photos (editors upload; anyone can view) ----
 app.post('/api/photos', need('editor'), express.json({ limit: '1mb' }), async (req, res, next) => {
@@ -1494,6 +1502,9 @@ async function photoAccess(req, id) {
   const sts = await pool.query('select s.family_id, p.data from stories s join persons p on p.id=s.person_id and p.family_id=s.family_id where s.photos ? $1 and p.deleted=false', [url]);
   for (const r of sts.rows) refs.push({ kind: 'story', famId: r.family_id, data: r.data });
   const pes = await pool.query('select family_id, data from persons where data->>\'photo\' = $1 and deleted=false', [url]);
+  // a gallery photo (person_photos, gallery.js) is shown with its person, the same as the profile photo
+  const gal = await pool.query('select pp.family_id, p.data from person_photos pp join persons p on p.id=pp.person_id and p.family_id=pp.family_id where pp.url = $1 and p.deleted=false', [url]);
+  for (const r of gal.rows) refs.push({ kind: 'person', famId: r.family_id, data: r.data });
   for (const r of pes.rows) refs.push({ kind: 'person', famId: r.family_id, data: r.data });
   let allowed = false; let open = false;
   const fams = new Map();

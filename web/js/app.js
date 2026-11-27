@@ -38,6 +38,7 @@ import * as SN from './surnames.js';
 import { COUNTRIES, countryName, countryCode } from './countries.js';
 import * as PL from './places.js';
 import { accountPage } from './account.js';
+import { galMount } from './gallery-ui.js';
 import { twoStepPage } from './twostep.js';
 import * as MT from './match.js';
 import * as DP from './dupes.js';
@@ -628,13 +629,14 @@ function person(id) {
    <div class="row acts2"><div class="acts2-go">${gioOf(d) ? followBar(p) : ''}<button class="btn sm" data-act="${S.isEditor() ? 'edit' : 'suggest'}" data-id="${id}">${icon('pencil')}Sửa</button></div><button class="ib" data-menu="${id}" data-menu-ctx="prof" aria-label="Thêm thao tác">⋯</button></div>
    ${profTabsHtml()}
    ${!surnG && S.isEditor() ? SN.surnameAddBlock() : ''}
-   ${profBody(p, { groups, id, d })}`;
+   ${profBody(p, { groups, id, d })}${profTab === 'info' ? '<div data-gal-slot></div>' : ''}`;
   relWire(main, () => M);
   if (profTab === 'info') LV.decorateSelf(main, id); // P1d: the own-profile setting, at the end of the Thông tin tab (only when the server says this viewer may change it)
   if (S.isEditor()) SN.bindSurnames(main, id, d, { edit: (pid, fields) => S.edit(pid, fields) });
   main.querySelector('[data-copy-code]')?.addEventListener('click', (e) => { const c = e.currentTarget.dataset.copyCode; (navigator.clipboard?.writeText(c) || Promise.reject()).then(() => toast(`Đã chép mã ${c}`), () => toast(`Mã người: ${c}`)); });
   if (profTab === 'life' || profTab === 'src' || profTab === 'info') evEnsure(p); // info: the Câu chuyện đời block reads the events too
   if (profTab === 'life') setUntag(lifeUntag);
+  if (profTab === 'info') galMount(main, { fam: famOfP(p), pid: id, editor: S.isEditor(), upload: uploadPhoto, render, onProfile: (url) => { const q = M.byId.get(id); if (q) { if (url) q.data.photo = url; else delete q.data.photo; } } });
 }
 
 // ---------- life events and stories: data, the Hồ sơ tabs and the timeline (Dòng đời) ----------

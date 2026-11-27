@@ -314,6 +314,20 @@
         "test/e2e/events*.test.js"
       ]
     },
+    "gallery": {
+      "paths": [
+        "web/js/gallery.js",
+        "web/js/gallery-ui.js",
+        "web/js/gallery-vi.js",
+        "server/gallery.js",
+        "server/gallery-routes.js",
+        "server/test/gallery-api.test.js",
+        "server/migrations/040_person_photos.sql"
+      ],
+      "e2e": [
+        "test/e2e/gallery.test.js"
+      ]
+    },
     "estimate": {
       "paths": [
         "web/js/estimate-graph.js",
