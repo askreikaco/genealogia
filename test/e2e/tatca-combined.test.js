@@ -280,6 +280,8 @@ test('person form in "Tất cả": a new person is saved into the family chosen 
     await page.fill('[name=name]', 'Nguyễn Văn Mới');
     await page.click('#fpsave');
     await page.waitForFunction(() => location.hash.includes('/dong-a/person/'));
+    // the outbox POST follows the local write (sync() is not awaited by edit): wait for it, then assert
+    for (let i = 0; i < 100 && !st.calls.some((c) => c.path === '/api/ops'); i++) await new Promise((r) => setTimeout(r, 100));
     const ops = st.calls.filter((c) => c.path === '/api/ops');
     assert.equal(ops.length, 1);
     assert.equal(ops[0].body.family, 'dong-a');

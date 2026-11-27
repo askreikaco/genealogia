@@ -40,6 +40,18 @@
         "test/e2e/text-size.test.js"
       ]
     },
+    "tree-export": {
+      "paths": [
+        "web/js/export-vi.js",
+        "web/js/app.js",
+        "web/app.css",
+        "web/tokens.css",
+        "test/e2e/tree-export.test.js"
+      ],
+      "e2e": [
+        "test/e2e/tree-export*.test.js"
+      ]
+    },
     "claim": {
       "paths": [
         "server/claim-*.js",

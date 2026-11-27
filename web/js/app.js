@@ -1,5 +1,6 @@
 import * as S from './store.js';
-import { nameOf, noticeNeeded, noticeHtml, isLabelOnly } from './hidden.js';
+import { nameOf, isHiddenLiving, noticeNeeded, noticeHtml, isLabelOnly } from './hidden.js';
+import { EXPORT_VI } from './export-vi.js';
 import * as LV from './living-vis.js';
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger, undoToast, restoreTrash } from './danger.js';
 import * as TR from './trash-ui.js';
@@ -1317,7 +1318,7 @@ function exportView() {
   if (S.isAll()) { famPicker('export', 'Tải về', 'Chọn dòng họ để tải về.'); return; }
   main.innerHTML = `<h1>Tải về</h1>
   ${card(`<button class="btn" id="xcsv">Tải file Excel (.csv)</button><span class="sub">Mỗi người một dòng. Mở bằng Excel hoặc Google Sheets.</span>`)}
-  ${card(`${calmRow({ attrs: 'id="xsvg"', title: 'Cây gia phả (SVG)', subtitle: 'Phóng to không vỡ', dense: true })}${calmRow({ href: '/book', title: 'Sách PDF', subtitle: 'Mở Sách, bấm In rồi chọn "Lưu dưới dạng PDF"', dense: true })}`)}
+  ${card(`${calmRow({ attrs: 'id="xsvg"', title: 'Cây gia phả (SVG)', subtitle: 'Phóng to không vỡ', dense: true })}${calmRow({ attrs: 'id="xpng"', title: EXPORT_VI.png, dense: true })}${calmRow({ attrs: 'id="xpdf"', title: EXPORT_VI.pdf, dense: true })}${calmRow({ href: '/book', title: 'Sách PDF', subtitle: 'Mở Sách, bấm In rồi chọn "Lưu dưới dạng PDF"', dense: true })}`)}
   <p class="sub">Liên hệ chỉ có trong file khi người đó cho phép công khai.</p>`;
   $('#xcsv').onclick = () => {
     const cols = ['id', 'gen', 'thu', 'name', 'sex', 'parent', 'spouse', 'born', 'died', 'death_lunar', 'gio_lunar', 'place', 'alias', 'job', 'religion', 'burial', 'phone', 'email', 'zalo', 'facebook', 'note', 'verify', 'source'];
@@ -1326,14 +1327,65 @@ function exportView() {
     const lines = [head.map(q).join(',')].concat(M.everyone.map((p) => cols.map((c) => q(c === 'id' ? p.id : c === 'sex' ? (p.data.sex === 'f' ? 'Nữ' : 'Nam') : ['phone', 'email', 'zalo', 'facebook'].includes(c) ? contactList(p.data).filter((x) => x.type === c).map((x) => x.value).join('; ') : p.data[c])).join(',')));
     download('gia-pha-ho-duong.csv', '﻿' + lines.join('\r\n'), 'text/csv');
   };
-  $('#xsvg').onclick = () => download('cay-gia-pha-ho-duong.svg', treeSvg(), 'image/svg+xml');
+  $('#xsvg').onclick = async () => download('cay-gia-pha-ho-duong.svg', treeSvg(treeRows(), await treeFontCss()), 'image/svg+xml');
+  $('#xpng').onclick = () => treePng().catch((e) => { console.error('giapha: PNG export failed', e); toast('Không tải được ảnh. Thử lại.'); });
+  $('#xpdf').onclick = () => treePrint();
 }
-function treeSvg() {
-  const rows = []; const walk = (p, d) => { rows.push([p, d]); M.kids(p.id).forEach((c) => walk(c, d + 1)); }; M.roots.forEach((r) => walk(r, 0));
-  const H = 18, W = 900;
-  const body = rows.map(([p, d], i) => `<g transform="translate(${10 + d * 22},${20 + i * H})"><text x="0" y="0" font-size="12" fill="${p.data.sex === 'f' ? '#9f1853' : '#0043ce'}">${esc(rank(p.data))} <tspan font-weight="700" fill="#161616">${esc(p.data.name)}</tspan>${years(p.data) ? ' · ' + esc(years(p.data)) : ''}</text></g>`).join('');
-  const lines = rows.map(([p, d], i) => d ? `<line x1="${10 + (d - 1) * 22 + 4}" x2="${10 + d * 22 - 4}" y1="${16 + i * H - 4}" y2="${16 + i * H - 4}" stroke="#c6c6c6"/>` : '').join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${rows.length * H + 30}" font-family="Noto Serif, Georgia, serif"><rect width="100%" height="100%" fill="#fff"/>${lines}${body}</svg>`;
+// The rows the tree exports draw, from the model the viewer sees. A living person without a name (hidden_living) gets the
+// same label as on screen, and no rank or years: the export never carries more about them than the tree shows.
+function treeRows() {
+  const out = []; const walk = (p, d) => { out.push({ p, d }); M.kids(p.id).forEach((c) => walk(c, d + 1)); }; M.roots.forEach((r) => walk(r, 0));
+  return out.map(({ p, d }) => {
+    const x = p.data; const hid = isHiddenLiving(x);
+    return { d, sex: x.sex, rank: hid ? '' : rank(x), name: nameOf(x), years: hid ? '' : (years(x) || '') };
+  });
+}
+// IBM Plex Sans (self-hosted, Vietnamese included) as base64 @font-face: an SVG drawn alone (an img, a saved file) carries its own font.
+async function treeFontCss() {
+  const out = [];
+  for (const [w, f] of [[400, 'Regular'], [600, 'SemiBold']]) {
+    const r = await fetch(`vendor/reika-ds/fonts/IBMPlexSans-${f}.woff2`);
+    if (!r.ok) throw new Error('font ' + f + ' ' + r.status);
+    const u = new Uint8Array(await r.arrayBuffer()); let bin = '';
+    for (let i = 0; i < u.length; i += 8192) bin += String.fromCharCode(...u.subarray(i, i + 8192));
+    out.push(`@font-face{font-family:"IBM Plex Sans";font-weight:${w};src:url(data:font/woff2;base64,${btoa(bin)}) format("woff2")}`);
+  }
+  return out.join('');
+}
+const TREE_W = 900, TREE_ROW = 18;
+function treeSvg(rows, fonts = '') {
+  const H = TREE_ROW, W = TREE_W;
+  const body = rows.map((r, i) => `<g transform="translate(${10 + r.d * 22},${20 + i * H})"><text x="0" y="0" font-size="12" fill="${r.sex === 'f' ? '#9f1853' : '#0043ce'}">${esc(r.rank)} <tspan font-weight="600" fill="#161616">${esc(r.name)}</tspan>${r.years ? ' · ' + esc(r.years) : ''}</text></g>`).join('');
+  const lines = rows.map((r, i) => r.d ? `<line x1="${10 + (r.d - 1) * 22 + 4}" x2="${10 + r.d * 22 - 4}" y1="${16 + i * H - 4}" y2="${16 + i * H - 4}" stroke="#c6c6c6"/>` : '').join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${rows.length * H + 30}" font-family="IBM Plex Sans, Georgia, serif"><style>${fonts}</style><rect width="100%" height="100%" fill="#fff"/>${lines}${body}</svg>`;
+}
+// PNG at 2x, drawn from the same SVG. Width or height above 16000 px (or more than 16 million pixels, the iOS canvas
+// limit) scales the image down and says so.
+const TREE_PNG_SCALE = 2, TREE_MAX_SIDE = 16000, TREE_MAX_AREA = 16e6;
+async function treePng() {
+  const rows = treeRows(); const w = TREE_W, h = rows.length * TREE_ROW + 30;
+  const scale = Math.min(TREE_PNG_SCALE, TREE_MAX_SIDE / w, TREE_MAX_SIDE / h, Math.sqrt(TREE_MAX_AREA / (w * h)));
+  const url = URL.createObjectURL(new Blob([treeSvg(rows, await treeFontCss())], { type: 'image/svg+xml' }));
+  try {
+    await document.fonts.ready;
+    const img = new Image(); img.src = url; await img.decode();
+    const c = document.createElement('canvas'); c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+    const cx = c.getContext('2d'); cx.drawImage(img, 0, 0, c.width, c.height); // the SVG's own white rect is the background
+    const png = await new Promise((res) => c.toBlob(res, 'image/png'));
+    if (!png) throw new Error('canvas.toBlob returned no PNG');
+    if (scale < TREE_PNG_SCALE) toast(EXPORT_VI.too_big);
+    const slug = S.familyMeta(S.curFamily())?.slug || S.curFamily();
+    download(`${slug}-cay-gia-pha.png`, png, 'image/png');
+  } finally { URL.revokeObjectURL(url); }
+}
+// Print / PDF: the tree as a print-only block (app.css .tree-print: A3 landscape, three columns), then the browser's print
+// dialog, where "Lưu dưới dạng PDF" makes the file. window.print() blocks until the dialog closes, then the block goes.
+function treePrint() {
+  const box = document.createElement('div');
+  box.className = 'tree-print';
+  box.innerHTML = `<p class="tp-h">${esc(S.familyName(S.curFamily()))}</p>` + treeRows().map((r) => `<p class="tp-row" style="--d:${r.d}"><span>${esc(r.rank)}</span> <b>${esc(r.name)}</b>${r.years ? ` <span class="tp-y">· ${esc(r.years)}</span>` : ''}</p>`).join('');
+  document.body.append(box);
+  try { window.print(); } finally { box.remove(); }
 }
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
 

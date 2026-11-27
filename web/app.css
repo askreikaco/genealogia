@@ -709,10 +709,21 @@ a.tl-band:focus-visible{outline:2px solid var(--c-focus, var(--c-accent));outlin
 .elder-card .elder-qr svg { width: 196px; }
 .elder-print-bar { display: flex; gap: 7px; }
 @media print {
-  body > *:not(.elder-print) { display: none !important; }
+  body > *:not(.elder-print):not(.tree-print) { display: none !important; }
   .elder-print { position: static; }
   .elder-print-bar { display: none; }
   @page { size: A6; margin: 8mm; }
+}
+/* Tree export (app.js treePrint): a block only the print view shows, on a named A3 landscape page with no margin
+   (the block's own padding keeps the edge). Colours come from print tokens in tokens.css. */
+.tree-print { display: none; }
+@media print {
+  @page tree-a3 { size: A3 landscape; margin: 0; }
+  .tree-print { display: block !important; page: tree-a3; box-sizing: border-box; min-height: 100vh; padding: var(--sp-6); column-count: 3; column-gap: var(--sp-6); color: var(--tp-ink); font-family: var(--sans); font-size: var(--fs-2); line-height: var(--lh-2); }
+  .tree-print .tp-h { column-span: all; margin: 0 0 var(--sp-5); font-size: var(--fs-5); font-weight: 600; }
+  .tree-print .tp-row { margin: 0; break-inside: avoid; padding-left: calc(var(--d) * var(--tree-indent)); }
+  .tree-print .tp-row b { font-weight: 600; }
+  .tree-print .tp-y { color: var(--tp-sub); }
 }
 /* Shared sheet (relui openSheet): a bottom sheet on phones, a centred modal from md up. */
 :where(html[data-layout=phone]) dialog.rel-sheet{margin:auto 0 0;width:100%;max-width:100%;max-height:92vh;border-radius:16px 16px 0 0}

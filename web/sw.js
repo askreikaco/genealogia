@@ -27,6 +27,7 @@ const SHELL = [
   '/manifest.webmanifest',
   '/icon.svg',
   '/js/app.js',
+  '/js/export-vi.js',
   '/js/book.js',
   '/js/booktext.js',
   '/js/bookchart.js',
