@@ -86,6 +86,9 @@ function buildServer({ deps, tok, base }) {
   reg('add_relation', 'Thêm quan hệ', 'Thêm quan hệ cha mẹ-con hoặc vợ/chồng (đi qua cùng đường với đề xuất).',
     { relation: z.looseObject({ kind: z.enum(['parent_child', 'couple']) }) },
     (a) => T.proposeChanges(ctx, [{ type: 'relation', relation: { ...a.relation, action: 'add' } }]));
+  reg('suggest_person_change', 'Góp ý sửa một người', 'Góp ý sửa thông tin của một người: tạo góp ý chờ quản trị duyệt trong app. Không ghi ngay, kể cả khi mã có quyền ghi.',
+    { person_id: ID, fields: z.record(z.string(), VALUE).describe('Trường cần sửa: name, birth_date, place, job, note, ...') },
+    (a) => T.suggestPersonChange(ctx, a));
   reg('apply_changes', 'Áp dụng lô', 'Ghi một lô đã xem trước. Cần op_id mới cho mỗi lần ghi (gửi lại cùng op_id thì không ghi lần nữa).',
     { batch_id: z.string().regex(/^b[0-9a-f]{24}$/), op_id: z.string().min(1).max(80) },
     (a) => T.applyChanges(ctx, a));

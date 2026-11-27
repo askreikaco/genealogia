@@ -29,6 +29,7 @@ import * as SUC from './succession.js';
 import * as CLM from './claim.js';
 import * as elder from './elder.js';
 import * as LK from './links.js';
+import { AI_RECIPES } from './ai-recipes.js';
 import * as BT from './branch-trees.js';
 import { personItem } from './person-item.js';
 import { openContactImport } from './contacts-import.js';
@@ -1844,6 +1845,9 @@ function connectSheet() {
     <ol class="ai-steps"><li>Mở Settings → Connectors.</li><li>Chọn Add custom connector.</li><li>Dán địa chỉ trên rồi nhấn Add.</li></ol>
     <h3>ChatGPT</h3>
     <ol class="ai-steps"><li>Mở Plugins, chọn dấu + rồi Add custom MCP server.</li><li>Dán địa chỉ trên vào ô Connection, chọn xác thực OAuth nếu được hỏi.</li><li>Xác nhận cảnh báo, chọn Create as a plugin, đăng nhập và cho phép.</li></ol>
+    <h3>Gợi ý câu lệnh</h3>
+    <p class="sub">Dán câu lệnh vào Claude hoặc ChatGPT sau khi đã kết nối. Sửa phần trong [ngoặc] trước khi gửi.</p>
+    ${AI_RECIPES.map((r, i) => `<div class="ai-rec"><b class="ai-rec-t">${esc(r.title)}</b><p class="ai-rec-p">${esc(r.prompt)}</p><button type="button" class="btn sm" data-recipe="${i}">Chép</button></div>`).join('')}
     <div class="row end cfm-acts"><button type="button" class="btn gh" data-close>Đóng</button></div></div>`;
   document.body.append(d);
   d.addEventListener('close', () => d.remove());
@@ -1851,6 +1855,10 @@ function connectSheet() {
   d.querySelector('[data-copy]').onclick = () => {
     (navigator.clipboard?.writeText(url) || Promise.reject()).then(() => toast('Đã chép địa chỉ.'), () => toast(`Địa chỉ: ${url}`));
   };
+  d.querySelectorAll('[data-recipe]').forEach((b) => b.onclick = () => {
+    const text = AI_RECIPES[Number(b.dataset.recipe)].prompt;
+    (navigator.clipboard?.writeText(text) || Promise.reject()).then(() => toast('Đã chép câu lệnh.'), () => toast('Không sao chép được. Chọn và sao chép bằng tay.'));
+  });
   d.showModal();
 }
 

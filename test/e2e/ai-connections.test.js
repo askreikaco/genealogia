@@ -4,6 +4,7 @@
 // Cài đặt lists the connection as a calm row; Gỡ kết nối asks to confirm, then the row is gone and the API no longer has it.
 // Signed out: the card says what it is and its Đăng nhập button opens the sign-in. Signed in: Kết nối ứng dụng AI opens
 // the sheet with this origin's /mcp address and steps for Claude and ChatGPT.
+// Also: the sheet lists the recipes (title, prompt with a placeholder) and Chép copies the prompt.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
@@ -116,6 +117,39 @@ test('signed in: connect sheet shows the MCP address and steps', { skip }, async
     const lists = sheet.locator('.ai-steps');
     assert.equal(await lists.count(), 2, 'steps for Claude and ChatGPT');
     assert.equal(await lists.nth(0).locator('li').count(), 3, 'three steps for Claude');
+    await sheet.locator('[data-close]').click();
+    await page.locator('dialog.ai-sheet').waitFor({ state: 'detached' });
+  } finally { await browser.close(); }
+});
+
+// Signed in: the sheet has the recipe section (a title and a prompt with a [placeholder] each), and Chép puts that
+// prompt on the clipboard, exactly as shown.
+test('connect sheet: recipes are shown and Chép copies the prompt', { skip }, async () => {
+  const sess = await fetch(base + '/api/test/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: OWNER, name: 'Chủ AI e2e' }) });
+  const cookie = sess.headers.get('set-cookie').split(';')[0];
+  const i = cookie.indexOf('=');
+  const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+    await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
+    await ctx.route(/^https:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com)\//, (r) => r.abort());
+    await ctx.addCookies([{ name: cookie.slice(0, i), value: cookie.slice(i + 1), url: base }]);
+    const page = await ctx.newPage();
+    await page.goto(`${base}/#settings`);
+    await page.locator('.ai-sec [data-connect]').click();
+    const sheet = page.locator('dialog.ai-sheet');
+    await sheet.waitFor();
+    const recs = sheet.locator('.ai-rec');
+    assert.equal(await recs.count(), 2, 'two recipes');
+    for (let n = 0; n < 2; n++) {
+      const r = recs.nth(n);
+      assert.ok((await r.locator('.ai-rec-t').textContent()).trim().length > 0, 'a title');
+      const prompt = (await r.locator('.ai-rec-p').textContent()).trim();
+      assert.match(prompt, /\[[^\]]+\]/, 'a placeholder the user edits');
+      await r.locator('[data-recipe]').click();
+      await page.getByText('Đã chép câu lệnh.').waitFor();
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), prompt, 'the clipboard has the prompt as shown');
+    }
     await sheet.locator('[data-close]').click();
     await page.locator('dialog.ai-sheet').waitFor({ state: 'detached' });
   } finally { await browser.close(); }

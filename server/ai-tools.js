@@ -244,6 +244,15 @@ async function suggestOut(ctx, eff, fam, out) {
   }
   return { mode: 'suggested', suggestions: ids, note: 'Đã gửi góp ý. Quản trị duyệt trong Cài đặt › Ứng dụng AI.' };
 }
+// One person's field changes, always as suggestions for the admins' review: never a preview, never a write, even for a
+// token that also has the write scope. Same validation, privacy check and suggestion table as propose_changes.
+async function suggestPersonChange(ctx, { person_id, fields }) {
+  const { eff, fam } = await readable(ctx);
+  if (!P.scopeIncludes(ctx.tok.scopes, 'suggest')) throw new AiError(403, 'Mã này không có quyền góp ý.');
+  const { out, errors } = await validateItems(ctx, fam, [{ type: 'edit', person_id, fields }]);
+  if (errors.length) throw new AiError(422, 'Có mục chưa hợp lệ. Sửa rồi gửi lại.', { errors });
+  return suggestOut(ctx, eff, fam, out);
+}
 async function applyChanges(ctx, { batch_id, op_id }) {
   const { eff, fam } = await readable(ctx);
   if (P.ROLE_RANK[eff.role] < P.ROLE_RANK.editor) throw new AiError(403, 'Cần quyền biên tập để áp dụng.');
@@ -354,4 +363,4 @@ async function rejectRequest(deps, session, id, reason) {
 }
 
 module.exports = { AiError, account, listFamilies, searchPeople, getPerson, getRelatives, getTimeline, getBookLink,
-  proposeChanges, applyChanges, requestAdminAction, approveRequest, rejectRequest, ROLES, isPersonId };
+  proposeChanges, suggestPersonChange, applyChanges, requestAdminAction, approveRequest, rejectRequest, ROLES, isPersonId };

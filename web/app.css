@@ -734,6 +734,9 @@ a.tl-band:focus-visible{outline:2px solid var(--c-focus, var(--c-accent));outlin
 .ai-url code{flex:1;min-width:0;overflow-wrap:anywhere;padding:var(--sp-3);background:var(--c-layer-2);font-size:var(--fs-2)}
 .ai-steps{margin:0 0 var(--sp-4);padding-inline-start:var(--sp-5);color:var(--c-text-2)}
 .ai-steps li{margin:var(--sp-2) 0}
+.ai-rec{margin:0 0 var(--sp-4);padding:var(--sp-3);background:var(--c-layer-2)}
+.ai-rec-t{display:block;margin-bottom:var(--sp-2)}
+.ai-rec-p{margin:0 0 var(--sp-3);color:var(--c-text-2);overflow-wrap:anywhere}
 
 /* Top bar title: centred on the viewport at every width (grid: left | title | right). Back chevron or switcher left, icons right. */
 .cbar{display:grid;grid-template-columns:minmax(48px,1fr) minmax(0,auto) minmax(48px,1fr);align-items:stretch}

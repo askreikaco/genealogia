@@ -271,6 +271,45 @@ test('guest or member with write scope: proposals become suggestions and apply i
   assert.equal((await one("select data->>'job' as job from persons where id=$1", [PX])).job, 'Sinh viên', 'nothing written');
 });
 
+test('suggest_person_change: a suggest token with write scope still only suggests (pending), never a preview or a write', { skip }, async () => {
+  const t = await connect(sess.editor, ['write', 'suggest'], FAM, 'Trợ lý góp ý sửa');
+  const c = await mcp(t.access);
+  const before = (await one("select data->>'job' as job from persons where id=$1", [P2])).job;
+  const out = await tool(c, 'suggest_person_change', { person_id: P2, fields: { job: 'Thợ may' } });
+  assert.equal(out.isError, false, JSON.stringify(out.data));
+  assert.equal(out.data.mode, 'suggested');
+  const s = await one('select status, changes from suggestions where id = $1', [out.data.suggestions[0].id]);
+  assert.equal(s.status, 'pending');
+  assert.equal(s.changes.job, 'Thợ may');
+  assert.equal((await one("select data->>'job' as job from persons where id=$1", [P2])).job, before, 'nothing written');
+  const b = await pool.query("select count(*)::int n from ai_batches where family_id=$1 and changes::text like '%Thợ may%'", [FAM]);
+  assert.equal(b.rows[0].n, 0, 'no preview batch is stored');
+});
+
+test('suggest_person_change: a read-only token does not list it and a call is refused', { skip }, async () => {
+  const t = await connect(sess.member, ['read'], FAM, 'Trợ lý chỉ đọc');
+  const c = await mcp(t.access);
+  assert.ok(!(await c.listTools()).tools.map((x) => x.name).includes('suggest_person_change'));
+  const r = await c.callTool({ name: 'suggest_person_change', arguments: { person_id: P2, fields: { job: 'X' } } }).catch((e) => ({ isError: true, e }));
+  assert.equal(!!r.isError, true);
+});
+
+test('suggest_person_change: a non-member cannot suggest to a private tree', { skip }, async () => {
+  const PP = rid();
+  await pool.query('insert into persons (id, family_id, data) values ($1, $2, $3)', [PP, PRIV, { name: 'Riêng tư', gen: 2, job: 'Ẩn' }]);
+  const email = `gone-priv-${TAG}@example.test`;
+  await pool.query("insert into members (email, name, role, status, family_id) values ($1,'Đã gỡ riêng','member','active',$2)", [email, PRIV]);
+  const s = await signIn(email, 'Đã gỡ riêng');
+  const t = await connect(s, ['suggest'], PRIV, 'Trợ lý họ riêng');
+  await pool.query("update members set status='removed' where email=$1 and family_id=$2", [email, PRIV]);
+  const c = await mcp(t.access);
+  const out = await tool(c, 'suggest_person_change', { person_id: PP, fields: { job: 'Lạ' } });
+  assert.equal(out.isError, true);
+  assert.equal(out.data.error, 'Dòng họ này là riêng tư.', 'refused by the privacy gate, not by the person lookup');
+  const n = await pool.query("select count(*)::int n from suggestions where family_id=$1", [PRIV]);
+  assert.equal(n.rows[0].n, 0, 'no suggestion is stored in the private tree');
+});
+
 test('admin actions never run directly: a request waits for an admin in the app', { skip }, async () => {
   const t = await connect(sess.owner, ['admin', 'read'], FAM, 'Trợ lý quản trị');
   const c = await mcp(t.access);

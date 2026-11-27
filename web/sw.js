@@ -75,6 +75,7 @@ const SHELL = [
   '/js/privacy-copy-vi.js',
   '/js/living-vis.js', '/js/living-vis-vi.js',
   '/js/links.js',
+  '/js/ai-recipes.js',
   '/js/branch-trees.js',
   '/js/contacts-import.js',
   '/js/contacts-parse.js',

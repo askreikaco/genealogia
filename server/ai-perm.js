@@ -22,6 +22,7 @@ const TOOL_POLICY = {
   propose_changes: { scope: 'suggest', min: 'guest' },
   add_event: { scope: 'suggest', min: 'guest' },
   add_relation: { scope: 'suggest', min: 'guest' },
+  suggest_person_change: { scope: 'suggest', min: 'guest' },
   apply_changes: { scope: 'write', min: 'editor' },
   invite_member: { scope: 'admin', min: 'admin' },
   change_role: { scope: 'admin', min: 'admin' },
