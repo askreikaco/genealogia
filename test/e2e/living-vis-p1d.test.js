@@ -97,8 +97,16 @@ test('a linked member sees the own-profile setting (3 options) and saves it', { 
     const card = s.page.locator('#lvself');
     await card.waitFor({ state: 'attached' });
     assert.equal(await card.locator('input[name=lvself]').count(), 3, 'three options');
-    const atEnd = await s.page.evaluate(() => { const c = document.querySelector('#lvself'); return !!(c && c.parentElement?.tagName === 'MAIN' && c.parentElement.lastElementChild === c && c.previousElementSibling?.classList.contains('cd')); });
+    // The card is the last child of the tab's MAIN, and a relations card (.cd) comes before it. The photo gallery slot
+    // (data-gal-slot) may sit between them, so only the card's position among the cards is checked, not its neighbour.
+    const atEnd = await s.page.evaluate(() => {
+      const c = document.querySelector('#lvself'); const main = c?.parentElement;
+      if (!c || main?.tagName !== 'MAIN' || main.lastElementChild !== c) return false;
+      return [...main.querySelectorAll('.cd')].some((el) => !c.contains(el) && (el.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING));
+    });
     assert.ok(atEnd, 'the own-profile card is the last block of the Thông tin tab (after the relations)');
+    // The card is the last block: at 390 px the fixed bottom tab bar covers its radios unless it is scrolled to the centre.
+    await card.locator('input[name=lvself][value=names]').evaluate((e) => e.scrollIntoView({ block: 'center' }));
     await card.locator('input[name=lvself][value=names]').check({ force: true });
     await s.page.waitForTimeout(400);
     const put = s.calls.find((c) => c.method === 'PUT' && c.path === '/api/persons/PH1/self-visibility');
