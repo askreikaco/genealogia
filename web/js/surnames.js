@@ -1,13 +1,14 @@
 // Họ qua các thời kỳ (surname over time) on the person profile: one fact group with the person's timeline (đổi họ,
-// họ khi sinh, bí danh), the surname a descendant inherits when no change is recorded, and an editor's form to add or
-// remove a mark. Writes go through the store's edit() (the same op path as every other field). Family họ gốc card
-// (Cài đặt dòng họ) is here too. Rules: surname-rules.js (copy of server/surname-rules.js).
+// họ khi sinh, bí danh) and the surname a descendant inherits when no change is recorded. Editors remove a mark here;
+// marks are added and changed in the person form ("+ Họ khác", person-form.js/app.js fpSurnames). Writes go through the
+// store's edit() (the same op path as every other field). Family họ gốc card (Cài đặt dòng họ) is here too.
+// Rules: surname-rules.js (copy of server/surname-rules.js).
 import { esc } from './model.js';
-import { NAME_TYPES, CONFIDENCE, timelineOf, surnameAt, namesError, yearOf } from './surname-rules.js';
+import { timelineOf, surnameAt, yearOf } from './surname-rules.js';
 import { dangerButton, confirmDanger } from './danger.js';
 import { section } from './ui.js';
 
-const TYPE_LABEL = { birth: 'Họ khi sinh', changed: 'Đổi họ', aka: 'Họ khác (bí danh)', religious: 'Họ tôn giáo', abroad: 'Họ dùng ở nước ngoài' };
+export const TYPE_LABEL = { birth: 'Họ khi sinh', changed: 'Đổi họ', aka: 'Họ khác (bí danh)', religious: 'Họ tôn giáo', abroad: 'Họ dùng ở nước ngoài' };
 const CONF_LABEL = { confirmed: 'đã xác nhận', tradition: 'theo truyền thống', uncertain: 'chưa chắc chắn' };
 const ROLE_NAMES = { all: 'Ai cũng thấy', members: 'Thành viên', editors: 'Biên tập viên trở lên' };
 
@@ -29,65 +30,25 @@ export function surnameGroup(id, d, M, { editor = false } = {}) {
   const rows = list.map((e, i) => [when(e), `<b>${esc(e.surname)}</b>${e.han ? ` <span lang="zh-Hant">${esc(e.han)}</span>` : ''}${e.given ? ` ${esc(e.given)}` : ''} · ${esc(TYPE_LABEL[e.type])}`
     + (e.reason ? `<br><span class="sub">${esc(e.reason)}</span>` : '')
     + `<br><span class="sub">${esc(CONF_LABEL[e.confidence || 'uncertain'])}${e.source ? ' · nguồn: ' + esc(e.source) : ''}</span>`
-    + (editor ? ` ${dangerButton('Xóa mốc', `data-surn-del="${i}"`, { size: 'sm' })}` : '')]);
+    + (editor ? ` ${dangerButton('Xóa', `data-surn-del="${i}"`, { size: 'sm' })}` : '')]);
   if (!list.length && inh.surname && inh.source === 'inherited') rows.push(['Theo cha', `<b>${esc(inh.surname)}</b> <span class="sub">kế thừa, chưa có mốc riêng</span>`]);
-  // No marks and nothing inherited: no fact group (the editor gets surnameAddBlock instead, so a person with no facts stays bare)
+  // No marks and nothing inherited: no fact group (a person with no facts stays bare; marks are added in the person form)
   if (!list.length && !(inh.surname && inh.source === 'inherited')) return null;
-  if (editor) rows.push(['', `<button type="button" class="btn ter sm" data-surn-add>Thêm mốc họ</button><div id="surn-slot"></div>`]);
   return { title: 'Họ', rows };
 }
 
-// Editors' entry point when the Họ group is not shown (no marks yet): a button and the form slot, outside the facts card.
-export function surnameAddBlock() {
-  return `<div class="surn-add-block"><button type="button" class="btn ter sm" data-surn-add>Thêm mốc họ</button><div id="surn-slot"></div></div>`;
-}
-
-const opt = (v, l, cur) => `<option value="${v}"${cur === v ? ' selected' : ''}>${esc(l)}</option>`;
-export function surnameForm(cur = {}) {
-  return `<form id="surn-form" class="form-stack surn-form">
-    <label class="fld">Loại mốc<select name="type">${NAME_TYPES.map((t) => opt(t, TYPE_LABEL[t], cur.type || 'changed')).join('')}</select></label>
-    <label class="fld">Họ<input name="surname" required maxlength="40" autocomplete="off"></label>
-    <label class="fld">Tên gọi (nếu khác)<input name="given" maxlength="40" autocomplete="off"></label>
-    <label class="fld">Chữ Hán<input name="han" maxlength="40" lang="zh-Hant" placeholder="tùy chọn"></label>
-    <div class="surn-yrs"><label class="fld">Từ năm<input name="from" maxlength="20" inputmode="numeric" placeholder="1232"></label>
-      <label class="fld">Đến năm<input name="to" maxlength="20" inputmode="numeric"></label></div>
-    <label class="fld">Lý do<input name="reason" maxlength="200" placeholder="tùy chọn"></label>
-    <label class="fld">Nguồn<input name="source" maxlength="200" placeholder="sách, bia, lời kể…"></label>
-    <label class="fld">Độ chắc chắn<select name="confidence">${CONFIDENCE.map((c) => opt(c, CONF_LABEL[c], cur.confidence || 'uncertain')).join('')}</select></label>
-    <div class="row end"><button type="button" class="btn ter" data-surn-cancel>Hủy</button><button class="btn">Lưu mốc họ</button></div>
-    <p class="err" hidden></p></form>`;
-}
-
-// Delegated handlers for the profile: open the form, remove a mark, save a mark. edit(id, fields) = store.edit.
+// Delegated handler for the profile: remove a mark (editors). edit(id, fields) = store.edit.
 export function bindSurnames(main, id, d, { edit }) {
   const list = () => timelineOf(d);
-  main._surnOff?.(); // the profile's element is reused between renders: drop the last handlers first
+  main._surnOff?.(); // the profile's element is reused between renders: drop the last handler first
   const onClick = async (ev) => {
-    const add = ev.target.closest('[data-surn-add]'); const del = ev.target.closest('[data-surn-del]'); const cancel = ev.target.closest('[data-surn-cancel]');
-    if (cancel) { const slot = main.querySelector('#surn-slot'); if (slot) slot.innerHTML = ''; return; }
-    if (add) { const slot = main.querySelector('#surn-slot'); if (slot) slot.innerHTML = surnameForm(); return; }
-    if (del) {
-      const i = Number(del.dataset.surnDel); const e = list()[i]; if (!e) return;
-      confirmDanger({ title: `Xóa mốc họ “${e.surname}”?`, lose: 'Mốc này sẽ được gỡ khỏi hồ sơ người này.', restore: 'Có thể thêm lại sau.', confirm: 'Xóa mốc',
-        onConfirm: () => edit(id, { names: list().filter((_, j) => j !== i) }) });
-    }
-  };
-  const onSubmit = async (ev) => {
-    if (ev.target.id !== 'surn-form') return;
-    ev.preventDefault();
-    const f = ev.target; const err = f.querySelector('.err');
-    const e = {};
-    for (const [k, v] of new FormData(f).entries()) { const t = String(v).trim(); if (t) e[k] = t; }
-    if (e.from && yearOf(e.from) == null) e.from = undefined;
-    if (e.to && yearOf(e.to) == null) e.to = undefined;
-    const next = [...list(), e];
-    const bad = namesError(next);
-    if (bad) { err.hidden = false; err.textContent = bad.replace(/^names: /, ''); return; }
-    await edit(id, { names: next });
+    const del = ev.target.closest('[data-surn-del]'); if (!del) return;
+    const i = Number(del.dataset.surnDel); const e = list()[i]; if (!e) return;
+    confirmDanger({ title: `Xóa mốc họ “${e.surname}”?`, lose: 'Mốc này sẽ được gỡ khỏi hồ sơ người này.', restore: 'Có thể thêm lại sau.', confirm: 'Xóa',
+      onConfirm: () => edit(id, { names: list().filter((_, j) => j !== i) }) });
   };
   main.addEventListener('click', onClick);
-  main.addEventListener('submit', onSubmit);
-  main._surnOff = () => { main.removeEventListener('click', onClick); main.removeEventListener('submit', onSubmit); };
+  main._surnOff = () => { main.removeEventListener('click', onClick); };
 }
 
 // Family họ gốc card (Cài đặt dòng họ). Admins edit; others read what their visibility allows.

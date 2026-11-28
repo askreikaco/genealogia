@@ -111,12 +111,18 @@ test('editor: the person timeline shows the marks; a new mark is added through t
     // A sync that finishes after the form opens re-renders the profile and drops the open form (pre-existing: store.emit -> renderSoon).
     // Wait for the first sync to finish so the click is not undone by it.
     await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Thêm mốc họ' }).click();
-    await page.locator('#surn-form input[name=surname]').fill('Trần');
-    await page.locator('#surn-form select[name=type]').selectOption('aka');
-    await page.locator('#surn-form input[name=from]').fill('1300');
-    await page.locator('#surn-form input[name=source]').fill('bia đá');
-    await page.getByRole('button', { name: 'Lưu mốc họ' }).click();
+    // Marks are added in the person form now ("+ Họ khác", one row per tap); the profile only removes one (Xóa).
+    // The form shows the two marks as rows; the third one is added and saved through the form's own store path.
+    await page.goto(`${base}/#/${FA}/sua/${P_ROOT}`);
+    await page.waitForSelector('#fpform', { timeout: 15000 });
+    await page.waitForLoadState('networkidle');
+    assert.equal(await page.locator('#fpform [data-sn-row]').count(), 2, 'the two marks are rows of the form');
+    await page.click('#fpform [data-sn-add]');
+    const row = page.locator('#fpform [data-sn-row]').nth(2);
+    await row.locator('[data-sn-name]').fill('Trần');
+    await row.locator('[data-sn-type]').selectOption('aka');
+    await row.locator('[data-sn-year]').fill('1300');
+    await page.click('#fpsave');
     let names = [];
     for (let i = 0; i < 40 && names.length < 3; i++) {
       await new Promise((r) => setTimeout(r, 250));
@@ -124,6 +130,8 @@ test('editor: the person timeline shows the marks; a new mark is added through t
     }
     assert.equal(names.length, 3, 'the mark is saved on the server');
     assert.equal(names[2].surname, 'Trần');
+    assert.equal(names[2].type, 'aka');
+    assert.equal(names[2].from, '1300');
     await shot(page, 'surn-2.png');
     assert.deepEqual(errors, []);
   } finally { await ctx.close(); }

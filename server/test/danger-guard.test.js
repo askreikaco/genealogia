@@ -12,7 +12,8 @@ const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.js'));
 const LABEL = /(?:>|['"`])\s*(Xóa|Xoá|Gỡ|Rời dòng họ|Đăng xuất tất cả|Rút lại|Bỏ nháp|Bỏ)(?=[\s<'"`(:…]|$)/u;
 // not destructive: filters, form-local chips/rows not saved yet, unfollow, selection
 // Bỏ phiếu = cast a vote (the vote card's group label), not a removal.
-const EXEMPT = /Xóa lọc|Xoá lọc|Xóa tất cả|Bỏ lọc|Bỏ theo dõi|Bỏ chọn|Bỏ người này|Bỏ nguồn|Bỏ gắn|Bỏ qua|Gỡ rối|Bỏ phiếu/u;
+// Bỏ họ này = the × on a surname row of the person form: it drops an unsaved row (nothing is written until Lưu), like Bỏ nguồn.
+const EXEMPT = /Xóa lọc|Xoá lọc|Xóa tất cả|Bỏ lọc|Bỏ theo dõi|Bỏ chọn|Bỏ người này|Bỏ nguồn|Bỏ họ này|Bỏ gắn|Bỏ qua|Gỡ rối|Bỏ phiếu/u;
 const OK = /dangerButton\(|dangerItem\(|dangerLabel\(|dangerZone\(|confirmDanger\(|data-danger/;
 
 test('danger.js exists and exports the shared component', () => {

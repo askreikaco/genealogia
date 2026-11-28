@@ -1092,6 +1092,16 @@ body:has(.fp-bar) .updnote{bottom:calc(56px + var(--fp-bar-h) + env(safe-area-in
 .ct-del{min-width:var(--sz-touch);min-height:var(--sz-touch);font:inherit;color:var(--c-text-2);background:none;border:0;cursor:pointer}
 .ct-acts{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-4)}
 .ct-empty{margin:0}
+/* Họ khác rows (person form): the same row look as the contacts, with a year field. Links sit on one line. */
+.fp-links{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3) var(--sp-5)}
+.fp-links .fp-2col{flex:1 1 100%}
+.sn-list{display:flex;flex-direction:column;gap:var(--sp-3)}
+.sn-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto var(--sz-touch);gap:var(--sp-3);align-items:center}
+.sn-row select,.sn-row input{min-height:var(--sz-touch);min-width:0;font:inherit;color:var(--c-text);background:var(--c-field,var(--c-layer));border:1px solid var(--c-border);padding:0 var(--sp-3)}
+.sn-row .ct-del{min-width:var(--sz-touch);min-height:var(--sz-touch);font:inherit;color:var(--c-text-2);background:none;border:0;cursor:pointer}
+.fp-fold{margin-top:var(--sp-4)}
+/* hidden blocks of the person form take no grid space (their own display rules would keep them) */
+.fp-au[hidden],.fld-w[hidden],.ct-list[hidden],[data-lunar-hint][hidden]{display:none}
 dialog.dlg.contact-import::backdrop{background:var(--c-scrim)}
 .ci-file{margin:var(--sp-4) 0 0}
 

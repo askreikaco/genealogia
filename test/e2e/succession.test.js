@@ -181,6 +181,8 @@ test('a signed-in account creates a new family: find page, Thêm, the form, then
   await page.locator('#lf-tile .crest-ch').waitFor({ timeout: 4000 });
   await page.locator('#lf-form input[name=place]').fill('Củ Chi');
   await page.locator('#lf-form select[name=visibility]').selectOption('link');
+  // the first person is in Thêm chi tiết now (a closed fold keeps its fields in the DOM): open it, then fill
+  await page.locator('#lf-form [data-fp-fold] > details > summary').click();
   await page.locator('#lf-form input[name=fp_name]').fill('Cụ Tổ e2e');
   await page.locator('#lf-form select[name=fp_sex]').selectOption('m');
   await page.getByRole('button', { name: 'Lập gia phả' }).click();

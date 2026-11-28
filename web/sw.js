@@ -46,6 +46,7 @@ const SHELL = [
   '/js/ev-title-vi.js',
   '/js/disc-rules.js',
   '/js/forms-vi.js',
+  '/js/person-rows.js',
   '/js/gallery.js',
   '/js/gallery-ui.js',
   '/js/gallery-vi.js',

@@ -400,6 +400,16 @@
         "test/e2e/form-*.test.js"
       ]
     },
+    "forms-b1": {
+      "paths": [
+        "web/js/person-rows.js",
+        "web/js/forms-vi.js",
+        "server/test/person-rows.test.js"
+      ],
+      "e2e": [
+        "test/e2e/forms-minimal-b1.test.js"
+      ]
+    },
     "gedcom": {
       "paths": [
         "server/gedcom*.js",

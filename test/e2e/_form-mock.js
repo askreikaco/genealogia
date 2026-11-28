@@ -56,20 +56,26 @@ async function openIn(ctx, { role, path: hash, persons = PERSONS, personsDelay =
 }
 const names = (page) => page.$$eval('#fpform [name]', (els) => [...new Set(els.map((e) => e.name))].sort());
 
-const expand = async (page, id) => { if ((await page.getAttribute(`[data-acc-btn="${id}"]`, 'aria-expanded')) !== 'true') await page.click(`[data-acc-btn="${id}"]`); };
-// Closed panels draw no inputs: open every section that this role has, before the field set is read.
+// The person form has one accordion left (the events section, "su"). The other sections are gone: the essentials are always
+// on the page and the rare fields sit in "Thêm chi tiết" (a closed details, its fields in the DOM). So a helper that used to
+// open a section now opens the fold when the section has no button, and does nothing else.
+const openFold = (page) => page.evaluate(async () => {
+  for (let i = 0; i < 20; i++) {
+    const d = document.querySelector('#fpform [data-fp-fold] > details');
+    if (!d || d.open) return;
+    document.querySelector('#fpform [data-fp-fold] > details > summary').click();
+    await new Promise((r) => setTimeout(r, 150));
+  }
+});
+const expand = async (page, id) => {
+  if (await page.$(`[data-acc-btn="${id}"]`)) { if ((await page.getAttribute(`[data-acc-btn="${id}"]`, 'aria-expanded')) !== 'true') await page.click(`[data-acc-btn="${id}"]`); return; }
+  await openFold(page);
+};
+// Closed panels draw no inputs: open the rare fields (Thêm chi tiết) before the field set is read.
 // (a programmatic click: the fixed save bar covers the lower headers on a phone)
 const expandAll = async (page) => {
-  const ids = ['ten', 'gd', 'sinh', 'mat', 'noi', 'ghi', 'lien'];
-  // the form is drawn again when the account and persons arrive: keep opening panels until all are open on the final DOM
-  // (a guest has no 'lien' panel, so a missing button counts as open)
-  const allOpen = (list) => list.every((id) => { const b = document.querySelector(`[data-acc-btn="${id}"]`); return !b || b.getAttribute('aria-expanded') === 'true'; });
   await page.waitForSelector('#fpform', { timeout: 8000 });
-  for (let i = 0; i < 20 && !(await page.evaluate(allOpen, ids)); i++) {
-    await page.evaluate((list) => { for (const id of list) { const b = document.querySelector(`[data-acc-btn="${id}"]`); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); } }, ids);
-    await page.waitForTimeout(150);
-  }
-  await page.waitForFunction(allOpen, ids, { timeout: 8000 });
+  await openFold(page);
 };
 
 const wait = (page, ms) => page.waitForTimeout(ms);

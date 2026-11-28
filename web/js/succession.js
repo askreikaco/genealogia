@@ -3,7 +3,8 @@
 // create-family page (#lap-gia-pha). Talks to /api/families/<ref>/succession and the token endpoints.
 // app.js calls init() once with what it owns (render, dialogs, sign-in URL, the store, the visibility options).
 import { esc } from './model.js';
-import { toast, surnameTileOf, famShort } from './ui.js';
+import { toast, surnameTileOf, famShort, moreFold, discWire } from './ui.js';
+import { FORMS_VI } from './forms-vi.js';
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger } from './danger.js';
 import { openClaimSheet } from './claim.js';
 
@@ -258,14 +259,15 @@ export function createView() {
         <span id="lf-tile" hidden></span></div>
       <label class="fld">Quê quán (không bắt buộc)<input name="place" maxlength="120" autocomplete="off"></label>
       <label class="fld">Ai thấy dòng họ<select name="visibility">${deps.visOpts.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select></label>
-      <fieldset class="succ-vis"><legend class="fld-l">Người đầu tiên trong gia phả (không bắt buộc)</legend>
-        <label class="fld">Họ tên<input name="fp_name" maxlength="80" autocomplete="off"></label>
+      <div class="fp-fold" data-fp-fold>${moreFold(FORMS_VI.more, `<fieldset class="succ-vis"><legend class="fld-l">Người đầu tiên trong gia phả (không bắt buộc)</legend>
+        <label class="fld" data-disc-part="Người đầu tiên">Họ tên<input name="fp_name" maxlength="80" autocomplete="off"></label>
         <label class="fld">Giới tính<select name="fp_sex"><option value="">Chưa rõ</option><option value="m">Nam</option><option value="f">Nữ</option></select></label>
-      </fieldset>
+      </fieldset>`, false, { disc: true })}</div>
       <div class="row end"><button class="btn">Lập gia phả</button></div>
       <p class="err" id="lf-err" hidden></p>
     </form>`;
   const form = document.getElementById('lf-form');
+  discWire(form); // the fold's closed summary follows the first person's name
   for (const [k, v] of Object.entries(lfDraft)) {
     const el = form.elements.namedItem(k);
     if (!el) continue;

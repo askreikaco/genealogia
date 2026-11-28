@@ -168,7 +168,8 @@ test('form: no "Để trống" hint; Thứ and Đời share one row at 390 px; g
   try {
     const e = await openPage(b, 'editor', '#/duong/sua/K1');
     assert.ok(!(await mainText(e.page)).includes('Để trống nếu là người gốc'), 'no parent hint');
-    await e.page.locator('[data-acc-btn="gd"]').click();
+    // Đời and Thứ sit in Thêm chi tiết now (the form was minimised): open the fold to measure them
+    await e.page.locator('#fpform [data-fp-fold] > details > summary').click();
     const tops = await e.page.evaluate(() => ['gen', 'thu'].map((k) => Math.round(document.querySelector(`[data-au="${k}"]`).getBoundingClientRect().top)));
     assert.equal(tops[0], tops[1], 'Đời and Thứ start on the same row');
     assert.equal(await e.page.locator('.fp-guest').count(), 0, 'no sign-in note for an editor');

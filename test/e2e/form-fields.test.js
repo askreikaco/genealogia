@@ -62,8 +62,8 @@ test('add a child under a parent with 3 dated siblings: Đời 7 and Thứ 3 are
 test('5/3/1963 shows âm lịch and saves the full date', { skip }, async () => {
   const browser = await launch();
   try {
+    // Ngày sinh is on the page from the start (no section to open since the form was minimised, see forms-minimal-b1)
     const s = await open(browser, { role: 'editor', path: '#sua/K2' });
-    await expand(s.page, 'sinh');
     await s.page.fill('input[name=birth_smart]', '5/3/1963');
     const lunar = await s.page.textContent('[data-au="birth_lunar"] .fp-ro');
     assert.match(lunar, /10\/2 Quý Mão/);
@@ -83,15 +83,14 @@ test('Đã khuất shows the death fields; death before birth is an inline error
   const browser = await launch();
   try {
     const s = await open(browser, { role: 'editor', path: '#sua/K2' });
-    await expand(s.page, 'mat');
+    // Đã khuất and Ngày mất are on the page (no section to open); the error shows under Ngày mất
     assert.equal(await s.page.locator('.fp-death').isVisible(), false, 'hidden when alive');
     await s.page.locator('input[name=dead]').check({ force: true });
     assert.equal(await s.page.locator('.fp-death').isVisible(), true, 'shown when Đã khuất is on');
-    await expand(s.page, 'sinh');
     await s.page.fill('input[name=birth_smart]', '1955');
     await s.page.fill('input[name=death_smart]', '1940');
     assert.match(await s.page.textContent('[data-err=death_smart]'), /trước năm sinh/);
-    assert.equal(await s.page.locator('[data-acc="mat"]').getAttribute('class').then((c) => /open/.test(c)), true);
+    assert.equal(await s.page.locator('[data-err=death_smart]').isVisible(), true, 'the error is on the page');
     await s.ctx.close();
   } finally { await browser.close(); }
 });
@@ -113,7 +112,8 @@ test('save with one section changed keeps the values of the sections never opene
   const browser = await launch();
   try {
     const s = await open(browser, { role: 'editor', path: '#sua/K2' });
-    assert.equal(await s.page.getAttribute('[data-acc-btn="sinh"]', 'aria-expanded'), 'false', 'Sinh starts closed');
+    // K2 has a birth place, a rare field: Thêm chi tiết opens by itself with it
+    assert.equal(await s.page.locator('#fpform [data-fp-fold] > details').evaluate((d) => d.open), true, 'the fold opens for the birth place');
     await expand(s.page, 'ten');
     await s.page.fill('input[name=name]', 'Dương Văn Hai (sửa)');
     await s.page.click('.fp-bar button[type=submit]');
@@ -129,7 +129,7 @@ test('draft restore into a closed section: the value is kept, shown in the heade
   const browser = await launch();
   try {
     const s = await open(browser, { role: 'editor', path: '#sua/K2' });
-    await expand(s.page, 'noi');
+    await expand(s.page, 'noi'); // Nghề sits in Thêm chi tiết (the fold is open for K2's birth place)
     await s.page.fill('input[name=job]', 'Thợ hồ');
     await s.page.waitForFunction(() => /Đã lưu nháp/.test(document.getElementById('fpstat')?.textContent || ''), null, { timeout: 5000 });
     const ctx = s.ctx; await s.page.close();
@@ -137,8 +137,7 @@ test('draft restore into a closed section: the value is kept, shown in the heade
     await p2.page.waitForSelector('.fp-draft', { timeout: 5000 });
     await p2.page.click('[data-dr-go]');
     await p2.page.waitForFunction(() => /Đã khôi phục/.test(document.getElementById('fpstat')?.textContent || ''), null, { timeout: 5000 });
-    assert.equal(await p2.page.getAttribute('[data-acc-btn="noi"]', 'aria-expanded'), 'false', 'Nơi sống & nghề stays closed');
-    assert.match(await p2.page.textContent('[data-acc-sum="noi"]'), /Thợ hồ/, 'the closed header shows the restored value');
+    assert.match(await p2.page.locator('#fpform [data-fp-fold] [data-disc-sum]').textContent(), /Thợ hồ/, 'the fold summary shows the restored value');
     await p2.page.click('.fp-bar button[type=submit]');
     await p2.page.waitForFunction(() => location.hash.includes('person/'), null, { timeout: 5000 });
     const job = p2.log.ops.map((o) => o.fields).find((f) => 'job' in f);

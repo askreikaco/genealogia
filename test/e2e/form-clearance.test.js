@@ -51,12 +51,12 @@ async function ownerPage(width, height) {
 }
 
 for (const [w, h] of [[390, 844], [1280, 800]]) {
-  test(`form at ${w}x${h}: last field above the bar with Liên hệ expanded; focus centres the field`, { skip }, async () => {
+  test(`form at ${w}x${h}: last field above the bar with contact rows; focus centres the field`, { skip }, async () => {
     const { ctx, page } = await ownerPage(w, h);
     try {
       await page.goto(base + '/#them');
       await page.waitForSelector('#fpform', { timeout: 15000 });
-      await page.click('button[data-acc-btn="lien"]');
+      // contacts are always on the page for members now (no section to open): the rows are added with + Liên hệ
       // contacts are rows [type][value][×] (#113): add a phone row, then an email row
       await page.click('#fpform [data-ct-add]');
       await page.click('#fpform [data-ct-add]');
@@ -67,7 +67,7 @@ for (const [w, h] of [[390, 844], [1280, 800]]) {
       const r = await page.evaluate(() => {
         const bar = document.querySelector('.fp-bar').getBoundingClientRect();
         const shown = [...document.querySelectorAll('#fpform input:not([type=hidden]), #fpform select, #fpform textarea')]
-          .filter((el) => el.getClientRects().length && !el.closest('[hidden]'));
+          .filter((el) => el.getClientRects().length && !el.closest('[hidden]') && !el.closest('details:not([open])'));
         const last = shown[shown.length - 1];
         return { barTop: bar.top, barH: bar.height, lastBottom: last.getBoundingClientRect().bottom, last: last.name || last.id };
       });

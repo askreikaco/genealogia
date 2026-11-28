@@ -82,7 +82,9 @@ test('editor: add two phones and an email, remove one, save; the reload shows th
     await page.click('[data-ct-edit="PN"]');
     await page.waitForSelector('[data-ct-add]', { timeout: 8000 });
     assert.equal(await rows(page).count(), 0, 'no contacts yet: no rows');
-    assert.match(await page.locator('.ct-empty').innerText(), /Chưa có liên hệ/);
+    // no "Chưa có liên hệ nào" line any more: the form shows no blank row, only + Liên hệ (the rows come from taps)
+    assert.equal(await page.locator('#fpform [data-ct-add]').count(), 1, '+ Liên hệ is the only contact control');
+    assert.equal(await page.locator('#fpform select[name="contact_public"]').count(), 0, 'the visibility control shows with the first row');
 
     await page.click('[data-ct-add]');
     await page.locator('[data-ct-row="0"] [data-ct-val]').fill('0912 345 678');

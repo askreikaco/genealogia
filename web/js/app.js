@@ -18,7 +18,7 @@ import { locate } from './geo.js';
 import { chartLayout, chartSvg } from './treechart.js';
 import { emblemField, bindEmblem } from './emblem.js';
 import { openConfirm } from '../vendor/reika-ds/js/index.js';
-import { isWide, isDesk, layoutAtLeast, emptyState, cic, iconButton, toolbar, addBtn, ltags, fpanel, fsheet, sheet, closeSheets, setUntag, deviceNote, toast, fmtTime, fmtDate, fieldDiff, frow, accItem, accToggle, confirmModal, CFM_CANCEL, closeConfirms, famChip, familyCrest, calmRow, calmAct, surnameTile, surnameTileOf, popMenu, closeMenu, sexMark, sexClass, SEX_LABEL, tag, section, card , discOpenErr } from './ui.js';
+import { isWide, isDesk, layoutAtLeast, emptyState, cic, iconButton, toolbar, addBtn, ltags, fpanel, fsheet, sheet, closeSheets, setUntag, deviceNote, toast, fmtTime, fmtDate, fieldDiff, frow, accItem, accToggle, confirmModal, CFM_CANCEL, closeConfirms, famChip, familyCrest, calmRow, calmAct, surnameTile, surnameTileOf, popMenu, closeMenu, sexMark, sexClass, SEX_LABEL, tag, section, card , discOpenErr, moreFold, discWire, discRefresh } from './ui.js';
 import { BUILD, BUILD_DATE, createUpdater, updateNotice, buildLabel } from './update.js';
 import { searchPeople } from './fuzzy.js';
 import { nameHit, listPrefill, gioPrefill, eventPrefill } from './prefill.js';
@@ -35,6 +35,9 @@ import * as BT from './branch-trees.js';
 import { personItem } from './person-item.js';
 import { openContactImport } from './contacts-import.js';
 import { CONTACT_TYPES, TYPE as CTYPE, listOf as contactList, contactHref, itemError as contactError, cleanList, sameList } from './contacts-model.js';
+import { FORMS_VI } from './forms-vi.js';
+import { namesError, NAME_TYPES } from './surname-rules.js';
+import { marksOfRows, namesClean, namesOfRecord, foldHasValue } from './person-rows.js';
 import * as CL from './clan.js';
 import * as SN from './surnames.js';
 import { COUNTRIES, countryName, countryCode } from './countries.js';
@@ -501,7 +504,7 @@ const saveOpen = () => localStorageSet('gp_open', JSON.stringify([...open]));
 main.addEventListener('click', (e) => {
   const t = e.target.closest('[data-tg]'); if (t) { const id = t.dataset.tg; const wasOpen = t.classList.contains('op') || t.getAttribute('aria-expanded') === 'true'; if (wasOpen) { open.delete(id); open.add('!' + id); } else { open.add(id); open.delete('!' + id); } saveOpen(); render(); return; }
   const a = e.target.closest('[data-act]'); if (a) { act(a.dataset.act, a.dataset.id); return; }
-  const ce = e.target.closest('[data-ct-edit]'); if (ce) { const p = M.byId.get(ce.dataset.ctEdit); if (p) goForm({ kind: 'sua', p, open: 'lien' }); return; }
+  const ce = e.target.closest('[data-ct-edit]'); if (ce) { const p = M.byId.get(ce.dataset.ctEdit); if (p) goForm({ kind: 'sua', p }); return; }
   if (e.target.closest('[data-contact-import-fam]')) { openContactImport({ fam: S.curFamily(), done: render }); return; }
   const add = e.target.closest('[data-add]'); if (add) { addFromBar(add.dataset.add); return; }
   const mn = e.target.closest('[data-menu]'); if (mn) { rowMenu(mn.dataset.menu, mn, mn.dataset.menuCtx); }
@@ -638,7 +641,6 @@ function person(id) {
    <div class="kpis">${[['Mất', d.died || (d.death_lunar ? d.death_lunar + ' ÂL' : '—'), 'c2'], ['Giỗ (ÂL)', d.gio_lunar || d.death_lunar || '—', 'c3'], ['Con', ks.length, 'c5'], ['Cháu chắt', M.desc(sp ? sp.id : id) - ks.length, 'c1']].filter(([, v]) => v && v !== '—').map(([l, v]) => `<div class="kpi"><span class="sub">${l}</span><b>${esc(v)}</b></div>`).join('')}</div>
    <div class="row acts2"><div class="acts2-go">${gioOf(d) ? followBar(p) : ''}<button class="btn sm" data-act="${S.isEditor() ? 'edit' : 'suggest'}" data-id="${id}">${icon('pencil')}Sửa</button></div><button class="ib" data-menu="${id}" data-menu-ctx="prof" aria-label="Thêm thao tác">⋯</button></div>
    ${profTabsHtml()}
-   ${!surnG && S.isEditor() ? SN.surnameAddBlock() : ''}
    ${profBody(p, { groups, id, d })}${profTab === 'info' ? '<div data-gal-slot></div>' : ''}`;
   relWire(main, () => M);
   if (profTab === 'info') LV.decorateSelf(main, id); // P1d: the own-profile setting, at the end of the Thông tin tab (only when the server says this viewer may change it)
@@ -2372,11 +2374,16 @@ function ctRowHtml(c, i) {
     <input class="ct-val" data-ct-val type="${t.input}" inputmode="${t.mode}" autocomplete="${t.ac}" placeholder="${esc(t.ph)}" aria-label="${esc(t.label)}" value="${fpE(c.value)}">
     <button type="button" class="ct-del" data-ct-del="${i}" aria-label="Bớt dòng ${esc(t.label)}">×</button></div>`;
 }
-const ctListHtml = (items) => items.length ? items.map(ctRowHtml).join('') : '<p class="sub ct-empty">Chưa có liên hệ nào.</p>';
+const ctListHtml = (items) => items.map(ctRowHtml).join('');
+// The one privacy control of the contact rows: drawn only when there is a row (or it is already on), so a new person shows none.
+function ctPubHtml(st) {
+  if (!ctItems(st).length && st.v.contact_public !== 'yes') return '';
+  return fpW('contact_public', true, `<label class="fld">Hiện liên hệ công khai?<select name="contact_public"><option value="" ${st.v.contact_public !== 'yes' ? 'selected' : ''}>Không</option><option value="yes" ${st.v.contact_public === 'yes' ? 'selected' : ''}>Có</option></select></label>`);
+}
 function ctEditorHtml(st) {
-  return `<div class="ct-wrap wide"><div class="ct-list" data-ct-list>${ctListHtml(ctItems(st))}</div>
+  return `<div class="ct-wrap wide"><div class="ct-list" data-ct-list${ctItems(st).length ? '' : ' hidden'}>${ctListHtml(ctItems(st))}</div><div data-ct-pub${ctPubHtml(st) ? '' : ' hidden'}>${ctPubHtml(st)}</div>
     <p class="fld-err" data-err="contacts" hidden></p>
-    <div class="ct-acts"><button type="button" class="btn gh sm" data-ct-add>+ Thêm liên hệ</button>
+    <div class="ct-acts"><button type="button" class="btn gh sm" data-ct-add>${FORMS_VI.add_contact}</button>
     <button type="button" class="linkbtn" data-ct-import>Nhập từ danh bạ</button></div></div>`;
 }
 // The rows as they are on the page (typed values included).
@@ -2386,7 +2393,8 @@ function ctReadDom(form) {
 // Redraws the rows from the state; focuses one row's field when asked.
 function ctRedraw(form, st, focusIdx = -1, focusField = 'val') {
   const host = form.querySelector('[data-ct-list]'); if (!host) return;
-  host.innerHTML = ctListHtml(ctItems(st));
+  host.innerHTML = ctListHtml(ctItems(st)); host.hidden = !ctItems(st).length;
+  const pub = form.querySelector('[data-ct-pub]'); if (pub) { pub.innerHTML = ctPubHtml(st); pub.hidden = !pub.innerHTML; }
   if (focusIdx >= 0) host.querySelector(`[data-ct-row="${focusIdx}"] [data-ct-${focusField}]`)?.focus();
 }
 // One change to the list: the typed values first, then the change, then the redraw, the live check and the draft.
@@ -2397,9 +2405,39 @@ function ctMutate(form, st, fn, focusIdx = -1, focusField = 'val') {
   ctRedraw(form, st, focusIdx, focusField);
   formDirty = true; fpLive(form, st); fpDraftSave(form, st);
 }
+// Họ khác rows: one row per surname mark (names). The state holds the list as JSON text, like the contacts. A row shows
+// only surname, type and the year it starts; every other field of the mark (confidence, source, Hán, reason, to) is kept
+// as loaded, so saving never drops it. A row with no surname and no year is blank and is left out on save.
+const snItems = (st) => { try { const a = JSON.parse(st.v.names || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
+const snRowHtml = (e, i) => `<div class="sn-row" data-sn-row="${i}">
+    <input class="ct-val" data-sn-name value="${fpE(e.surname)}" maxlength="40" autocomplete="off" aria-label="${esc(FORMS_VI.surname_ph)}" placeholder="${esc(FORMS_VI.surname_ph)}">
+    <select class="ct-type" data-sn-type aria-label="Loại mốc họ">${NAME_TYPES.map((t) => `<option value="${t}" ${t === (e.type || 'changed') ? 'selected' : ''}>${esc(SN.TYPE_LABEL[t])}</option>`).join('')}</select>
+    <input class="sn-yr" data-sn-year value="${fpE(e.from)}" size="6" maxlength="20" inputmode="numeric" autocomplete="off" aria-label="${esc(FORMS_VI.surname_year)}" placeholder="1232">
+    <button type="button" class="ct-del" data-sn-del="${i}" aria-label="${esc(FORMS_VI.surname_remove)}" title="${esc(FORMS_VI.surname_remove)}">×</button></div>`;
+const snListHtml = (st) => snItems(st).map(snRowHtml).join('');
+// The rows as they are on the page (typed values included), merged over the loaded marks by position.
+function snReadDom(form, st) {
+  const rows = [...form.querySelectorAll('[data-sn-row]')].map((r) => ({ type: r.querySelector('[data-sn-type]').value, surname: r.querySelector('[data-sn-name]').value, from: r.querySelector('[data-sn-year]').value }));
+  return marksOfRows(snItems(st), rows);
+}
+function snRedraw(form, st, focusIdx = -1) {
+  const host = form.querySelector('[data-sn-list]'); if (!host) return;
+  host.innerHTML = snListHtml(st);
+  if (focusIdx >= 0) host.querySelector(`[data-sn-row="${focusIdx}"] [data-sn-name]`)?.focus();
+}
+// One change to the rows: the typed values first, then the change, then the redraw, the live check and the draft.
+function snMutate(form, st, fn, focusIdx = -1) {
+  fpSync(form, st);
+  const list = snItems(st); fn(list);
+  st.v.names = JSON.stringify(list);
+  snRedraw(form, st, focusIdx);
+  formDirty = true; fpLive(form, st); fpDraftSave(form, st);
+}
+
 // The list as the draft and the conflict check compare it (text), and whether a saved field differs from the record.
-const baseVal = (rec, k) => (k === 'contacts' ? JSON.stringify(contactList(rec)) : String(rec[k] ?? ''));
-const differs = (k, rec, v) => (k === 'contacts' ? !sameList(contactList(rec), v) : String(rec[k] ?? '') !== String(v ?? ''));
+const baseVal = (rec, k) => (k === 'contacts' ? JSON.stringify(contactList(rec)) : k === 'names' ? JSON.stringify(namesOfRecord(rec)) : String(rec[k] ?? ''));
+const differs = (k, rec, v) => (k === 'contacts' ? !sameList(contactList(rec), v) : k === 'names' ? JSON.stringify(namesOfRecord(rec)) !== JSON.stringify(v || [])
+  : String(rec[k] ?? '') !== String(v ?? ''));
 
 // Blocks of the form. Only-mode (a single action such as "Vợ / chồng") gets a plain list of those fields.
 // The form state (st.v) holds a value for every field of the form, drawn or not. An accordion panel is drawn from that
@@ -2419,10 +2457,13 @@ function fpInitVals(st) {
   if (st.keys.has('dead')) v.dead = isDead(d) ? 'on' : '';
   if (st.keys.has('contact_public')) v.contact_public = d.contact_public === 'yes' ? 'yes' : '';
   if (st.keys.has('contacts')) v.contacts = JSON.stringify(contactList(d)); // the list, as JSON text (a draft holds text too)
+  if (st.keys.has('names')) v.names = JSON.stringify(namesOfRecord(d)); // the surname marks, in timeline order (JSON text)
   return v;
 }
-const fpDeath = (st) => `<div class="fp-2col">${fpW('death_smart', false, `<label class="fld">Ngày mất<input name="death_smart" value="${fpE(st.v.death_smart)}" inputmode="numeric" autocomplete="off" placeholder="5/3/1963 · 3/1963 · 1963"></label>`)}<div class="fp-au fld-w" data-au="death_lunar"></div></div>`
-  + `${fpIn('gio_lunar', 'Ngày giỗ (ÂL), nếu khác ngày mất', st.v, true)}${fpIn('burial', 'Nơi an táng', st.v, true)}`;
+// A date field (Ngày sinh, Ngày mất): a short placeholder, the ⓘ help beside the label, and the auto lunar hint under it.
+// The lunar itself (with its Sửa override) sits in Thêm chi tiết; the hint is shown only when the date is exact.
+const fpDateField = (k, label, lk, st) => fpW(k, true, `<div class="fld"><span class="evx-dt-h"><span>${esc(label)}</span><details class="evx-help"><summary aria-label="${esc(FORMS_VI.date_help_label)}">ⓘ</summary><p class="sub">${esc(FORMS_VI.date_help)}</p></details></span><input name="${k}" value="${fpE(st.v[k])}" inputmode="numeric" autocomplete="off" aria-label="${esc(label)}" placeholder="${esc(FORMS_VI.date_ph)}"></div><p class="sub" data-lunar-hint="${lk}" hidden></p>`);
+const fpDeath = (st) => fpDateField('death_smart', 'Ngày mất', 'death_lunar', st);
 // Cha/mẹ: the chosen parent, or the search box (only one of the two is in the page).
 function fpPickBox(st) {
   const par = st.v.parent ? M.byId.get(st.v.parent) : null;
@@ -2433,59 +2474,70 @@ function fpPickBox(st) {
       <input type="hidden" name="parent" value="${fpE(st.v.parent)}">
       <p class="fld-err" data-err="parent" hidden></p></div>`;
 }
-// The inner blocks of one accordion section, from the state.
-function fpBody(st, id) {
+// The inner blocks of the one accordion section left: the events and stories editor (members' and editors' people).
+function fpBody(st, id) { return id === 'su' ? evFormBody(st) : ''; }
+// Always on the page: Họ tên, the links to add another name or surname, Giới tính, Cha/mẹ, Ngày sinh, Đã khuất (and
+// Ngày mất), and the contact rows for members. Nothing else is drawn by default.
+function fpEssentials(st) {
   const v = st.v; const { suggest } = st;
-  if (id === 'su') return evFormBody(st);
-  if (id === 'ten') {
-    const names = !!(v.alias || v.title_name);
-    return fpIn('name', 'Họ tên', v, true, 'required')
-      + fpIn('name_han', 'Tên chữ Hán (tùy chọn)', v, true, 'lang="zh-Hant" placeholder="Nhập chữ Hán"')
-      + `<div class="fp-more wide">${names ? `<div class="fp-2col">${fpIn('alias', 'Tên khác', v)}${fpIn('title_name', 'Tên húy / tự / hiệu', v)}</div>`
-        : '<button type="button" class="linkbtn fp-expand" data-expand>＋ Tên khác, tên húy</button>'}</div>`
-      + `<fieldset class="fp-field wide"><legend>Giới tính</legend><div class="fp-seg2" role="radiogroup">
+  const tableRel = S.relOf(st.p?.fam || st.fam || S.curFamily()).source === 'table';
+  const names = !!(v.alias || v.title_name);
+  const aliasHtml = names ? `<div class="fp-2col">${fpIn('alias', 'Tên khác', v)}${fpIn('title_name', 'Tên húy / tự / hiệu', v)}</div>`
+    : '<button type="button" class="linkbtn fp-expand" data-expand>＋ Tên khác, tên húy</button>';
+  const dead = v.dead === 'on';
+  return fpIn('name', 'Họ tên', v, true, 'required')
+    + `<div class="fp-more wide"><div class="fp-links"><div data-alias-host>${aliasHtml}</div>${suggest ? '' : `<button type="button" class="linkbtn" data-sn-add>${FORMS_VI.add_surname}</button>`}</div>`
+    + (suggest ? '' : `<div class="sn-list" data-sn-list>${snListHtml(st)}</div><p class="fld-err" data-err="names" hidden></p>`) + '</div>'
+    + `<fieldset class="fp-field wide"><legend>Giới tính</legend><div class="fp-seg2" role="radiogroup">
       <label class="fp-seg-o"><input type="radio" name="sex" value="m" ${v.sex === 'm' ? 'checked' : ''}>Nam</label>
-      <label class="fp-seg-o"><input type="radio" name="sex" value="f" ${v.sex === 'f' ? 'checked' : ''}>Nữ</label></div></fieldset>`;
-  }
-  if (id === 'gd') {
-    // Table-backed families: parents and spouses are edited only in Quan hệ (their values stay in the state, unchanged).
-    const tableRel = S.relOf(st.p?.fam || st.fam || S.curFamily()).source === 'table';
-    return tableRel ? '<p class="sub wide">Cha mẹ, vợ/chồng và con sửa ở mục Quan hệ trên hồ sơ.</p>'
-      + fpIn('married', 'Năm cưới', v) + `<div class="fp-2col wide"><div class="fp-au fld-w" data-au="gen"></div><div class="fp-au fld-w" data-au="thu"></div></div>`
-      : fpPickBox(st) + '<div data-oth-host></div>' + fpIn('spouse', 'Vợ/chồng', v, true) + fpIn('married', 'Năm cưới', v)
-      + `<div class="fp-2col wide"><div class="fp-au fld-w" data-au="gen"></div><div class="fp-au fld-w" data-au="thu"></div></div>`;
-  }
-  if (id === 'sinh') {
-    return `<div class="fp-2col wide">${fpW('birth_smart', false, `<label class="fld">Ngày sinh<input name="birth_smart" value="${fpE(v.birth_smart)}" inputmode="numeric" autocomplete="off" placeholder="5/3/1963 · 3/1963 · 1963"></label>`)}<div class="fp-au fld-w" data-au="birth_lunar"></div></div>`
-      + ((suggest && !S.isMember()) ? '<p class="sub wide">Ngày đầy đủ chỉ thành viên xem được. Bạn có thể góp ý ngày sinh đầy đủ.</p>' : '')
-      + fpIn('birth_place', 'Nơi sinh', v, true);
-  }
-  if (id === 'mat') {
-    const dead = v.dead === 'on';
-    return `<label class="fp-switch wide"><input type="checkbox" name="dead" role="switch" ${dead ? 'checked' : ''}><span>Đã khuất</span></label>`
-      + `<div class="fp-death wide" data-death data-on="${dead ? '1' : ''}">${dead ? fpDeath(st) : ''}</div>`;
-  }
-  if (id === 'noi') return fpIn('place', 'Nơi sống', v) + fpIn('job', 'Nghề', v) + fpIn('religion', 'Tôn giáo', v);
-  if (id === 'lien') {
-    return ctEditorHtml(st)
-      + fpW('contact_public', true, `<label class="fld">Hiện liên hệ công khai?<select name="contact_public"><option value="" ${v.contact_public !== 'yes' ? 'selected' : ''}>Không</option><option value="yes" ${v.contact_public === 'yes' ? 'selected' : ''}>Có</option></select></label>`);
-  }
-  // ghi
-  const photo = `<div class="fld-w wide"><div class="fld">Ảnh<div class="phup">${v.photo ? `<img src="${fpE(v.photo)}" alt="">` : ''}<input name="photo" value="${fpE(v.photo)}" placeholder="Dán link ảnh${suggest ? '' : ' hoặc chọn ảnh'}">${suggest ? '' : '<label class="btn gh sm">Chọn ảnh<input type="file" accept="image/*" hidden data-photo></label>'}</div>${suggest ? '' : '<span class="sub" data-photomsg></span>'}</div></div>`;
-  return photo + fpIn('note', 'Ghi chú', v, true) + fpIn('verify', 'Cần xác minh', v, true) + fpIn('source', 'Nguồn', v, true);
+      <label class="fp-seg-o"><input type="radio" name="sex" value="f" ${v.sex === 'f' ? 'checked' : ''}>Nữ</label></div></fieldset>`
+    + (tableRel ? '<p class="sub wide">Cha mẹ, vợ/chồng và con sửa ở mục Quan hệ trên hồ sơ.</p>' : fpPickBox(st))
+    + fpDateField('birth_smart', 'Ngày sinh', 'birth_lunar', st)
+    + ((suggest && !S.isMember()) ? '<p class="sub wide">Ngày đầy đủ chỉ thành viên xem được. Bạn có thể góp ý ngày sinh đầy đủ.</p>' : '')
+    + `<label class="fp-switch wide"><input type="checkbox" name="dead" role="switch" ${dead ? 'checked' : ''}><span>Đã khuất</span></label>`
+    + `<div class="fp-death wide" data-death data-on="${dead ? '1' : ''}"${dead ? '' : ' hidden'}>${dead ? fpDeath(st) : ''}</div>`
+    + (st.keys.has('contacts') ? ctEditorHtml(st) : '');
 }
-// Blocks of the form. Only-mode draws a plain list of its fields; otherwise one accordion item per section (the closed ones are empty).
+// The rare fields behind "Thêm chi tiết". A field with a part label shows in the closed summary when it holds a value.
+function fpFoldBody(st) {
+  const v = st.v; const table = S.relOf(st.p?.fam || st.fam || S.curFamily()).source === 'table';
+  const inP = (k, label, part, wide = false, extra = '') => fpW(k, wide, `<label class="fld"${part ? ` data-disc-part="${fpE(part)}"` : ''}>${esc(label)}<input name="${k}" value="${fpE(v[k])}" autocomplete="off" ${extra}></label>`);
+  const photo = `<div class="fld-w wide"><div class="fld">Ảnh<div class="phup">${v.photo ? `<img src="${fpE(v.photo)}" alt="">` : ''}<input name="photo" value="${fpE(v.photo)}" placeholder="Dán link ảnh${st.suggest ? '' : ' hoặc chọn ảnh'}">${st.suggest ? '' : '<label class="btn gh sm">Chọn ảnh<input type="file" accept="image/*" hidden data-photo></label>'}</div>${st.suggest ? '' : '<span class="sub" data-photomsg></span>'}</div></div>`;
+  return `<div class="fgrid">${inP('name_han', 'Tên chữ Hán (tùy chọn)', FORMS_VI.han_short, true, 'lang="zh-Hant" placeholder="Nhập chữ Hán"')}`
+    + (table ? '' : inP('spouse', 'Vợ/chồng', 'Vợ/chồng', true) + '<div data-oth-host></div>')
+    + inP('married', 'Năm cưới', 'Năm cưới', false)
+    + `<div class="fp-2col wide"><div class="fp-au fld-w" data-au="gen"></div><div class="fp-au fld-w" data-au="thu"></div></div>`
+    + `<div class="fp-au fld-w wide" data-au="birth_lunar"></div><div class="fp-au fld-w wide" data-au="death_lunar"${v.dead === 'on' ? '' : ' hidden'}></div>`
+    + inP('gio_lunar', 'Ngày giỗ (ÂL), nếu khác ngày mất', FORMS_VI.gio_short, true)
+    + inP('burial', 'Nơi an táng', 'Nơi an táng', true)
+    + inP('birth_place', 'Nơi sinh', 'Nơi sinh', true)
+    + inP('place', 'Nơi sống', 'Nơi sống', false)
+    + inP('job', 'Nghề', 'Nghề', false)
+    + inP('religion', 'Tôn giáo', 'Tôn giáo', false)
+    + photo
+    + inP('note', 'Ghi chú', 'Ghi chú', true)
+    + inP('verify', 'Cần xác minh', 'Cần xác minh', true)
+    + inP('source', 'Nguồn', 'Nguồn', true) + '</div>';
+}
+// The fold opens by itself when a field in it holds a value (an edit or a suggestion of a person who has one).
+const FP_FOLD = new Set(['name_han', 'spouse', 'married', 'other_parent', 'gio_lunar', 'burial', 'birth_place', 'place', 'job', 'religion', 'photo', 'note', 'verify', 'source', 'gen', 'thu', 'birth_lunar', 'death_lunar']);
+// A stored lunar that the date does not give (typed by someone, or a lunar with no exact date) opens the fold for it.
+function lunarTyped(st, k) {
+  const stored = String(st.d[`${k}_lunar`] ?? '').trim(); if (!stored) return false;
+  const sol = parseSmartDate(String(st.v[`${k}_smart`] ?? ''));
+  if (!sol.ok || sol.kind !== 'full') return true;
+  return stored !== lunarOf(sol.day, sol.month, +sol.year).stored;
+}
+function fpFoldOpen(st) {
+  return foldHasValue(st.v, S.relOf(st.p?.fam || st.fam || S.curFamily()).source === 'table') || lunarTyped(st, 'birth') || (st.v.dead === 'on' && lunarTyped(st, 'death'));
+}
+// Blocks of the form. Only-mode draws a plain list of its fields; otherwise the essentials, the events section (existing people),
+// the "Thêm chi tiết" fold, then the suggestion cards.
 function fpSections(st) {
   if (st.only) return `${card(`<div class="fgrid">${st.only.map((k) => fpIn(k, FL2(k), st.v, FP_WIDE.includes(k))).join('')}</div>`, { tag: 'section', cls: 'fp-sec' })}`;
-  const sec = (id, title) => {
-    const open = !!st.open[id];
-    if (open) st.rendered.add(id);
-    return accItem({ id, title, open, body: open ? `<div class="fgrid">${fpBody(st, id)}</div>` : '' });
-  };
-  const ids = [['ten', 'Tên'], ['gd', 'Gia đình'], ['sinh', 'Sinh'], ['mat', 'Mất'], ['noi', 'Nơi sống & nghề'], ['ghi', 'Ghi chú & nguồn']];
-  if (st.p && !st.patch) ids.splice(ids.length - 1, 0, ['su', 'Sự kiện & câu chuyện']); // events and stories: members' and editors' people (not new people)
-  if (S.isMember()) ids.push(['lien', 'Liên hệ']); // Liên hệ: members and above only (guests never see or send contact fields)
-  let out = `<div class="acc-group">${ids.map(([id, t]) => sec(id, t)).join('')}</div>`;
+  let out = `<div class="fgrid fp-main">${fpEssentials(st)}</div>`;
+  if (st.p && !st.patch) out += `<div class="acc-group">${accItem({ id: 'su', title: 'Sự kiện & câu chuyện' })}</div>`; // events and stories: members' and editors' people (not new people)
+  out += `<div class="fp-fold" data-fp-fold>${moreFold(FORMS_VI.more, fpFoldBody(st), fpFoldOpen(st), { disc: true })}</div>`;
   if (st.patch) out += `${card(`<h3 class="fp-h">Ghi chú</h3><div class="fgrid"><label class="fld wide">Ghi chú (cho quản trị)<input name="suggest_note" maxlength="1000" autocomplete="off" value="${fpE(st.patch.note)}"></label></div>`, { tag: 'section', cls: 'fp-sec' })}`;
   if (st.contrib) out += `${card(`<h3 class="fp-h">Người góp ý</h3><div class="fgrid">
       <label class="fld">Tên của bạn<input name="by_name" maxlength="80" autocomplete="name"></label>
@@ -2497,6 +2549,7 @@ function fpSections(st) {
 // The drawn inputs into the state (the closed panels keep theirs). Every change goes through here before it is read.
 function fpSync(form, st) {
   if (st.keys.has('contacts') && form.querySelector('[data-ct-list]')) st.v.contacts = JSON.stringify(ctReadDom(form));
+  if (st.keys.has('names') && form.querySelector('[data-sn-list]')) st.v.names = JSON.stringify(snReadDom(form, st));
   for (const el of form.querySelectorAll('input[name],select[name]')) {
     const n = el.name; if (!st.keys.has(n) || el.type === 'file') continue;
     if (el.type === 'checkbox') st.v[n] = el.checked ? 'on' : '';
@@ -2521,13 +2574,16 @@ function fpRender(form, st, id) {
   const panel = document.getElementById('acc-p-' + id); if (!panel) return;
   st.rendered.add(id);
   panel.innerHTML = `<div class="fgrid">${fpBody(st, id)}</div>`;
-  if (id === 'gd') fpOtherOpts(form, st, false);
 }
-// Opens an accordion section (drawing it first) by id: used for errors and for conflicts in a closed section.
-function fpOpen(form, st, id) { fpRender(form, st, id); accToggle(id, true); }
+// Opens the "Thêm chi tiết" fold: an error or a conflict in one of its fields must be on the page.
+function fpOpenFold(form) { const d = form.querySelector('[data-fp-fold] > details'); if (d) d.open = true; }
 // The death block exists only for a deceased person (its inputs are not in the page otherwise).
 function fpPaintDeath(form, st, dead) {
   const host = form.querySelector('[data-death]'); if (!host) return;
+  host.hidden = !dead; // a living person has no empty block (no gap in the grid)
+  // the lunar chip of a living person is not rendered at all (a hidden host with a "Sửa" button fails the hidden-controls audit)
+  const dl = form.querySelector('[data-au="death_lunar"]');
+  if (dl) { dl.hidden = !dead; if (dead) fpPaintAu(form, st, 'death_lunar'); else { dl.dataset.h = ''; dl.innerHTML = ''; } }
   const want = dead ? '1' : '';
   if (host.dataset.on === want) return;
   host.dataset.on = want; host.innerHTML = dead ? fpDeath(st) : '';
@@ -2559,8 +2615,13 @@ function fpResolve(form, st) {
     if (bad) err('contacts', `Dòng ${bad[1] + 1}: ${contactError(bad[0])}`);
     put('contacts', cleanList(rows));
   }
-  put('gio_lunar', dead ? sv('gio_lunar') : '');
-  put('burial', dead ? sv('burial') : '');
+  if (has('names')) {
+    const list = namesClean(snItems(st)); const bad = namesError(list);
+    if (bad) err('names', bad.replace(/^names: /, ''));
+    put('names', list);
+  }
+  put('gio_lunar', sv('gio_lunar'));
+  put('burial', sv('burial'));
   const parentId = sv('parent');
   put('parent', parentId);
   put('other_parent', parentId ? sv('other_parent') : '');
@@ -2600,7 +2661,11 @@ function fpResolve(form, st) {
     }
     if (sol.kind === 'full') {
       const lu = lunarOf(sol.day, sol.month, +sol.year);
-      put(k, lu.stored); eff[k] = { raw: lu.stored, text: lu.label, auto: true, hint: 'tự tính' };
+      // a stored lunar that is not the computed one of the record's saved date was typed: it is kept (old data keeps saving)
+      const orig = parseSmartDate(String(d[k === 'birth_lunar' ? 'birth_date' : 'death_date'] || ''));
+      const origLu = orig.ok && orig.kind === 'full' ? lunarOf(orig.day, orig.month, +orig.year).stored : null;
+      if (storedFallback && storedFallback !== origLu) { put(k, storedFallback); eff[k] = { raw: storedFallback, text: storedFallback, auto: false, hint: 'sửa tay' }; }
+      else { put(k, lu.stored); eff[k] = { raw: lu.stored, text: lu.label, auto: true, hint: 'tự tính', computed: true }; }
     } else {
       put(k, storedFallback ?? ''); eff[k] = storedFallback ? { raw: storedFallback, text: storedFallback, auto: true, hint: okHint } : { raw: '', text: 'Nhập ngày đủ để tự tính', ph: true, auto: true, hint: '' };
     }
@@ -2623,7 +2688,7 @@ function fpShowErrs(form, errs) {
 
 // One auto chip (Đời, Thứ, Âm lịch): the value and its origin, or the override editor after "Sửa".
 function fpPaintAu(form, st, k, force = false) {
-  const host = form.querySelector(`[data-au="${k}"]`); if (!host) return;
+  const host = form.querySelector(`[data-au="${k}"]`); if (!host || host.hidden) return; // a hidden host is not painted (see fpPaintDeath)
   const a = st.A[k];
   if (a && a.open && !force) return; // the open editor keeps what is typed
   const e = st.eff[k] || {};
@@ -2709,35 +2774,25 @@ function fpLive(form, st) {
   form.querySelectorAll('[data-ov]').forEach((el) => { const k = el.dataset.ov; if (st.A[k]) st.A[k].v = el.value; });
   const r = fpResolve(form, st);
   if (!st.only) {
-    for (const k of Object.keys(r.errs)) if (FP_SEC_OF[k]) fpOpen(form, st, FP_SEC_OF[k]); // an error inside a closed section opens it
+    if (Object.keys(r.errs).some((k) => FP_FOLD.has(k))) fpOpenFold(form); // an error inside the fold opens it
     fpPaintDeath(form, st, r.dead);
   }
   for (const k of ['gen', 'thu', 'birth_lunar', 'death_lunar']) fpPaintAu(form, st, k);
+  for (const k of ['birth_lunar', 'death_lunar']) { // the hint under the date: the computed lunar, only for an exact date
+    const h = form.querySelector(`[data-lunar-hint="${k}"]`); if (!h) continue;
+    const e = st.eff[k]; const txt = e && e.computed ? FORMS_VI.lunar_hint.replace('{v}', e.raw) : '';
+    if (h.textContent !== txt) h.textContent = txt;
+    h.hidden = !txt;
+  }
   fpShowErrs(form, r.errs);
   if (!st.only) fpSummaries(form, st, r);
   return r;
 }
-// One-line summary in each accordion header; "Chưa có" in grey when the section is empty.
-const FP_SEC_OF = { contacts: 'lien', name: 'ten', name_han: 'ten', alias: 'ten', title_name: 'ten', parent: 'gd', other_parent: 'gd', spouse: 'gd', married: 'gd', gen: 'gd', thu: 'gd',
-  birth_smart: 'sinh', birth_lunar: 'sinh', birth_place: 'sinh', death_smart: 'mat', death_lunar: 'mat', gio_lunar: 'mat', burial: 'mat' };
-function fpSummaries(form, st, r) {
-  const v = r.vals; const par = v.parent ? M.byId.get(v.parent) : null;
-  const year = v.died || v.death_date;
-  const cnt = (keys) => keys.filter((k) => v[k]).length;
-  const sums = {
-    ten: [v.name, v.alias || v.title_name].filter(Boolean).join(' · '),
-    gd: [par ? 'Cha/mẹ ' + par.data.name : '', v.gen ? 'đời ' + v.gen : '', v.thu ? 'Thứ ' + v.thu : ''].filter(Boolean).join(' · '),
-    sinh: [v.birth_date || v.born ? 'Sinh ' + (v.birth_date || v.born) : '', v.birth_place].filter(Boolean).join(' · '),
-    mat: r.dead ? ['Đã khuất', year].filter(Boolean).join(' ') : '',
-    noi: [v.place, v.job].filter(Boolean).join(' · '),
-    ghi: cnt(['photo', 'note', 'verify', 'source']) ? `${cnt(['photo', 'note', 'verify', 'source'])} mục` : '',
-    su: evSumText(st),
-    lien: ctItems(st).filter((c) => String(c.value || '').trim()).length ? `${ctItems(st).filter((c) => String(c.value || '').trim()).length} mục` : '',
-  };
-  for (const [k, txt] of Object.entries(sums)) {
-    const el = form.querySelector(`[data-acc-sum="${k}"]`); if (!el) continue;
-    el.textContent = txt || 'Chưa có'; el.classList.toggle('muted', !txt);
-  }
+// The events section's one-line summary in its accordion header; "Chưa có" in grey when it is empty.
+function fpSummaries(form, st) {
+  const el = form.querySelector('[data-acc-sum="su"]'); if (!el) return;
+  const txt = evSumText(st);
+  el.textContent = txt || 'Chưa có'; el.classList.toggle('muted', !txt);
 }
 
 // ---------- drafts: saved on this device 800 ms after a change, offered back on reopen; never sent by themselves ----------
@@ -2799,15 +2854,17 @@ function fpRestore(form, st, dr) {
   if (Array.isArray(dr.ev)) { st.evq = dr.ev; const sec = document.getElementById('acc-p-su'); if (sec && st.rendered.has('su')) evAfterChange(st); }
   fpPushDom(form, changed);
   if (names.includes('contacts')) ctRedraw(form, st);
+  if (names.includes('names')) snRedraw(form, st);
   const box = form.querySelector('.fp-pick'); if (box && names.includes('parent')) box.outerHTML = fpPickBox(st);
   fpOtherOpts(form, st, false);
   for (const k of FP_AUK) fpPaintAu(form, st, k, true);
+  discRefresh(form); // the values were set by script (no input event): the fold's summary is refreshed here
   // conflict: the record changed on the server after the draft was made; the draft's value is kept and marked
   const cur = st.p ? (M.byId.get(st.p.id)?.data || {}) : {};
   for (const n of names) {
     const keys = FP_MAP[n] || [n];
     if (!keys.some((k) => baseVal(cur, k) !== String(dr.base?.[k] ?? ''))) continue;
-    if (FP_SEC_OF[n]) fpOpen(form, st, FP_SEC_OF[n]); // the marked field must be on the page
+    if (FP_FOLD.has(n)) fpOpenFold(form); // the marked field must be on the page
     const el = form.querySelector(`[name="${n}"]`); const w = el?.closest('.fld-w') || el?.parentElement;
     if (w && !w.querySelector('.fld-conf')) w.insertAdjacentHTML('beforeend', '<p class="fld-conf">Đã có người sửa</p>');
   }
@@ -2843,10 +2900,10 @@ function formPage(arg) {
   const only = st0?.only || null;
   const st = { p, patch, suggest, d, only, title: st0?.title, base: inferThuBase(M.ps.filter(famPeople)), fam, inAll, fams, famPeople,
     A: { gen: null, thu: null, birth_lunar: null, death_lunar: null }, eff: {}, contrib: suggest && !patch && !S.isMember(),
-    open: { ten: true, gd: !p && !patch, ...(st0?.open ? { [st0.open]: true } : {}) },  // Tên open; Gia đình open when adding a person; others collapsed; st0.open: the section a link asks for
     serverD: patch ? serverD : d, mode: patch ? 'patch' : suggest ? 'suggest' : 'edit', autoDraft: !!st0?.autoDraft, draftHold: true,
     draftKey: draftKeyOf(fam, suggest, p, patch),
     keys: fpKeys(only, famMember), rendered: new Set(), evq: [], evEd: null }; // every field's state (st.v) is set below; closed panels draw from it; evq: pending events and stories
+  if (!suggest && !only) st.keys.add('names'); // Họ khác rows: the editors' own form only (a suggestion does not change marks)
   st.v = fpInitVals(st);
   const name = p ? p.data.name : (d.name || 'Người mới');
   const h = patch || suggest ? 'Góp ý' : view === 'sua' ? 'Sửa thông tin' : 'Thêm người';
@@ -2866,10 +2923,11 @@ function formPage(arg) {
     </form>
     <div class="fp-bar" role="toolbar" aria-label="Thao tác">
       <span class="fp-status" id="fpstat" role="status" aria-live="polite"></span>
-      <button type="button" class="btn gh" data-fp-cancel>Huỷ</button>
+      <button type="button" class="btn gh" data-fp-cancel>Hủy</button>
       <button type="submit" form="fpform" class="btn" id="fpsave">${esc(saveLbl)}</button>
     </div>`;
   const form = $('#fpform');
+  discWire(form); // the fold's closed summary follows the fields
   // guest sign-in note: Đăng nhập opens the sign-in dialog; Tiếp tục góp ý hides the note
   const gNote = main.querySelector('.fp-guest');
   if (gNote) gNote.addEventListener('click', (e) => { if (e.target.closest('[data-fp-login]')) loginDialog(); else if (e.target.closest('[data-fp-guest-x]')) gNote.hidden = true; });
@@ -2888,6 +2946,8 @@ function formPage(arg) {
   form.addEventListener('click', (e) => {
     if (evFormClick(form, st, e)) return; // the events and stories section
     if (e.target.closest('[data-ct-add]')) { ctMutate(form, st, (l) => l.push({ type: 'phone', value: '' }), ctItems(st).length, 'val'); return; }
+    if (e.target.closest('[data-sn-add]')) { snMutate(form, st, (l) => l.push({ type: 'changed', surname: '' }), snItems(st).length); return; }
+    const sdel = e.target.closest('[data-sn-del]'); if (sdel) { const i = Number(sdel.dataset.snDel); snMutate(form, st, (l) => l.splice(i, 1), -1); return; }
     const cdel = e.target.closest('[data-ct-del]'); if (cdel) { const i = Number(cdel.dataset.ctDel); ctMutate(form, st, (l) => l.splice(i, 1), -1); return; }
     if (e.target.closest('[data-ct-import]')) {
       openContactImport({ person: { id: st.p?.id || null, name: st.v.name || '' }, onPick: (items) => ctMutate(form, st, (l) => {
@@ -2898,7 +2958,7 @@ function formPage(arg) {
     // a closed panel is drawn when it is opened (the document handler opens it after this one)
     const ab = e.target.closest('[data-acc-btn]'); if (ab && !st.rendered.has(ab.dataset.accBtn)) { fpRender(form, st, ab.dataset.accBtn); fpLive(form, st); }
     const exp = e.target.closest('[data-expand]');
-    if (exp) { exp.closest('.fp-more').innerHTML = `<div class="fp-2col">${fpIn('alias', 'Tên khác', st.v)}${fpIn('title_name', 'Tên húy / tự / hiệu', st.v)}</div>`; form.querySelector('[name="alias"]')?.focus(); return; }
+    if (exp) { exp.closest('[data-alias-host]').innerHTML = `<div class="fp-2col">${fpIn('alias', 'Tên khác', st.v)}${fpIn('title_name', 'Tên húy / tự / hiệu', st.v)}</div>`; form.querySelector('[name="alias"]')?.focus(); return; }
     if (e.target.closest('[data-pk-clear]')) { fpPickSet(form, st, ''); form.querySelector('.pk-q')?.focus(); return; }
     const ed = e.target.closest('[data-au-edit]');
     if (ed) { const k = ed.dataset.auEdit; st.A[k] = { open: true, v: st.eff[k]?.raw ?? '' }; fpPaintAu(form, st, k, true); form.querySelector(`[data-ov="${k}"]`)?.focus(); return; }

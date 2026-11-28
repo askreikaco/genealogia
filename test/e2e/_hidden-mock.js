@@ -43,6 +43,9 @@ const AUDIT = () => {
   const out = [];
   for (const el of document.querySelectorAll(sel)) {
     if (el.closest('dialog:not([open])')) continue;
+    // a file picker is a hidden input inside its visible label (the label is the control, a button): not an invisible control.
+    // The person form draws its photo picker inside Thêm chi tiết (a closed details keeps its fields in the DOM).
+    if (el.matches('input[type=file]') && el.closest('label') && getComputedStyle(el.closest('label')).display !== 'none') continue;
     let hidden = false;
     for (let a = el; a && !hidden; a = a.parentElement) { const s = getComputedStyle(a); if (s.display === 'none' || s.visibility === 'hidden') hidden = true; }
     if (hidden) out.push(`${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : ''} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 40)}"`);
