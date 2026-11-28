@@ -608,6 +608,18 @@ app.get('/api/events', H(async (req, res) => {
   res.json({ hidden: false, items: await EV.listEvents(pool, view.famId, p.id), stories: await EV.listStories(pool, view.famId, p.id), role: w.role });
 }));
 
+// Custom event names (Khác) the family already uses, for the suggestions in the event form: most used first. Only the
+// events the viewer may see (privacy by person; a branch reads its own people), so a hidden name never comes back.
+app.get('/api/events/titles', H(async (req, res) => {
+  const f = await famOf(req); const w = await who(req, f.id);
+  if (!canRead(f, w)) throw new HttpError(403, 'Dòng họ này là riêng tư.');
+  const view = await BRN.viewOf(pool, f, canSeePrivate(w));
+  const R = await EV.rules();
+  res.set('Cache-Control', 'no-store');
+  res.json({ titles: await EV.titleSuggestions(pool, view.famId, (pid, data) => (!view.ids || view.ids.includes(pid))
+    && R.canSeeEventsOf(data, { member: canSeePrivate(w), familyReadable: true })) });
+}));
+
 // One editor write: idempotent by op_id, one transaction, the author is the signed-in name (history).
 async function evWrite(req, res, next, fn) {
   const f = req.fam; const w = await who(req, f.id);

@@ -6,7 +6,8 @@ import { sourcesAreaHtml, readCites, wireSources } from './sources-ui.js';
 import { SRC_VI } from './sources-vi.js';
 import { toolbar, ltags, fpanel, cic, addBtn, tag, card } from './ui.js';
 import { EVENT_TYPES, EVENT_TYPE_KEYS, parseEventDate, formatEventDate, sortEvents, eventDays, yearOfDays,
-  birthIso, ageAt, stageOf, STAGES, autoSummary } from './events.js';
+  birthIso, ageAt, stageOf, STAGES, autoSummary, eventTitle } from './events.js';
+import { EVT_VI } from './ev-title-vi.js';
 
 const P = (d) => `<path d="${d}"/>`;
 // 24-unit stroke icons for the event types (one per type icon key in events.js).
@@ -39,7 +40,7 @@ const HEAD = {
   hoc: (e) => (e.place ? `Học tại ${e.place}` : 'Học hành'), nghe: (e) => (e.place ? `Làm việc tại ${e.place}` : 'Nghề nghiệp'),
   quan_ngu: (e) => (e.place ? `Nhập ngũ tại ${e.place}` : 'Quân ngũ'), thanh_tich: () => 'Thành tích',
   ton_giao: () => 'Tôn giáo', mat: (e) => (e.place ? `Mất ở ${e.place}` : 'Mất'), an_tang: (e) => (e.place ? `An táng ở ${e.place}` : 'An táng'),
-  khac: (e) => (e.description ? e.description.split('\n')[0].slice(0, 80) : 'Sự kiện'),
+  khac: (e) => eventTitle(e) || (e.description ? e.description.split('\n')[0].slice(0, 80) : 'Sự kiện'),
 };
 export const headline = (e) => (e.derived ? e.label : (HEAD[e.type] ? HEAD[e.type](e) : typeLabel(e.type)));
 const firstLine = (s) => String(s || '').split('\n')[0];
@@ -234,12 +235,15 @@ export function lifeStoriesHtml({ name, events, summary, stories, canEdit, canAd
 
 // ---- event editor (dialog on the timeline, and inline in the person form). Values live in data-f attributes. ----
 export function evEditorHtml(item = {}, { people = [], persons = [], id = '', page = false } = {}) {
-  const v = { type: 'sinh', date_text: '', place: '', place_new: '', description: '', lunar: '', ...item };
+  const v = { type: 'sinh', date_text: '', place: '', place_new: '', description: '', lunar: '', title: '', ...item };
   if (item.date_kind && !v.date_text) v.date_text = formatEventDate(item);
   const chips = people.map((pid) => personChip(pid, persons)).join('');
   const photos = (item.photos || []).map((u) => photoRow(u)).join('');
   return `<div class="evx" data-evx data-id="${esc(id)}">
     <label class="fld">Loại sự kiện<select data-f="type">${EVENT_TYPE_KEYS.map((k) => `<option value="${k}" ${k === v.type ? 'selected' : ''}>${esc(typeLabel(k))}</option>`).join('')}</select></label>
+    <div class="evx-title" data-tt-wrap${v.type === 'khac' ? '' : ' hidden'}>
+      <label class="fld">${EVT_VI.title_label}<input data-f="title" value="${esc(v.title || '')}" maxlength="80" autocomplete="off" placeholder="${esc(EVT_VI.title_ph)}" data-tt-q></label>
+      <div class="pk-res" data-tt-res></div></div>
     <label class="fld">Thời gian<input data-f="date_text" value="${esc(v.date_text)}" autocomplete="off" placeholder="vd 1981, 3/1981, 1980–1981"></label>
     <p class="sub">Nhập năm, tháng/năm, hoặc “khoảng 1980”, “trước 1975”, “sau 1990”, “1980–1985”.</p>
     <label class="fld">Âm lịch (tuỳ chọn)<input data-f="lunar" value="${esc(v.lunar)}" autocomplete="off"></label>
@@ -270,7 +274,8 @@ export function readEvx(root) {
   if (dp.error) return { error: dp.error, field: 'date_text' };
   const people = [...root.querySelectorAll('[data-chips] [data-pid]')].map((el) => el.dataset.pid);
   const sources = readCites(root);
-  const item = { type: g('type'), date_text: g('date_text'), date_kind: dp.kind || null, date_from: dp.from || null, date_to: dp.to || null,
+  const type = g('type');
+  const item = { type, title: type === 'khac' ? g('title') : '', date_text: g('date_text'), date_kind: dp.kind || null, date_from: dp.from || null, date_to: dp.to || null,
     lunar: g('lunar'), place: g('place'), place_new: g('place_new'), description: root.querySelector('[data-f="description"]').value.trim(),
     people, sources, photos: [...root.querySelectorAll('[data-ph]')].map((el) => el.dataset.ph), is_preferred: true };
   return { item };
@@ -278,9 +283,36 @@ export function readEvx(root) {
 
 // Wires a rendered editor: chips, people picker, sources. persons: [{id, name, years}]; opts: { fam } (the family whose
 // sources the picker offers: sources-ui.js).
+// The family's custom names (Khác) with their use counts, most used first; [] when offline or refused.
+async function titlesOf(fam) {
+  try {
+    const r = await fetch(`/api/events/titles?family=${encodeURIComponent(fam)}`, { cache: 'no-store' });
+    if (!r.ok) return [];
+    return (await r.json()).titles || [];
+  } catch { return []; }
+}
+// Name suggestions under the field "Tên sự kiện": the names already used in the family, filtered by what is typed.
+// Shown when the field is focused or typed in; a tap fills the field. Only for type Khác (the field is hidden otherwise).
+function wireTitles(root, fam) {
+  const wrap = root.querySelector('[data-tt-wrap]'); const q = root.querySelector('[data-tt-q]'); const res = root.querySelector('[data-tt-res]');
+  const typeSel = root.querySelector('[data-f="type"]');
+  let all = [];
+  const paint = () => {
+    const term = fold(q.value.trim()); const hits = all.filter((t) => !term || fold(t.title).includes(term)).slice(0, 8);
+    res.innerHTML = hits.length ? `<p class="sub">${esc(EVT_VI.title_used)}</p>` + hits.map((t) => `<button type="button" class="pk-opt" data-tt-pick="${esc(t.title)}">${esc(t.title)}</button>`).join('') : '';
+  };
+  q.addEventListener('input', paint);
+  q.addEventListener('focus', paint);
+  q.addEventListener('blur', () => setTimeout(() => { res.innerHTML = ''; }, 150));
+  res.addEventListener('mousedown', (e) => e.preventDefault()); // keep the field focused when a suggestion is tapped
+  res.addEventListener('click', (e) => { const b = e.target.closest('[data-tt-pick]'); if (!b) return; q.value = b.dataset.ttPick; res.innerHTML = ''; q.focus(); });
+  typeSel?.addEventListener('change', () => { wrap.hidden = typeSel.value !== 'khac'; if (!wrap.hidden) q.focus(); });
+  if (fam) titlesOf(fam).then((list) => { all = list; if (document.activeElement === q) paint(); });
+}
 export function wireEvx(root, persons, opts = {}) {
   const res = root.querySelector('[data-pk-res]'); const q = root.querySelector('[data-pk-q]');
   const chips = root.querySelector('[data-chips]');
+  if (root.querySelector('[data-tt-wrap]')) wireTitles(root, opts.fam);
   const paint = () => {
     const term = q.value.trim(); const have = new Set([...chips.querySelectorAll('[data-pid]')].map((x) => x.dataset.pid));
     const hits = term ? searchPeople(persons.filter((p) => !have.has(p.id)), term, { limit: 8 }) : [];

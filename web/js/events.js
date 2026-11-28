@@ -10,6 +10,7 @@
 // mat DEAT, an_tang BURI, khac EVEN.
 
 import { parseReignYear } from './events-history.js';
+import { EVT_VI } from './ev-title-vi.js';
 
 export const EVENT_TYPES = {
   sinh: { label: 'Sinh', icon: 'sprout', gedcom: 'BIRT' },
@@ -32,6 +33,7 @@ export const DATE_KIND_LABEL = { exact: '', about: 'khoảng', before: 'trước
 
 const ISO_RE = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/;
 const MAX_TEXT = 2000;
+const MAX_TITLE = 80; // Tên sự kiện: a custom name for an event of type 'khac' (GEDCOM EVEN + TYPE)
 
 // ---- ISO partial dates ----
 export function parseIso(s) {
@@ -159,6 +161,16 @@ export function isoOfDied(s) {
 }
 
 // ---- privacy: by person. A living person's events are shown to members only; a deceased person's to anyone who can read the family ----
+// The custom name of an event, shown in place of "Khác": only for type 'khac', trimmed; '' otherwise.
+export const eventTitle = (e) => (e && e.type === 'khac' && typeof e.title === 'string' ? e.title.trim() : '');
+// Distinct custom names with how often each is used, most used first (then A–Z). Rows: { type, title }. The caller
+// passes only the rows the viewer may see (family, privacy); this only counts.
+export function usedTitles(rows) {
+  const n = new Map();
+  for (const r of rows) { const t = eventTitle(r); if (t) n.set(t, (n.get(t) || 0) + 1); }
+  return [...n].map(([title, uses]) => ({ title, uses })).sort((a, b) => b.uses - a.uses || a.title.localeCompare(b.title, 'vi'));
+}
+
 export const isLiving = (d) => !(d.living === 'dead' || !!(d.died || d.death_lunar || d.gio_lunar));
 export function canSeeEventsOf(personData, { member, familyReadable }) {
   if (!familyReadable) return false;
@@ -177,6 +189,7 @@ export function validateEvent(e) {
       if (startDays(e.date_from) > endDays(e.date_to)) return 'Ngày đầu phải trước ngày cuối.';
     } else if (e.date_to) return 'Chỉ khoảng ngày mới có ngày cuối.';
   }
+  if (e.title !== undefined && e.title !== null && (typeof e.title !== 'string' || e.title.trim().length > MAX_TITLE)) return EVT_VI.title_long;
   for (const k of ['date_text', 'lunar', 'place', 'place_new', 'description']) {
     if (e[k] !== undefined && e[k] !== null && (typeof e[k] !== 'string' || e[k].length > MAX_TEXT)) return `${k} quá dài hoặc sai kiểu.`;
   }
@@ -230,7 +243,7 @@ export function autoSummary(name, events) {
       ton_giao: `Theo đạo${when ? ' từ ' + when : ''}.`,
       mat: `Mất${when ? ' ' + when.toLowerCase() : ''}${place}.`,
       an_tang: `An táng${place}.`,
-      khac: `${e.description ? e.description.split('\n')[0] : 'Sự kiện'}${when ? ' (' + when + ')' : ''}.`,
+      khac: `${eventTitle(e) || (e.description ? e.description.split('\n')[0] : 'Sự kiện')}${when ? ' (' + when + ')' : ''}.`,
     }[e.type];
     if (t) out.push(t.replace(/\s+\(\)/g, '').replace(/\s{2,}/g, ' ').replace(/\s+\./g, '.'));
   }

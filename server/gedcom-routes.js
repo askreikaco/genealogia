@@ -32,7 +32,7 @@ module.exports = function mountGedcom(app, deps) {
     if (doc.persons.length > MAX_PEOPLE) throw new HttpError(400, `Tệp có quá nhiều người (tối đa ${MAX_PEOPLE}).`);
     const { rows: persons } = await q.query('select id, data from persons where family_id = $1 and not deleted', [f.id]);
     const { rows: events } = await q.query(
-      'select id, person_id, type, date_kind, date_from, date_to, place, description, lunar from events where family_id = $1', [f.id]);
+      'select id, person_id, type, title, date_kind, date_from, date_to, place, description, lunar from events where family_id = $1', [f.id]);
     const { rows: stories } = await q.query('select person_id, kind, title, body from stories where family_id = $1', [f.id]);
     const { rows: sources } = await q.query('select id, title, url from sources where family_id = $1 and deleted_at is null', [f.id]);
     const table = await REL.isTable(q, f.id);
@@ -114,7 +114,7 @@ module.exports = function mountGedcom(app, deps) {
     const pick = (rs, key) => (ids ? rs.filter((r) => ids.has(r[key])) : rs);
     const { rows: persons } = await pool.query('select id, data from persons where family_id = $1 and not deleted order by id', [view.famId]);
     const { rows: events } = await pool.query(
-      'select id, person_id, type, date_kind, date_from, date_to, place, description, lunar, sources from events where family_id = $1', [view.famId]);
+      'select id, person_id, type, title, date_kind, date_from, date_to, place, description, lunar, sources from events where family_id = $1', [view.famId]);
     const { rows: stories } = await pool.query('select person_id, kind, title, body from stories where family_id = $1 order by created_at', [view.famId]);
     const { rows: sources } = await pool.query('select id, title, kind, author, year, url, note from sources where family_id = $1 and deleted_at is null order by lower(title), id', [view.famId]);
     const rel = view.rel || await REL.readRel(pool, f.id, true);

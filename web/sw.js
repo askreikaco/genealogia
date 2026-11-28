@@ -42,6 +42,7 @@ const SHELL = [
   '/js/events-ui.js',
   '/js/sources-ui.js',
   '/js/sources-vi.js',
+  '/js/ev-title-vi.js',
   '/js/gallery.js',
   '/js/gallery-ui.js',
   '/js/gallery-vi.js',

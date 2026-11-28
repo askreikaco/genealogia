@@ -315,7 +315,10 @@
       "paths": [
         "server/events.js",
         "web/js/events*.js",
+        "web/js/ev-title-vi.js",
+        "server/migrations/042_event_title.sql",
         "server/test/events*.test.js",
+        "server/test/event-title-*.test.js",
         "server/facts-events.js",
         "server/scripts/facts-to-events.js",
         "server/test/facts-events.test.js",
@@ -323,7 +326,8 @@
         "server/migrations/037_event_photos.sql"
       ],
       "e2e": [
-        "test/e2e/events*.test.js"
+        "test/e2e/events*.test.js",
+        "test/e2e/event-title.test.js"
       ]
     },
     "gallery": {

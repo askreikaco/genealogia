@@ -477,7 +477,9 @@ function buildExport({ R, family, persons, events = [], pc = [], cp = [], storie
 function writeEvent(lines, R, e, citeRef) {
   const tag = R.EVENT_TYPES[e.type]?.gedcom || 'EVEN';
   const desc = String(e.description || '').trim();
-  if (tag === 'EVEN') { tagLine(lines, 1, 'EVEN', desc); lines.push(`2 TYPE ${EVEN_LABEL[e.type] || 'Khác'}`); }
+  // a custom name (Khác: Tên sự kiện) is the TYPE of the EVEN; the other EVEN types keep their label
+  const name = R.eventTitle(e);
+  if (tag === 'EVEN') { tagLine(lines, 1, 'EVEN', desc); lines.push(`2 TYPE ${name ? name.replace(/\s+/g, ' ') : EVEN_LABEL[e.type] || 'Khác'}`); }
   else if (VALUE_TAGS.includes(tag)) tagLine(lines, 1, tag, desc || 'Y');
   else lines.push(`1 ${tag}`);
   if (e.date_kind) lines.push(`2 DATE ${gedDateOut(R, e.date_kind, e.date_from, e.date_to)}`);
@@ -589,12 +591,12 @@ function planImport(doc, ctx) {
       else if (norm(field, c) !== norm(field, inc) && !conflicts.some((k) => k.field === field)) conflicts.push({ field, current: c, incoming: inc });
     };
     const existing = m.target ? (evBy.get(m.target) || []) : [];
-    const evKey = (e) => [e.type, e.date_kind || '', e.date_from || '', e.date_to || '', String(e.place || '').trim(), String(e.description || '').trim()].join('|');
+    const evKey = (e) => [e.type, e.title || '', e.date_kind || '', e.date_from || '', e.date_to || '', String(e.place || '').trim(), String(e.description || '').trim()].join('|');
     const haveKeys = new Set(existing.map(evKey));
     const dateOf = (f) => (f.date && f.date.kind ? f.date : null);
-    const addEvent = (type, f, description) => {
+    const addEvent = (type, f, description, title = '') => {
       const date = dateOf(f);
-      const input = { type, date_kind: date ? date.kind : null, date_from: date ? date.from : null, date_to: date ? (date.to || null) : null,
+      const input = { type, title: title || null, date_kind: date ? date.kind : null, date_from: date ? date.from : null, date_to: date ? (date.to || null) : null,
         date_text: date ? R.formatEventDate({ date_kind: date.kind, date_from: date.from, date_to: date.to }) : (f.dateRaw || ''),
         place: f.place || '', description: description ?? f.notes.join('\n'), lunar: f.lunar || '',
         sources: (f.sources || []).filter((s) => s.title).map((s) => ({ title: s.title, ...(s.url ? { url: s.url } : {}), ...(s.quality ? { quality: s.quality } : {}),
@@ -667,7 +669,16 @@ function planImport(doc, ctx) {
       else if (f.tag === 'MARR') addEvent('cuoi', f);
       else if (f.tag === 'DIV') addEvent('ly_hon', f);
       else if (f.tag === 'EDUC') addEvent('hoc', f, descOf(f));
-      else if (f.tag === 'EVEN') addEvent(LABEL_TO_EVEN[String(f.type).toLowerCase()] || 'khac', f, descOf(f));
+      else if (f.tag === 'EVEN') {
+        // a TYPE that is one of the known labels keeps its type; any other TYPE is a custom event (khac) named by it
+        const t = String(f.type || '').replace(/\s+/g, ' ').trim();
+        const known = LABEL_TO_EVEN[t.toLowerCase()];
+        if (known) addEvent(known, f, descOf(f));
+        else {
+          if (t.length > 80) warnings.push(`${x.name}: tên sự kiện “${t.slice(0, 30)}…” dài quá 80 ký tự, được cắt bớt.`);
+          addEvent('khac', f, descOf(f), t.slice(0, 80));
+        }
+      }
     }
     const conflictFields = new Set(conflicts.map((c) => c.field));
     const fields = Object.keys(fill).filter((k) => !conflictFields.has(k));

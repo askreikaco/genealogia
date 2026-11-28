@@ -389,3 +389,46 @@ test('stories: the same story twice in one file is written once; a second summar
   assert.strictEqual(again.counts.stories_skipped, 2, 'both summaries in the file differ from the stored one');
   assert.ok(again.warnings.some((w) => w.includes('câu chuyện đời')));
 });
+
+// Custom event names (Khác: Tên sự kiện): exported as EVEN with TYPE = the name; read back as type khac with that
+// name; the known EVEN labels (Quân ngũ, Thành tích, Khác) keep their type. Round trip: export, then import adds nothing.
+test('custom name: a khac event with a name is EVEN with TYPE = the name; without one it is TYPE Khác', () => {
+  const fx = { persons: [{ id: 'P001', data: { name: 'Dương Văn Ất', sex: 'm', born: '1900' } }], pc: [], cp: [], stories: [], events: [
+    { id: 'E1', person_id: 'P001', type: 'khac', title: 'Đỗ tú tài', date_kind: 'exact', date_from: '1930', date_to: null, place: 'Nam Định', description: 'Khoa thi Hương', lunar: '', sources: [] },
+    { id: 'E2', person_id: 'P001', type: 'khac', title: '', date_kind: null, date_from: null, date_to: null, place: '', description: 'Việc khác', lunar: '', sources: [] },
+    { id: 'E3', person_id: 'P001', type: 'quan_ngu', title: '', date_kind: null, date_from: null, date_to: null, place: '', description: '', lunar: '', sources: [] },
+  ] };
+  const text = exportOf(fx);
+  assert.ok(text.includes('1 EVEN Khoa thi Hương\n2 TYPE Đỗ tú tài\n'), 'the name is the TYPE of the EVEN');
+  assert.ok(text.includes('2 TYPE Khác'), 'no name: the label Khác');
+  assert.ok(text.includes('2 TYPE Quân ngũ'), 'the known labels are unchanged');
+});
+
+test('custom name: export, then import of the same file adds no event (the name is part of the match)', () => {
+  const events = [
+    { id: 'E1', person_id: 'P001', type: 'khac', title: 'Đỗ tú tài', date_kind: 'exact', date_from: '1930', date_to: null, place: 'Nam Định', description: 'Khoa thi Hương', lunar: '', sources: [] },
+    { id: 'E2', person_id: 'P001', type: 'khac', title: 'Xây nhà thờ họ', date_kind: null, date_from: null, date_to: null, place: '', description: 'Khoa thi Hương', lunar: '', sources: [] },
+  ];
+  const fx = { persons: [{ id: 'P001', data: { name: 'Dương Văn Ất', sex: 'm', born: '1900' } }], pc: [], cp: [], stories: [], events };
+  const plan = planOf(exportOf(fx), fx);
+  assert.equal(plan.counts.events_new, 0, JSON.stringify(plan.persons.map((p) => p.events)));
+});
+
+test('custom name: an EVEN with another TYPE is a khac event named by it; a known label keeps its type', () => {
+  const text = '0 HEAD\n1 GEDC\n2 VERS 5.5.1\n0 @I1@ INDI\n1 NAME Dương Văn Ất\n1 EVEN Năm 1932 học giỏi\n2 TYPE Thành tích\n2 DATE 1932\n'
+    + '1 EVEN Gia nhập đoàn\n2 TYPE Tham gia tổ chức\n1 EVEN\n2 TYPE Khác\n0 TRLR\n';
+  const plan = planOf(text, { persons: [], events: [], pc: [], cp: [] });
+  const evs = plan.persons[0].events;
+  assert.equal(evs.length, 3, JSON.stringify(evs));
+  assert.deepStrictEqual(evs.map((e) => [e.type, e.title || '']), [['thanh_tich', ''], ['khac', 'Tham gia tổ chức'], ['khac', '']]);
+  assert.equal(evs[1].description, 'Gia nhập đoàn');
+});
+
+test('custom name: a name longer than 80 characters is cut to 80 and the file says so', () => {
+  const long = 'Tên rất dài '.repeat(9).trim();
+  const text = `0 HEAD\n1 GEDC\n2 VERS 5.5.1\n0 @I1@ INDI\n1 NAME Dương Văn Ất\n1 EVEN\n2 TYPE ${long}\n0 TRLR\n`;
+  const plan = planOf(text, { persons: [], events: [], pc: [], cp: [] });
+  const e = plan.persons[0].events[0];
+  assert.equal(e.title.length, 80);
+  assert.ok(plan.warnings.some((w) => w.includes('80 ký tự')));
+});

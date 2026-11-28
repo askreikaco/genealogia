@@ -12,12 +12,12 @@ const rules = () => rulesMod || (rulesMod = import(pathToFileURL(path.join(__dir
 
 const SRC = require('./sources'); // reusable sources: a citation's source_id is checked and its title/url copied here
 
-const EV_COLS = 'id, family_id, person_id, type, date_text, date_kind, date_from, date_to, lunar, place, place_new, description, people, sources, photos, is_preferred, alt_of, created_by, created_at, updated_at';
+const EV_COLS = 'id, family_id, person_id, type, title, date_text, date_kind, date_from, date_to, lunar, place, place_new, description, people, sources, photos, is_preferred, alt_of, created_by, created_at, updated_at';
 const ST_COLS = 'id, family_id, person_id, kind, title, body, photos, created_by, created_at, updated_at';
 const iso = (d) => (d instanceof Date ? d.toISOString() : d);
 
 function eventOut(r) {
-  return { id: r.id, person_id: r.person_id, type: r.type, date_text: r.date_text || '', date_kind: r.date_kind || null, date_from: r.date_from || null,
+  return { id: r.id, person_id: r.person_id, type: r.type, title: r.title || '', date_text: r.date_text || '', date_kind: r.date_kind || null, date_from: r.date_from || null,
     date_to: r.date_to || null, lunar: r.lunar || '', place: r.place || '', place_new: r.place_new || '', description: r.description || '',
     people: r.people || [], sources: r.sources || [], photos: r.photos || [], is_preferred: r.is_preferred !== false, alt_of: r.alt_of || null,
     created_by: r.created_by || '', created_at: iso(r.created_at), updated_at: iso(r.updated_at) };
@@ -32,7 +32,7 @@ function cleanEvent(e) {
   const s = (v) => (typeof v === 'string' ? v.trim() : '');
   const kind = e.date_kind || null;
   return {
-    type: e.type, date_text: s(e.date_text).slice(0, 200), date_kind: kind,
+    type: e.type, title: s(e.title).slice(0, 80) || null, date_text: s(e.date_text).slice(0, 200), date_kind: kind,
     date_from: kind ? s(e.date_from) : null, date_to: kind === 'between' ? s(e.date_to) : null,
     lunar: s(e.lunar).slice(0, 200), place: s(e.place).slice(0, 2000), place_new: s(e.place_new).slice(0, 2000),
     description: s(e.description).slice(0, 2000),
@@ -58,7 +58,7 @@ async function writeHistory(client, personId, field, oldV, newV, byUser) {
   await client.query('insert into history (person_id, field, old_value, new_value, by_user) values ($1,$2,$3,$4,$5)',
     [personId, field, oldV == null ? null : JSON.stringify(oldV), newV == null ? null : JSON.stringify(newV), byUser]);
 }
-const evSummary = (r) => (r ? { type: r.type, date_text: r.date_text || '', place: r.place || '', description: (r.description || '').slice(0, 200) } : null);
+const evSummary = (r) => (r ? { type: r.type, title: r.title || '', date_text: r.date_text || '', place: r.place || '', description: (r.description || '').slice(0, 200) } : null);
 const storySummary = (r) => (r ? { kind: r.kind, title: r.title || '' } : null);
 
 // Person in this family, not deleted (events and stories hang off a person).
@@ -67,6 +67,13 @@ async function personIn(client, famId, personId) {
   return rows[0] && !rows[0].deleted ? rows[0] : null;
 }
 
+// Custom names (Khác) of the family's events that the viewer may see: canSee(personId, personData) filters the rows before
+// they are counted (privacy by person, branch scope), so a hidden person's name never comes back. Another family is never read.
+async function titleSuggestions(pool, famId, canSee) {
+  const R = await rules();
+  const { rows } = await pool.query("select e.type, e.title, p.id as pid, p.data from events e join persons p on p.id = e.person_id and p.family_id = e.family_id where e.family_id=$1 and e.type='khac' and e.title is not null and not p.deleted", [famId]);
+  return R.usedTitles(rows.filter((r) => canSee(r.pid, r.data)).map((r) => ({ type: r.type, title: r.title }))).slice(0, 100);
+}
 async function listEvents(pool, famId, personId) {
   const { rows } = await pool.query(`select ${EV_COLS} from events where family_id=$1 and person_id=$2`, [famId, personId]);
   return rows.map(eventOut);
@@ -81,9 +88,9 @@ async function insertEvent(client, famId, personId, input, byUser) {
   const c = cleanEvent(input);
   const id = 'E' + crypto.randomBytes(6).toString('hex');
   const { rows } = await client.query(
-    `insert into events (id, family_id, person_id, type, date_text, date_kind, date_from, date_to, lunar, place, place_new, description, people, sources, is_preferred, created_by, photos)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning ${EV_COLS}`,
-    [id, famId, personId, c.type, c.date_text, c.date_kind, c.date_from, c.date_to, c.lunar, c.place, c.place_new, c.description,
+    `insert into events (id, family_id, person_id, type, title, date_text, date_kind, date_from, date_to, lunar, place, place_new, description, people, sources, is_preferred, created_by, photos)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning ${EV_COLS}`,
+    [id, famId, personId, c.type, c.title, c.date_text, c.date_kind, c.date_from, c.date_to, c.lunar, c.place, c.place_new, c.description,
       JSON.stringify(c.people), JSON.stringify(c.sources), c.is_preferred, byUser, JSON.stringify(c.photos)]);
   await writeHistory(client, personId, 'su_kien', null, evSummary(rows[0]), byUser);
   return eventOut(rows[0]);
@@ -93,10 +100,10 @@ async function updateEvent(client, famId, eventId, input, byUser) {
   if (!cur.rows[0]) return null;
   const c = cleanEvent(input);
   const { rows } = await client.query(
-    `update events set type=$2, date_text=$3, date_kind=$4, date_from=$5, date_to=$6, lunar=$7, place=$8, place_new=$9, description=$10,
+    `update events set type=$2, title=$15, date_text=$3, date_kind=$4, date_from=$5, date_to=$6, lunar=$7, place=$8, place_new=$9, description=$10,
        people=$11, sources=$12, photos=$14, is_preferred=$13, updated_at=now() where id=$1 returning ${EV_COLS}`,
     [eventId, c.type, c.date_text, c.date_kind, c.date_from, c.date_to, c.lunar, c.place, c.place_new, c.description,
-      JSON.stringify(c.people), JSON.stringify(c.sources), c.is_preferred, JSON.stringify(c.photos)]);
+      JSON.stringify(c.people), JSON.stringify(c.sources), c.is_preferred, JSON.stringify(c.photos), c.title]);
   await writeHistory(client, cur.rows[0].person_id, 'su_kien', evSummary(cur.rows[0]), evSummary(rows[0]), byUser);
   return eventOut(rows[0]);
 }
@@ -157,7 +164,8 @@ async function checkEvSuggest(ev) {
 function evLabel(ev, typeLabel) {
   const what = ev.kind === 'story' ? 'câu chuyện' : 'sự kiện';
   const verb = { add: 'Thêm', edit: 'Sửa', delete: 'Xóa' }[ev.action];
-  const t = ev.kind === 'event' && ev.item ? typeLabel(ev.item.type) : (ev.item && ev.item.title) || '';
+  const custom = ev.kind === 'event' && ev.item && ev.item.type === 'khac' && typeof ev.item.title === 'string' ? ev.item.title.trim() : '';
+  const t = ev.kind === 'event' && ev.item ? (custom || typeLabel(ev.item.type)) : (ev.item && ev.item.title) || '';
   return `${verb} ${what}${t ? ': ' + t : ''}`;
 }
 
@@ -192,6 +200,6 @@ async function applyEvSuggestion(client, famId, s, author) {
 }
 
 module.exports = {
-  EvError, applyEvSuggestion, rules, withSources, eventOut, storyOut, claimOp, personIn, listEvents, listStories, insertEvent, updateEvent, deleteEvent,
+  EvError, applyEvSuggestion, rules, withSources, eventOut, storyOut, claimOp, personIn, listEvents, listStories, titleSuggestions, insertEvent, updateEvent, deleteEvent,
   upsertStory, updateStory, deleteStory, checkEvSuggest, evLabel, evSummary,
 };
