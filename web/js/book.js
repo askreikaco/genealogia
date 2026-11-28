@@ -5,6 +5,7 @@ import { rank, years } from './bookplan.js';
 import { figSvg } from './bookchart.js';
 import { toolbar, ltags, fpanel, setUntag, cic, familyCrest } from './ui.js';
 import { isDead } from './model.js';
+import { nameOf } from './hidden.js';
 import { listOf } from './contacts-model.js';
 import { tx, childOf, kinRegionPref, setKinRegion, LANGS, REGIONS } from './booktext.js';
 import { formatSid } from './shortid.js';
@@ -79,7 +80,7 @@ let printing = false;
 
 // ---- data ----
 // Hide living: a living person is printed as a name-less placeholder (structure and page layout stay the same).
-const P = (id) => { const d = persons.get(id) || null; if (d && d.hidden_living && !d.name) return { sex: d.sex, gen: d.gen, name: T('living2'), living: 'living' }; return d && PREF.hideLiving && !isDead(d) ? { sex: d.sex, gen: d.gen, name: T('living2'), living: 'living' } : d; };
+const P = (id) => { const d = persons.get(id) || null; if (d && d.hidden_living && !d.name) return { sex: d.sex, gen: d.gen, name: nameOf(d, PREF.lang), living: 'living' }; return d && PREF.hideLiving && !isDead(d) ? { sex: d.sex, gen: d.gen, name: nameOf({ hidden_living: true }, PREF.lang), living: 'living' } : d; };
 // Persons not yet known are requested in batches; ids already in flight are awaited, not asked again.
 async function loadPersons(ids) {
   const need = [...new Set(ids)].filter((id) => !persons.has(id) && !pending.has(id));

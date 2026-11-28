@@ -46,7 +46,6 @@ const T = {
   layoutBranch: ['Theo nhánh', 'By branch'],
   layoutSummary: ['Tóm tắt', 'Summary'],
   hideLiving: ['Ẩn hồ sơ riêng tư', 'Hide living people'],
-  living2: ['Người còn sống', 'Living person'],
   privateLabel: ['Riêng tư', 'Private'],
   showCodes: ['Hiện mã người', 'Show person codes'],
   codeLabel: ['Mã', 'Code'],

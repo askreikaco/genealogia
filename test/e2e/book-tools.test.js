@@ -5,7 +5,13 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
-const { FONTS, seedPersons, seedPlan, staticServer, mockApi } = require('./_book-mock');
+const path = require('path');
+const { pathToFileURL } = require('url');
+const { FONTS, WEB, seedPersons, seedPlan, staticServer, mockApi } = require('./_book-mock');
+
+// The visitor label, copied from the source (booktext.js), never typed here.
+const labelVi = async () => (await import(pathToFileURL(path.join(WEB, 'js', 'booktext.js')).href)).tx('privateLabel', 'vi');
+const OLD_LABEL = 'Người còn sống';
 
 let chromium = null;
 try { ({ chromium } = require('playwright')); } catch {}
@@ -156,7 +162,25 @@ test('Settings: colour, font, size and layout persist after a reload; hide-livin
     await page.waitForSelector('.pg .cover');
     await page.click('#bset');
     assert.equal(await page.$eval('#phide', (el) => el.checked), true, 'hide-living persists');
-    assert.ok((await page.textContent('body')).includes('Người còn sống'), 'living people print as a placeholder');
+    const body = await page.textContent('body');
+    assert.ok(body.includes(await labelVi()), 'living people print as a placeholder');
+    assert.ok(!body.includes(OLD_LABEL), 'the old label is gone');
+  } finally { await ctx.close(); }
+});
+
+test('visitor: a hidden living person prints the same Riêng tư label as the rest of the site, never the old label', { skip }, async () => {
+  const HIDDEN = { id: 'PHID', deleted: false, v: 1, data: { gen: 2, sex: 'f', name: '', hidden_living: true, parent: 'P001' } };
+  const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+  const page = await ctx.newPage();
+  await page.route(FONTS, (r) => r.abort());
+  await mockApi(page, [], { persons: [HIDDEN] });
+  try {
+    await page.goto(base + '/book?inapp=1');
+    await page.waitForSelector('.pg .cover');
+    await page.waitForFunction((l) => document.body.textContent.includes(l), await labelVi(), { timeout: 10000 });
+    const body = await page.textContent('body');
+    assert.ok(body.includes(await labelVi()), 'the hidden living person shows the label');
+    assert.ok(!body.includes(OLD_LABEL), 'the old label never shows');
   } finally { await ctx.close(); }
 });
 
