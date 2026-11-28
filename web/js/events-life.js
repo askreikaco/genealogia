@@ -119,7 +119,7 @@ export function deriveLifeEvents(personId, persons, { rel = null, eventsOf = () 
     if (e.person_id === personId && stored.some((s) => s.type === e.type && yearOf(s.date_from) === yearOf(e.date_from))) return false;
     return true;
   });
-  return collapseGrandchildren(sortEvents(inLifetime(uniq, me, { today, stored })));  // chronological; undated last
+  return collapseGrandchildren(sortEvents(inLifetime(uniq, me, { today, stored }), { lifeAnchors: true }));  // the person's life: undated between birth and death
 }
 
 // Three or more grandchildren born in the same year: one row "N cháu ra đời" (names on expand), at the first one's place.

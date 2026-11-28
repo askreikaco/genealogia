@@ -12,6 +12,7 @@
 import { parseReignYear } from './events-history.js';
 import { solarToLunar } from './lunar.js';
 import { EVT_VI } from './ev-title-vi.js';
+import { CAL_VI } from './calendars-vi.js';
 
 export const EVENT_TYPES = {
   sinh: { label: 'Sinh', icon: 'sprout', gedcom: 'BIRT' },
@@ -72,9 +73,22 @@ export function eventDays(ev) {
 }
 export const yearOfDays = (n) => new Date(n * DAY).getUTCFullYear();
 
-// Sort: estimated day, then the preferred one first, then the id (stable across devices).
-export function sortEvents(list) {
+// Sort: estimated day, then the preferred one first, then the id (stable across devices). Undated events go last.
+// lifeAnchors (a person's timeline only): the person's own birth first, then the dated life events, then the undated ones
+// (between birth and death), then the own death, then the burial; a dated event still sorts by its date (a data error stays visible).
+export function sortEvents(list, { lifeAnchors = false } = {}) {
+  const group = (e) => {
+    if (!lifeAnchors) return 0;
+    if (!e.derived) { // the person's own birth, death and burial anchor the life; a relative's event (derived) is dated like any other
+      if (e.type === 'sinh') return 1;
+      if (e.type === 'mat') return 4;
+      if (e.type === 'an_tang') return 5;
+    }
+    return eventDays(e) === null ? 3 : 2;
+  };
   return [...list].sort((a, b) => {
+    const ga = group(a); const gb = group(b);
+    if (ga !== gb) return ga - gb;
     const da = eventDays(a); const db = eventDays(b);
     if (da === null && db !== null) return 1;
     if (db === null && da !== null) return -1;
@@ -118,12 +132,17 @@ export function parseEventDate(text) {
   return { kind: KIND[word] || 'exact', from: one, to: null };
 }
 // Display of an event date, Vietnamese, as typed: "1981", "3/1981", "khoảng 1980", "trước 1975", "1980–1985".
+// An event whose Thời gian was typed in another calendar (date_cal) shows the text as typed, then the solar date in
+// brackets when known: "15/8/1890 ÂL (≈ 28/9/1890)". "text" (Lịch cũ) shows the text, and the estimated year if any.
 export function formatEventDate(ev) {
-  if (!ev || !ev.date_kind || !ev.date_from) return '';
+  if (!ev) return '';
+  if (ev.date_cal === 'text') return ev.date_text ? (ev.date_kind && ev.date_from ? `${ev.date_text} (≈ ${ev.date_from})` : ev.date_text) : '';
+  if (!ev.date_kind || !ev.date_from) return '';
   const show = (iso) => { const p = parseIso(iso); if (!p) return iso; return p.d ? `${p.d}/${p.m}/${p.y}` : p.m ? `${p.m}/${p.y}` : `${p.y}`; };
-  if (ev.date_kind === 'between') return `${show(ev.date_from)}–${show(ev.date_to)}`;
-  const lbl = DATE_KIND_LABEL[ev.date_kind];
-  return (lbl ? lbl + ' ' : '') + show(ev.date_from);
+  const solar = ev.date_kind === 'between' ? `${show(ev.date_from)}–${show(ev.date_to)}` : (DATE_KIND_LABEL[ev.date_kind] ? DATE_KIND_LABEL[ev.date_kind] + ' ' : '') + show(ev.date_from);
+  if (!ev.date_cal || !ev.date_text) return solar;
+  const tag = ev.date_cal === 'vn-lunar' ? CAL_VI.tag_vn : ev.date_cal === 'cn-lunar' ? CAL_VI.cn_short : '';
+  return `${ev.date_text}${tag ? ' ' + tag : ''} (≈ ${solar})`;
 }
 
 // Lunar date of an event, auto from Thời gian: only for an exact day (date_from is Y-M-D), stored as the person form does
@@ -241,7 +260,7 @@ export function validateStory(s) {
 
 // ---- auto "Câu chuyện đời": neutral sentences built from the events (shown until someone saves an edited version) ----
 export function autoSummary(name, events) {
-  const sorted = sortEvents(events.filter((e) => !e.derived));
+  const sorted = sortEvents(events.filter((e) => !e.derived), { lifeAnchors: true });
   const out = [];
   for (const e of sorted) {
     const when = formatEventDate(e);

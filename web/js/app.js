@@ -51,6 +51,8 @@ import * as CS from './consistency.js';
 import * as RP from './relpath.js';
 import { VI as CSV } from './consistency-vi.js';
 import { TEXT_SIZE_VI } from './text-size-vi.js';
+import { CAL_VI } from './calendars-vi.js';
+import { ALTCAL_KEY, altCalPref } from './calendars.js';
 import { addSearch, addBasic } from './addflow.js';
 import * as VR from './variants.js';
 import { KIN_REGION_KEY, resolveRegion } from './kin/index.js';
@@ -1090,7 +1092,7 @@ function evMergedEvents(st) {
     else if (q.action === 'edit') { if (i >= 0) items[i] = { ...q.item, id: q.id, _st: 'edit' }; }
     else items.push({ ...q.item, id: q.id, _st: 'add' });
   }
-  return sortEvents(items);
+  return sortEvents(items, { lifeAnchors: true });
 }
 function evMergedStories(st) {
   const ev = EVD.get(evKey(st.fam, st.p.id));
@@ -1924,11 +1926,19 @@ function setText(v) {
   try { localStorage.setItem(TEXT_KEY, v); } catch { /* private window: not kept, this page still scales */ }
   if (v === 'normal') delete document.documentElement.dataset.text; else document.documentElement.dataset.text = v;
 }
+// Lịch phụ (per device): the calendar shown under an exact date in the event editor (calendars.js altCalPref).
+const ALTCAL_OPTS = [['', CAL_VI.opt_vn], ['cn-lunar', CAL_VI.opt_cn], ['japanese', CAL_VI.opt_jp], ['hebrew', CAL_VI.opt_he], ['islamic-umalqura', CAL_VI.opt_is], ['none', CAL_VI.opt_none]];
+function setAltCal(v) {
+  try { localStorage.setItem(ALTCAL_KEY, v); } catch { /* private window: not kept */ }
+  toast(CAL_VI.toast_saved); render();
+}
 function settings() {
   const t = themePref();
   const x = textPref();
+  const alt = altCalPref();
   main.innerHTML = `<h1>Cài đặt</h1>${section('Giao diện', `${[['', 'Theo hệ thống'], ['light', 'Sáng'], ['dark', 'Tối']].map(([v, l]) => `<label class="radio"><input type="radio" name="thm" value="${v}" ${t === v ? 'checked' : ''}> ${l}</label>`).join('')}`, { variant: 'card' })}`;
   main.insertAdjacentHTML('beforeend', `${section(TEXT_SIZE_VI.label, `${TEXT_SIZES.map(([v, l]) => `<label class="radio"><input type="radio" name="txt" value="${v}" ${x === v ? 'checked' : ''}> ${l}</label>`).join('')}`, { variant: 'card' })}`);
+  main.insertAdjacentHTML('beforeend', `${section(CAL_VI.alt_label, `<p class="sub">${CAL_VI.alt_help}</p>${ALTCAL_OPTS.map(([v, l]) => `<label class="radio"><input type="radio" name="altcal" value="${v}" ${alt === v ? 'checked' : ''}> ${l}</label>`).join('')}`, { variant: 'card' })}`);
   main.insertAdjacentHTML('beforeend', `${section('Dòng họ', `
     ${followedRecs().map((f) => famRowHtml(f, `#/${f.slug}/cai-dat-dong-ho`)).join('')}
     <a class="famr add" href="#/${S.ALL_FAMS}/tree"><span class="famr-tx"><span class="famr-nm">＋ Tìm / lập dòng họ</span></span></a>`, { variant: 'card', cls: 'fam-sec' })}`);
@@ -1938,6 +1948,7 @@ function settings() {
   digestToggle();
   main.querySelectorAll('input[name=thm]').forEach((r) => { r.onchange = () => setTheme(r.value); });
   main.querySelectorAll('input[name=txt]').forEach((r) => { r.onchange = () => setText(r.value); });
+  main.querySelectorAll('input[name=altcal]').forEach((r) => { r.onchange = () => setAltCal(r.value); });
   refreshFams();
   aiSection();
 }

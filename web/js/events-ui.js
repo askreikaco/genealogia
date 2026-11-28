@@ -7,14 +7,14 @@ import { SRC_VI } from './sources-vi.js';
 import { STORIES_VI } from './stories-vi.js';
 import { nameOf } from './hidden.js';
 import { toolbar, ltags, fpanel, fsheet, cic, addBtn, tag, card, emptyState, moreFold, discWire } from './ui.js';
-import { EVENT_TYPES, EVENT_TYPE_KEYS, parseEventDate, formatEventDate, eventAutoLunar, sortEvents, eventDays, yearOfDays,
+import { EVENT_TYPES, EVENT_TYPE_KEYS, formatEventDate, sortEvents, eventDays, yearOfDays,
   birthIso, ageAt, stageOf, STAGES, autoSummary, eventTitle } from './events.js';
 import { EVT_VI } from './ev-title-vi.js';
+import { dateFieldHtml, wireDateField, readDateField } from './date-field.js';
 import { FORMS_VI } from './forms-vi.js';
 import { discHasValue } from './disc-rules.js';
 // The date help: a native details (tap to show, as the "Cách tính" help does), beside Thời gian. The example stays the placeholder.
 const DATE_HELP = 'Nhập năm, tháng/năm, hoặc “khoảng 1980”, “trước 1975”, “sau 1990”, “1980–1985”.';
-const lunarHint = (v) => FORMS_VI.lunar_hint.replace('{v}', v);
 
 const P = (d) => `<path d="${d}"/>`;
 // 24-unit stroke icons for the event types (one per type icon key in events.js).
@@ -72,7 +72,7 @@ export function tlEntries({ events, derived, birth }) {
     return { id: e.id, e: { ...e, derived: isD }, derived: isD, days, age, stage: age ? stageOf(age.years) : null };
   });
   const byId = new Map(rows.map((r) => [r.id, r]));
-  return sortEvents(rows.map((r) => r.e)).map((e) => byId.get(e.id));
+  return sortEvents(rows.map((r) => r.e), { lifeAnchors: true }).map((e) => byId.get(e.id));
 }
 
 // The filter of one entry. nameOf(id) gives a person's name (for search).
@@ -172,7 +172,7 @@ function cardHtml(row, { ageLabel, canEdit, nameOf, editLbl, personHref = null, 
   const yr = yearOfLabel(row); const when = formatEventDate(e) || 'chưa rõ năm';
   const yrCell = e.date_kind === 'about' && yr ? approxHtml(yr, `khoảng ${yr}`) : esc(yr);
   const age = ageLabel ? `<span class="tl-age">${ageLabel}</span>` : '';
-  const reign = e.date_text && /[^\d\s/~–-]/.test(e.date_text) && !/^(khoảng|khoang|trước|truoc|sau|chừng)\b/i.test(e.date_text) ? e.date_text : '';
+  const reign = !e.date_cal && e.date_text && /[^\d\s/~–-]/.test(e.date_text) && !/^(khoảng|khoang|trước|truoc|sau|chừng)\b/i.test(e.date_text) ? e.date_text : '';
   const whenLine = reign ? `<span class="sub">≈${esc(yr)} · ${esc(reign)}</span>` : when !== yr && when !== 'chưa rõ năm' ? `<span class="sub">${esc(when)}</span>` : '';
   const people = (e.people || []).map(nameOf).filter(Boolean);
   const nsrc = (e.sources || []).length; const photos = e.photos ? e.photos.length : 0;
@@ -292,21 +292,20 @@ export function storiesBodyHtml({ name, events, summary, stories, canEdit, selfI
 
 // ---- event editor (dialog on the timeline, and inline in the person form). Values live in data-f attributes. ----
 export function evEditorHtml(item = {}, { people = [], persons = [], id = '', page = false } = {}) {
-  const v = { type: 'sinh', date_text: '', place: '', place_new: '', description: '', lunar: '', title: '', ...item };
+  const v = { type: 'sinh', date_text: '', place: '', place_new: '', description: '', lunar: '', title: '', date_cal: '', ...item };
   if (item.date_kind && !v.date_text) v.date_text = formatEventDate(item);
   const chips = people.map((pid) => personChip(pid, persons)).join('');
   const photos = (item.photos || []).map((u) => photoRow(u)).join('');
   const dtId = `evx-dt-${id || 'new'}`;
-  const autoLu = eventAutoLunar(v.date_text); // the lunar of an exact Thời gian: a hint under it, never stored
   return `<div class="evx" data-evx data-id="${esc(id)}">
     <label class="fld">Loại sự kiện<select data-f="type">${EVENT_TYPE_KEYS.map((k) => `<option value="${k}" ${k === v.type ? 'selected' : ''}>${esc(typeLabel(k))}</option>`).join('')}</select></label>
     <div class="evx-title" data-tt-wrap${v.type === 'khac' ? '' : ' hidden'}>
       <label class="fld">${EVT_VI.title_label}<input data-f="title" value="${esc(v.title || '')}" maxlength="80" autocomplete="off" placeholder="${esc(EVT_VI.title_ph)}" data-tt-q></label>
       <div class="pk-res" data-tt-res></div></div>
-    <div class="fld evx-dt"><span class="evx-dt-h"><label for="${dtId}">Thời gian</label><details class="evx-help"><summary aria-label="${esc(FORMS_VI.date_help_label)}">ⓘ</summary><p class="sub">${esc(DATE_HELP)}</p></details></span><input id="${dtId}" data-f="date_text" value="${esc(v.date_text)}" autocomplete="off" placeholder="vd 1981, 3/1981, 1980–1981"><p class="sub evx-lunar" data-lunar-hint${autoLu ? '' : ' hidden'}>${autoLu ? esc(lunarHint(autoLu)) : ''}</p></div>
+    ${dateFieldHtml({ id: dtId, label: 'Thời gian', text: v.date_text, cal: v.date_cal || '', year: v.date_kind === 'about' && v.date_cal === 'text' ? v.date_from || '' : '', help: `<details class="evx-help"><summary aria-label="${esc(FORMS_VI.date_help_label)}">ⓘ</summary><p class="sub">${esc(DATE_HELP)}</p></details>` })}
     <label class="fld">Địa điểm<input data-f="place" value="${esc(v.place)}" autocomplete="off"></label>
     <label class="fld">Mô tả<textarea data-f="description" rows="3" maxlength="2000">${esc(v.description)}</textarea></label>
-    ${moreFold(FORMS_VI.more, `<label class="fld" data-disc-part="${esc(FORMS_VI.lunar)}">Âm lịch (tuỳ chọn)<input data-f="lunar" value="${esc(v.lunar)}" autocomplete="off"></label>
+    ${moreFold(FORMS_VI.more, `${v.lunar ? `<label class="fld" data-disc-part="${esc(FORMS_VI.lunar)}">Âm lịch (tuỳ chọn)<input data-f="lunar" value="${esc(v.lunar)}" autocomplete="off"></label>` : ''}
       <label class="fld" data-disc-part="${esc(FORMS_VI.new_name)}">Tên mới (sau 2025), nếu khác<input data-f="place_new" value="${esc(v.place_new)}" autocomplete="off"></label>
       <div class="evx-people" data-disc-count="[data-pid]" data-disc-unit="${esc(FORMS_VI.unit_person)}"><span class="sub">Người liên quan</span><div class="chips" data-chips>${chips}</div>
         <input class="pk-q" type="search" placeholder="Tìm người…" autocomplete="off" aria-label="Tìm người liên quan" data-pk-q>
@@ -329,12 +328,12 @@ export { photoRow };
 // Reads the editor's values: { item, error }. Dates are parsed here (the server checks them again).
 export function readEvx(root) {
   const g = (k) => (root.querySelector(`[data-f="${k}"]`)?.value ?? '').trim();
-  const dp = parseEventDate(g('date_text'));
-  if (dp.error) return { error: dp.error, field: 'date_text' };
+  const df = readDateField(root);
+  if (df.error) return { error: df.error, field: df.field || 'date_text' };
   const people = [...root.querySelectorAll('[data-chips] [data-pid]')].map((el) => el.dataset.pid);
   const sources = readCites(root);
   const type = g('type');
-  const item = { type, title: type === 'khac' ? g('title') : '', date_text: g('date_text'), date_kind: dp.kind || null, date_from: dp.from || null, date_to: dp.to || null,
+  const item = { type, title: type === 'khac' ? g('title') : '', ...df,
     lunar: g('lunar'), place: g('place'), place_new: g('place_new'), description: root.querySelector('[data-f="description"]').value.trim(),
     people, sources, photos: [...root.querySelectorAll('[data-ph]')].map((el) => el.dataset.ph), is_preferred: true };
   return { item };
@@ -368,22 +367,11 @@ function wireTitles(root, fam) {
   typeSel?.addEventListener('change', () => { wrap.hidden = typeSel.value !== 'khac'; if (!wrap.hidden) q.focus(); });
   if (fam) titlesOf(fam).then((list) => { all = list; if (document.activeElement === q) paint(); });
 }
-// Lunar hint: an exact Thời gian shows "≈ 15/8 ÂL" under it. The hint is display only: the Âm lịch field keeps what the
-// user typed (or what was saved), and nothing is stored from the date.
-function wireDateLunar(root) {
-  const dt = root.querySelector('[data-f="date_text"]'); const hint = root.querySelector('[data-lunar-hint]');
-  if (!dt || !hint) return;
-  dt.addEventListener('input', () => {
-    const auto = eventAutoLunar(dt.value);
-    hint.hidden = !auto;
-    hint.textContent = auto ? lunarHint(auto) : '';
-  });
-}
 export function wireEvx(root, persons, opts = {}) {
   const res = root.querySelector('[data-pk-res]'); const q = root.querySelector('[data-pk-q]');
   const chips = root.querySelector('[data-chips]');
   if (root.querySelector('[data-tt-wrap]')) wireTitles(root, opts.fam);
-  wireDateLunar(root);
+  wireDateField(root);
   discWire(root);
   const paint = () => {
     const term = q.value.trim(); const have = new Set([...chips.querySelectorAll('[data-pid]')].map((x) => x.dataset.pid));

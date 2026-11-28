@@ -1,0 +1,25 @@
+// Copy for the calendar of an event's other date (Lịch), generated from vi.json by node. Shared by calendars.js and the event form.
+// Regenerate: node <scratch>/cal-b/gen-vi.js (edit vi.json, not this file).
+export const CAL_VI = {
+  alt_label: "Lịch phụ",
+  alt_help: "Ngày theo lịch này hiện dưới ngày dương lịch. Chỉ áp dụng trên máy này.",
+  opt_vn: "Âm lịch Việt Nam",
+  opt_cn: "Âm lịch Trung Quốc",
+  opt_jp: "Lịch Nhật (niên hiệu)",
+  opt_he: "Lịch Do Thái",
+  opt_is: "Lịch Hồi giáo",
+  opt_none: "Không hiện",
+  toast_saved: "Đã lưu lịch phụ",
+  cn_short: "ÂL TQ",
+  type_label: "Loại lịch",
+  opt_duong: "Dương lịch",
+  opt_text: "Lịch cũ / ghi nguyên văn",
+  tag_vn: "ÂL",
+  hint_solar: "≈ {v} dương lịch",
+  hint_text: "Giữ nguyên văn, không đổi sang dương lịch.",
+  err_not_found: "Không tìm thấy ngày này trong lịch đã chọn.",
+  err_bad: "Ngày không hợp lệ theo lịch đã chọn.",
+  year_add: "+ Năm dương lịch ước tính",
+  year_label: "Năm dương lịch ước tính",
+  err_year: "Năm phải gồm 4 chữ số.",
+};

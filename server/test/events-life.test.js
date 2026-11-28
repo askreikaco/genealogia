@@ -226,7 +226,7 @@ test('auto rows: a stored event of the same type and year replaces the derived r
   assert.deepEqual(dead.filter((r) => r.type === 'mat').map((r) => r.date_from), [], 'the stored 1970 death wins');
 });
 
-test('auto rows: children, grandchildren, spouse, parents and children deaths, sorted by date (undated last)', async () => {
+test('auto rows: children, grandchildren, spouse, parents and children deaths, dated rows in date order (undated between birth and death)', async () => {
   const L = await mod('events-life.js'); const E = await mod('events.js');
   const fam = new Map([
     ['H', { name: 'Ông Thử Chính', sex: 'm', born: '1900', died: '1980' }],
@@ -248,7 +248,8 @@ test('auto rows: children, grandchildren, spouse, parents and children deaths, s
   assert.ok(labels.some((x) => x.startsWith('Cháu Bốn ra đời')), 'grandchild birth');
   assert.ok(labels.includes('Con Hai ra đời'));
   const days = rows.map((r) => E.eventDays(r));
-  assert.deepEqual(days, [...days].sort((a, b) => a - b), 'chronological');
+  const dated = days.filter((d) => d !== null);
+  assert.deepEqual(dated, [...dated].sort((a, b) => a - b), 'the dated rows are chronological');
   // undated rows (an estimate-free relative with no year) are left out: the timeline shows dated rows only
   assert.ok(rows.every((r) => r.date_from), 'every auto row has a date');
 });

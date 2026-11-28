@@ -330,6 +330,8 @@
         "web/js/disc-rules.js",
         "web/js/forms-vi.js",
         "web/js/calendars.js",
+        "web/js/calendars-vi.js",
+        "web/js/date-field.js",
         "server/test/forms-disc-lunar.test.js",
         "server/test/calendars.test.js",
         "server/migrations/042_event_title.sql",
@@ -344,6 +346,7 @@
       "e2e": [
         "test/e2e/events*.test.js",
         "test/e2e/event-title.test.js",
+        "test/e2e/event-calendar.test.js",
         "test/e2e/forms-minimal-a.test.js"
       ]
     },

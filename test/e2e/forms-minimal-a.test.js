@@ -1,10 +1,11 @@
 // E2E: minimal forms A (Thêm chi tiết, the event form, the auto lunar of an exact date). Own family (slug fma-<tag>),
 // so the seeded data is not touched. Needs a SCRATCH database: GP_TEST_DATABASE_URL=postgres://.../<scratch>
 // NODE_PATH=<dir with playwright>. GP_SHOT_DIR=<dir> also writes the screenshots (new form closed and open, edit with sources).
-// Covers: a new event shows only the five fields (Tên sự kiện only for Khác); Thêm chi tiết is closed and lists nothing;
-// an exact date shows "≈ 5/7 ÂL" under Thời gian, fills Âm lịch and saves it; a typed lunar wins; a lunar-only entry
-// works for a partial date; editing an event with photos and sources opens the fold with its summary; the ⓘ shows the
-// date help; the fold opens from the keyboard; 360 px has no horizontal overflow.
+// Covers: a new event shows only the fields (Tên sự kiện only for Khác; the Loại lịch select sits in Thời gian); Thêm chi
+// tiết is closed and lists nothing; an exact date shows "≈ 5/7 ÂL" under Thời gian and saves no lunar; a lunar date typed
+// with Loại lịch = Âm lịch Việt Nam saves its calendar and solar day; an event with a saved Âm lịch keeps it on save;
+// editing an event with photos and sources opens the fold with its summary; the ⓘ shows the date help; the fold opens
+// from the keyboard; 360 px has no horizontal overflow.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
@@ -27,6 +28,7 @@ const OWNER = `owner.${TAG}@test.local`;
 const LIVING = `N${TAG}liv`; const DEAD = `N${TAG}dd1`;
 const SRC = 'D' + crypto.randomBytes(6).toString('hex');
 const EV_EDIT = 'E' + crypto.randomBytes(6).toString('hex');
+const LEG = 'E' + crypto.randomBytes(6).toString('hex'); // an event with a saved Âm lịch (inserted by the test)
 const PH1 = crypto.randomBytes(12).toString('hex'); const PH2 = crypto.randomBytes(12).toString('hex');
 const MOD = (f) => path.join(__dirname, '..', '..', 'server', f);
 let base, pool, srv, browser;
@@ -109,6 +111,15 @@ const shot = async (page, name) => {
   await page.waitForTimeout(300); // the chevron and the fold finish their transition first
   await page.screenshot({ path: path.join(SHOT, name) });
 };
+// Waits until a saved event row (the query selects from events, with $1 family and $2 date text) passes the check.
+async function waitRow(select, dateText, check) {
+  for (let i = 0; i < 60; i++) {
+    const r = await pool.query(`${select} order by created_at desc limit 1`, [SLUG, dateText]);
+    if (r.rows[0] && check(r.rows[0])) return true;
+    await new Promise((res) => setTimeout(res, 250));
+  }
+  return false;
+}
 // Waits until the saved event row has the lunar the test expects (the save is asynchronous).
 async function waitLunar(dateText, expected) {
   let row = null;
@@ -125,15 +136,17 @@ test('new event: only the five fields show, Thêm chi tiết is closed and lists
   const { ctx, page, errs } = await newOwnerPage(390);
   try {
     await openEventPage(page, LIVING);
-    assert.deepEqual(await visibleFields(page), ['type', 'date_text', 'place', 'description'], 'Loại, Thời gian, Địa điểm, Mô tả (Tên sự kiện is for Khác only)');
+    // the Loại lịch select is part of the Thời gian field: it is not counted as a field of its own
+    const fields = async () => (await visibleFields(page)).filter((f) => f !== 'date_cal');
+    assert.deepEqual(await fields(), ['type', 'date_text', 'place', 'description'], 'Loại, Thời gian, Địa điểm, Mô tả (Tên sự kiện is for Khác only)');
     await page.selectOption('[data-evx] select[data-f="type"]', 'khac');
-    assert.deepEqual(await visibleFields(page), ['type', 'title', 'date_text', 'place', 'description'], 'Khác shows Tên sự kiện');
+    assert.deepEqual(await fields(), ['type', 'title', 'date_text', 'place', 'description'], 'Khác shows Tên sự kiện');
     await page.selectOption('[data-evx] select[data-f="type"]', 'sinh');
     const fold = foldOf(page);
     assert.equal(await fold.evaluate((el) => el.open), false, 'closed');
     const sum = (await fold.locator('summary').innerText()).trim();
     assert.equal(sum, 'Thêm chi tiết', 'the closed summary names the fold and lists nothing (no value yet)');
-    assert.equal(await page.locator('[data-evx] [data-f="lunar"]').isVisible(), false, 'Âm lịch is inside the fold');
+    assert.equal(await page.locator('[data-evx] [data-f="lunar"]').count(), 0, 'a new event has no Âm lịch field (only an event that has one shows it)');
     assert.equal(await page.locator('[data-evx] [data-f="place_new"]').isVisible(), false, 'Tên mới is inside the fold');
     await reloadForm(page, LIVING);
     await shot(page, 'ev-new-closed.png');
@@ -141,7 +154,7 @@ test('new event: only the five fields show, Thêm chi tiết is closed and lists
   } finally { await ctx.close(); }
 });
 
-test('Thêm chi tiết opens from the keyboard and shows the five inner fields', { skip }, async () => {
+test('Thêm chi tiết opens from the keyboard and shows the inner fields', { skip }, async () => {
   const { ctx, page, errs } = await newOwnerPage(390);
   try {
     await openEventPage(page, LIVING);
@@ -150,7 +163,7 @@ test('Thêm chi tiết opens from the keyboard and shows the five inner fields',
     await page.keyboard.press('Enter');
     assert.equal(await fold.evaluate((el) => el.open), true, 'Enter opens the native summary');
     assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('[data-evx] details[data-disc] [data-f]')].map((el) => el.dataset.f)),
-      ['lunar', 'place_new'], 'Âm lịch and Tên mới are the fold\'s fields; people, photos and sources sit there too');
+      ['place_new'], 'Tên mới is the fold\'s field (Âm lịch only for an event that has one); people, photos and sources sit there too');
     assert.equal(await page.locator('[data-evx] [data-pk-q]').isVisible(), true, 'Người liên quan is inside the open fold');
     assert.equal(await page.locator('[data-evx] [data-evx-photo]').count(), 1, 'Ảnh is inside the fold');
     assert.equal(await page.locator('[data-evx] [data-src-add]').isVisible(), true, '+ Chọn nguồn is inside the fold');
@@ -161,19 +174,22 @@ test('Thêm chi tiết opens from the keyboard and shows the five inner fields',
   } finally { await ctx.close(); }
 });
 
-test('an exact date shows ≈ ÂL under Thời gian but saves no lunar; a typed lunar is saved; a lunar-only entry needs no date; re-editing stays closed', { skip }, async () => {
-  const { ctx, page, errs } = await newOwnerPage(390);
+test('an exact date shows ≈ ÂL under Thời gian but saves no lunar; a lunar date typed with Loại lịch saves its calendar and solar day; re-editing stays closed', { skip }, async () => {
+  let { ctx, page, errs } = await newOwnerPage(390);
+  const allErrs = [];
+  // a fresh page (a full load) for each step: after a save or an edit the SPA keeps the previous form on a hash-only change
+  const again = async () => { allErrs.push(...errs); await ctx.close(); ({ ctx, page, errs } = await newOwnerPage(390)); };
   try {
-    // exact day: 15/8/1980 is 5/7 (âm lịch). The hint is for display; nothing is saved from it.
+    // exact day, Lịch phụ default: 15/8/1980 is 5/7 (âm lịch). The hint is for display; nothing is saved from it.
     await openEventPage(page, LIVING);
     await page.fill('[data-evx] input[data-f="date_text"]', '15/8/1980');
     assert.equal((await page.innerText('[data-lunar-hint]')).trim(), '≈ 5/7 ÂL', 'hint under Thời gian');
-    assert.equal(await page.inputValue('[data-evx] input[data-f="lunar"]'), '', 'the Âm lịch field is not filled from the date');
     assert.equal((await foldOf(page).locator('summary').innerText()).trim(), 'Thêm chi tiết', 'the closed summary lists no derived lunar');
     await page.fill('[data-evx] textarea[data-f="description"]', 'Ngày cưới');
     await page.click('[data-evx] [data-evx-save]');
     assert.equal((await waitLunar('15/8/1980', ''))?.lunar, '', 'nothing derived is stored');
-    const { rows } = await pool.query("select id from events where family_id=$1 and date_text='15/8/1980'", [SLUG]);
+    const { rows } = await pool.query("select id, date_cal from events where family_id=$1 and date_text='15/8/1980'", [SLUG]);
+    assert.equal(rows[0].date_cal, null, 'a Dương lịch date stores no calendar');
     const evId = rows[0].id;
 
     // re-edit: the fold stays closed (no stored value in it), the hint is still shown
@@ -181,27 +197,29 @@ test('an exact date shows ≈ ÂL under Thời gian but saves no lunar; a typed 
     assert.equal(await foldOf(page).evaluate((el) => el.open), false, 're-edit: the fold is closed');
     assert.equal((await page.innerText('[data-lunar-hint]')).trim(), '≈ 5/7 ÂL', 're-edit: the hint is shown');
 
-    // typed lunar is saved as typed
+    // a lunar date typed with Loại lịch = Âm lịch Việt Nam: 7/7/1963 is 25/8/1963 (dương lịch)
+    await again();
     await openEventPage(page, LIVING);
-    await page.fill('[data-evx] input[data-f="date_text"]', '25/1/1963');
-    await foldOf(page).locator('summary').click();
-    assert.equal(await page.inputValue('[data-evx] input[data-f="lunar"]'), '', 'nothing is pre-filled');
-    await page.fill('[data-evx] input[data-f="lunar"]', '7/7');
+    await page.selectOption('[data-evx] select[data-f="date_cal"]', 'vn-lunar');
+    await page.fill('[data-evx] input[data-f="date_text"]', '7/7/1963');
+    assert.equal((await page.innerText('[data-lunar-hint]')).trim(), '≈ 25/8/1963 dương lịch', 'the solar day under Thời gian');
     await page.fill('[data-evx] textarea[data-f="description"]', 'Tết');
     await page.click('[data-evx] [data-evx-save]');
-    assert.equal((await waitLunar('25/1/1963', '7/7'))?.lunar, '7/7', 'the typed lunar is saved');
+    assert.ok(await waitRow("select date_cal, date_from from events where family_id=$1 and date_text=$2", '7/7/1963', (r) => r.date_cal === 'vn-lunar' && r.date_from === '1963-08-25'),
+      'saved with date_cal vn-lunar and the solar day');
 
-    // partial date: no hint, and a lunar-only entry is kept as typed
-    await openEventPage(page, LIVING);
-    await page.fill('[data-evx] input[data-f="date_text"]', '1980');
-    assert.equal(await page.locator('[data-lunar-hint]').isVisible(), false, 'no lunar for a year only');
-    await foldOf(page).locator('summary').click();
-    await page.fill('[data-evx] input[data-f="lunar"]', '15 tháng 8');
-    await page.fill('[data-evx] textarea[data-f="description"]', 'Chỉ có âm lịch');
+    // an event with a saved Âm lịch shows the field, and keeps it on save (partial date: no hint)
+    await pool.query("insert into events (id, family_id, person_id, type, date_text, date_kind, date_from, lunar, people, sources, photos, is_preferred, created_by) values ($1,$2,$3,'hoc','1981','exact','1981','15 tháng 8','[]','[]','[]',true,'e2e')",
+      [LEG, SLUG, LIVING]);
+    await again();
+    await openEventPage(page, LIVING, LEG);
+    assert.equal(await foldOf(page).evaluate((el) => el.open), true, 'the fold opens: it holds the saved Âm lịch');
+    assert.equal(await page.inputValue('[data-evx] input[data-f="lunar"]'), '15 tháng 8', 'the saved Âm lịch is shown');
+    assert.equal(await page.locator('[data-lunar-hint]').isVisible(), false, 'no hint for a year only');
     await page.click('[data-evx] [data-evx-save]');
-    assert.equal((await waitLunar('1980', '15 tháng 8'))?.lunar, '15 tháng 8', 'lunar-only entry saved');
+    assert.equal((await waitLunar('1981', '15 tháng 8'))?.lunar, '15 tháng 8', 'the saved Âm lịch is kept');
     await toastGone(page);
-    assert.deepEqual(errs, []);
+    assert.deepEqual([...allErrs, ...errs], []);
   } finally { await ctx.close(); }
 });
 

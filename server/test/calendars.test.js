@@ -29,7 +29,7 @@ test('cn-lunar: Chinese New Year 1968-01-30, 1985-02-20, 2007-02-18 is lunar 1/1
   assert.deepEqual(C.inCalendar(30, 1, 1968, 'cn-lunar'), { cal: 'cn-lunar', day: 1, month: 1, year: 1968, leap: false });
   assert.deepEqual(C.inCalendar(20, 2, 1985, 'cn-lunar'), { cal: 'cn-lunar', day: 1, month: 1, year: 1985, leap: false });
   assert.deepEqual(C.inCalendar(18, 2, 2007, 'cn-lunar'), { cal: 'cn-lunar', day: 1, month: 1, year: 2007, leap: false });
-  assert.equal(C.calendarLabel(C.inCalendar(20, 2, 1985, 'cn-lunar')), '1/1 农历');
+  assert.equal(C.calendarLabel(C.inCalendar(20, 2, 1985, 'cn-lunar')), '1/1 ÂL TQ');
 });
 
 test('cn-lunar leap month: 22/3/2023 is 1 of the leap 2nd month (闰二月, Intl "2bis")', async () => {
@@ -73,4 +73,68 @@ test('unknown calendar returns null; CALENDARS lists the six calendars', async (
   assert.equal(C.inCalendar(17, 2, 2026, 'mayan'), null);
   assert.deepEqual(C.CALENDARS, ['vn-lunar', 'cn-lunar', 'japanese', 'hebrew', 'islamic-umalqura', 'gregorian']);
   assert.equal(C.calendarLabel(null), '');
+});
+
+test('altCalPref: unknown, missing or no localStorage gives the default ""; known values are kept', async () => {
+  const C = await web('calendars.js');
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const set = (v) => Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: () => v } });
+  try {
+    assert.equal(C.ALTCAL_KEY, 'gp_altcal');
+    set('cn-lunar'); assert.equal(C.altCalPref(), 'cn-lunar');
+    set('none'); assert.equal(C.altCalPref(), 'none');
+    set('vn-lunar'); assert.equal(C.altCalPref(), '', 'not a choice: the default');
+    set('gregorian'); assert.equal(C.altCalPref(), '');
+    set(null); assert.equal(C.altCalPref(), '', 'nothing stored');
+    set(undefined); Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('denied'); } });
+    assert.equal(C.altCalPref(), '', 'storage refused');
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'localStorage', had); else delete globalThis.localStorage;
+  }
+});
+
+test('toSolar: vn-lunar 1/1/1985 is 21/1/1985; 15/8/1890 converts; "m/yyyy" and "yyyy" give the year of lunar 1/1', async () => {
+  const C = await web('calendars.js');
+  assert.deepEqual(C.toSolar('1/1/1985', 'vn-lunar'), { kind: 'exact', from: '1985-01-21', to: null });
+  assert.deepEqual(C.toSolar('15/8/1890', 'vn-lunar'), { kind: 'exact', from: '1890-09-28', to: null });
+  assert.deepEqual(C.toSolar('3/1985', 'vn-lunar'), { kind: 'about', from: '1985', to: null });
+  assert.deepEqual(C.toSolar('1985', 'vn-lunar'), { kind: 'about', from: '1985', to: null });
+  assert.equal(C.toSolar('31/2/1985', 'vn-lunar').error !== undefined, true, 'a day that is not in the calendar is an error');
+});
+
+test('toSolar: cn-lunar 1/1/1985 is 20/2/1985; a day that is not there is an error', async () => {
+  const C = await web('calendars.js');
+  assert.deepEqual(C.toSolar('1/1/1985', 'cn-lunar'), { kind: 'exact', from: '1985-02-20', to: null });
+  assert.ok(C.toSolar('31/1/1985', 'cn-lunar').error, 'no match: an error');
+});
+
+test('toSolar: japanese "Reiwa 8/2/17" is 17/2/2026; era year only is about that year', async () => {
+  const C = await web('calendars.js');
+  assert.deepEqual(C.toSolar('Reiwa 8/2/17', 'japanese'), { kind: 'exact', from: '2026-02-17', to: null });
+  assert.deepEqual(C.toSolar('Reiwa 8', 'japanese'), { kind: 'about', from: '2026', to: null });
+});
+
+test('toSolar: hebrew and islamic labels for 17/2/2026 convert back to 2026-02-17', async () => {
+  const C = await web('calendars.js');
+  for (const cal of ['hebrew', 'islamic-umalqura', 'japanese']) {
+    const label = C.calendarLabel(C.inCalendar(17, 2, 2026, cal));
+    assert.deepEqual(C.toSolar(label, cal), { kind: 'exact', from: '2026-02-17', to: null }, label);
+  }
+});
+
+test('toSolar: text is kept as typed (kind null); garbage is an error; Dương lịch is parseEventDate unchanged', async () => {
+  const C = await web('calendars.js');
+  assert.deepEqual(C.toSolar('năm Giáp Tý', 'text'), { kind: null, from: null, to: null });
+  assert.ok(C.toSolar('abc', 'vn-lunar').error, 'garbage: an error');
+  assert.ok(C.toSolar('abc', 'japanese').error, 'garbage: an error');
+  assert.deepEqual(C.toSolar('Tự Đức thứ 10', ''), { kind: 'about', from: '1857', to: null, reign: 'Tự Đức' });
+  assert.deepEqual(C.toSolar('1963', ''), { kind: 'exact', from: '1963', to: null });
+});
+
+test('textSolar: "Lịch cũ" with a 4-digit year is about that year; no year is undated; other text is an error', async () => {
+  const C = await web('calendars.js');
+  assert.deepEqual(C.textSolar('1890'), { kind: 'about', from: '1890', to: null });
+  assert.deepEqual(C.textSolar(''), { kind: null, from: null, to: null });
+  assert.deepEqual(C.textSolar(undefined), { kind: null, from: null, to: null });
+  assert.ok(C.textSolar('18x0').error, 'not a year: an error');
 });
