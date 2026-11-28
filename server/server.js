@@ -605,7 +605,8 @@ app.get('/api/events', H(async (req, res) => {
   const R = await EV.rules();
   res.set('Cache-Control', 'no-store');
   if (!R.canSeeEventsOf(p.data, { member: canSeePrivate(w), familyReadable: true })) return res.json({ hidden: true, items: [], stories: [], role: w.role });
-  res.json({ hidden: false, items: await EV.listEvents(pool, view.famId, p.id), stories: await EV.listStories(pool, view.famId, p.id), role: w.role });
+  const stories = await EV.forViewer(pool, view.famId, await EV.listStories(pool, view.famId, p.id), canSeePrivate(w));
+  res.json({ hidden: false, items: await EV.listEvents(pool, view.famId, p.id), stories, role: w.role });
 }));
 
 // Custom event names (Khác) the family already uses, for the suggestions in the event form: most used first. Only the
@@ -670,6 +671,7 @@ app.post('/api/events/:id/delete', need('editor'), (req, res, next) => evWrite(r
 app.post('/api/stories', need('editor'), (req, res, next) => evWrite(req, res, next, async (client, f, w, opId) => {
   const R = await EV.rules(); const err = R.validateStory(req.body?.story); if (err) throw new HttpError(400, err);
   const p = await evPersonInput(client, f, req.body);
+  await EV.checkStoryPeople(client, f.id, req.body.story, p.id);
   if (!(await EV.claimOp(client, opId, p.id))) return { duplicate: true };
   return { story: await EV.upsertStory(client, f.id, p.id, req.body.story, actorName(w)) };
 }));
@@ -677,6 +679,7 @@ app.put('/api/stories/:id', need('editor'), (req, res, next) => evWrite(req, res
   const R = await EV.rules(); const err = R.validateStory(req.body?.story); if (err) throw new HttpError(400, err);
   const cur = await client.query('select person_id from stories where id=$1 and family_id=$2', [req.params.id, f.id]);
   if (!cur.rows[0]) return null;
+  await EV.checkStoryPeople(client, f.id, req.body.story, cur.rows[0].person_id);
   if (!(await EV.claimOp(client, opId, cur.rows[0].person_id))) return { duplicate: true };
   return { story: await EV.updateStory(client, f.id, req.params.id, req.body.story, actorName(w)) };
 }));
@@ -852,6 +855,10 @@ app.post('/api/suggest', async (req, res, next) => {
     const err = isEv ? (Object.keys(b.changes).length === 1 ? await EV.checkEvSuggest(b.changes._ev) : 'Một góp ý sự kiện chỉ gồm một mục.') : await checkSuggestChanges(b.changes);
     if (err) return res.status(400).json({ error: err });
     if (isEv && !personId) return res.status(400).json({ error: 'Chọn người cần góp ý sự kiện.' });
+    if (isEv && b.changes._ev.kind === 'story') { // stories: members only (editors save at once); the tagged people are of this family
+      if (!canSeePrivate(await who(req, f.id))) return res.status(403).json({ error: 'Chỉ thành viên mới góp được câu chuyện.' });
+      try { await EV.checkStoryPeople(pool, f.id, b.changes._ev.item, personId); } catch (e) { return res.status(400).json({ error: e.message }); }
+    }
     const isRel = Object.prototype.hasOwnProperty.call(b.changes, '_rel');
     if (isRel && !(await isTable(pool, f.id))) return res.status(409).json({ error: 'Dòng họ này chưa chuyển dữ liệu quan hệ.' });
     if (isRel) { const pe = await REL.precheckRel(pool, f.id, b.changes._rel); if (pe) return res.status(pe.status).json({ error: pe.message }); }

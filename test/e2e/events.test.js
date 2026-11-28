@@ -216,7 +216,8 @@ test('Câu chuyện đời: an edit is saved and shown again', { skip }, async (
   const { ctx, page, errs } = await newPage(390, 'light', true);
   try {
     await profile(page, LIVING);
-    await page.click('button[data-ptab="info"]'); // Câu chuyện đời is on Thông tin, under the facts and contact
+    // Câu chuyện đời moved from Thông tin to its own Câu chuyện tab (stories-tab.test.js covers the move); the edit is the same
+    await page.click('button[data-ptab="story"]');
     await page.waitForSelector('[data-sum-edit]');
     await page.click('[data-sum-edit]');
     await page.waitForSelector('dialog.evdlg [data-s="body"]');
@@ -224,7 +225,7 @@ test('Câu chuyện đời: an edit is saved and shown again', { skip }, async (
     await page.click('dialog.evdlg [data-stx-save]');
     await page.waitForFunction(() => !document.querySelector('dialog.evdlg'), null, { timeout: 15000 });
     await profile(page, LIVING);
-    await page.click('button[data-ptab="info"]');
+    await page.click('button[data-ptab="story"]');
     assert.match(await page.textContent('.lifestory'), /Bản kể của gia đình\./);
     assert.deepEqual(errs, []);
   } finally { await ctx.close(); }

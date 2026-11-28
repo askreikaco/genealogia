@@ -33,6 +33,8 @@ export const DATE_KIND_LABEL = { exact: '', about: 'khoảng', before: 'trước
 
 const ISO_RE = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/;
 const MAX_TEXT = 2000;
+// A person id as the server stores it (P<digits> or N<token>): the people of an event or a story.
+const PERSON_ID_RE = /^P\d{3,6}$|^N[0-9a-z-]{6,40}$/;
 const MAX_TITLE = 80; // Tên sự kiện: a custom name for an event of type 'khac' (GEDCOM EVEN + TYPE)
 
 // ---- ISO partial dates ----
@@ -193,7 +195,7 @@ export function validateEvent(e) {
   for (const k of ['date_text', 'lunar', 'place', 'place_new', 'description']) {
     if (e[k] !== undefined && e[k] !== null && (typeof e[k] !== 'string' || e[k].length > MAX_TEXT)) return `${k} quá dài hoặc sai kiểu.`;
   }
-  if (e.people !== undefined && (!Array.isArray(e.people) || e.people.length > 20 || e.people.some((x) => typeof x !== 'string' || !/^P\d{3,6}$|^N[0-9a-z-]{6,40}$/.test(x)))) return 'Người liên quan không hợp lệ.';
+  if (e.people !== undefined && (!Array.isArray(e.people) || e.people.length > 20 || e.people.some((x) => typeof x !== 'string' || !PERSON_ID_RE.test(x)))) return 'Người liên quan không hợp lệ.';
   if (e.sources !== undefined) {
     if (!Array.isArray(e.sources) || e.sources.length > 20) return 'Nguồn không hợp lệ.';
     for (const s of e.sources) {
@@ -221,6 +223,7 @@ export function validateStory(s) {
   if (typeof s.body !== 'string' || s.body.length > 20000) return 'Nội dung quá dài (tối đa 20.000 ký tự).';
   if (s.photos !== undefined && (!Array.isArray(s.photos) || s.photos.length > 30 || s.photos.some((u) => typeof u !== 'string' || !/^https?:\/\//i.test(u) || u.length > 2000))) return 'Ảnh phải là link http(s), tối đa 30 ảnh.';
   if (s.kind !== undefined && !['chuyen', 'tom_tat'].includes(s.kind)) return 'Loại câu chuyện không hợp lệ.';
+  if (s.people !== undefined && (!Array.isArray(s.people) || s.people.length > 20 || s.people.some((x) => typeof x !== 'string' || !PERSON_ID_RE.test(x)))) return 'Người liên quan không hợp lệ.';
   return null;
 }
 

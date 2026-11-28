@@ -135,18 +135,19 @@ test('event edit is a page with back and a sticky Hủy · Lưu bar; delete is i
       if (scheme === 'dark') {
         await del.click();
         await page.click('dialog#dcf [data-rds-confirm]');
-        await page.waitForFunction((pid) => location.hash.endsWith(`/person/${pid}`), P1, { timeout: 15000 });
+        // back on the profile: the address keeps the open tab (?tab=life), so the route match allows the query
+        await page.waitForFunction((pid) => new RegExp(`/person/${pid}(\\?tab=[a-z]+)?$`).test(location.hash), P1, { timeout: 15000 });
         assert.equal(await eventCount(page), 0, 'deleted after the confirm');
       } else {
         // Hủy and back both leave the page without saving
         await page.click('.evpage [data-evx-cancel]');
-        await page.waitForFunction((pid) => location.hash.endsWith(`/person/${pid}`), P1, { timeout: 15000 });
+        await page.waitForFunction((pid) => new RegExp(`/person/${pid}(\\?tab=[a-z]+)?$`).test(location.hash), P1, { timeout: 15000 });
         await page.goto(`${base}/#/${SLUG}/su-kien/${P1}`);
         await page.waitForSelector('.evpage [data-evx]', { timeout: 15000 });
         assert.equal(await page.textContent('#cbtitle'), 'Thêm sự kiện');
         assert.equal(await page.locator('.dzone').count(), 0, 'nothing to delete on a new event');
         await page.click('#cbback');
-        await page.waitForFunction((pid) => location.hash.endsWith(`/person/${pid}`), P1, { timeout: 15000 });
+        await page.waitForFunction((pid) => new RegExp(`/person/${pid}(\\?tab=[a-z]+)?$`).test(location.hash), P1, { timeout: 15000 });
       }
       assert.deepEqual(errs, []);
     } finally { await ctx.close(); }

@@ -311,6 +311,16 @@
         "test/e2e/contacts-list.test.js"
       ]
     },
+    "stories": {
+      "paths": [
+        "web/js/stories-vi.js",
+        "server/test/stories-*.test.js",
+        "server/migrations/043_stories_people.sql"
+      ],
+      "e2e": [
+        "test/e2e/stories-*.test.js"
+      ]
+    },
     "events": {
       "paths": [
         "server/events.js",

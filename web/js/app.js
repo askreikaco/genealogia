@@ -56,8 +56,9 @@ import { deriveLifeEvents, historyRows, relAccess, legacyAccess, estimatedLifeRo
 import { estimateFamilyCached, ageAtDeathOf } from './estimate-graph.js';
 import { HISTORY_ALL } from './events-history.js';
 import { index as relIndex } from './relgraph.js';
-import { evIcon, typeIcon, headline, tlLoad, tlSave, tlTags, tlApplyUntag, tlToolbar, tlSheetDialog, tlEntries, tlMatch, tlList, tlCount, lifeStoriesHtml, approxHtml,
+import { evIcon, typeIcon, headline, tlLoad, tlSave, tlTags, tlApplyUntag, tlToolbar, tlSheetDialog, tlEntries, tlMatch, tlList, tlCount, storiesBodyHtml, stLoad, stSave, stBarHtml, stSheetDialog, stApplyUntag, approxHtml,
   evEditorHtml, readEvx, wireEvx, storyEditorHtml, readStx, photoRow, PHOTO_PREVIEW } from './events-ui.js';
+import { STORIES_VI } from './stories-vi.js';
 import { sourcesPage } from './sources-ui.js';
 const fold = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/đ/g, 'd');
 
@@ -603,7 +604,9 @@ function act(k, id) {
 // ---------- person ----------
 function person(id) {
   const p = M.byId.get(id); if (!p) { main.innerHTML = '<p>Không tìm thấy người này.</p>'; return; }
-  if (profFor !== id) { profFor = id; profTab = 'info'; }
+  // the address names the open tab (?tab=story): a plain link to the person opens Thông tin, as before the tabs had addresses
+  const urlTab = route().qs.get('tab'); profTab = PTABS.some(([k]) => k === urlTab) ? urlTab : 'info';
+  if (profFor !== id) profFor = id;
   if (p.data.hidden_living) { main.innerHTML = `<section class="card"><h1 class="keep">${esc(nameOf(p.data))}</h1></section>`; return; } // a living person (visitor view): the label only, no data
   const d = p.data; const sp = d.spouse_of && M.byId.get(d.spouse_of); const ks = sp ? (M.kidsOf2(id).length || M.inlaws(sp.id).length > 1 ? M.kidsOf2(id) : M.kids(sp.id)) : M.kids(id); const br = branchOf(M, sp || p);
   const row = (k, v) => (v ? [k, v] : null); // one fact: [label, value html], or null when empty
@@ -637,8 +640,9 @@ function person(id) {
   if (profTab === 'info') LV.decorateSelf(main, id); // P1d: the own-profile setting, at the end of the Thông tin tab (only when the server says this viewer may change it)
   if (S.isEditor()) SN.bindSurnames(main, id, d, { edit: (pid, fields) => S.edit(pid, fields) });
   main.querySelector('[data-copy-code]')?.addEventListener('click', (e) => { const c = e.currentTarget.dataset.copyCode; (navigator.clipboard?.writeText(c) || Promise.reject()).then(() => toast(`Đã chép mã ${c}`), () => toast(`Mã người: ${c}`)); });
-  if (profTab === 'life' || profTab === 'src' || profTab === 'info') evEnsure(p); // info: the Câu chuyện đời block reads the events too
+  if (profTab === 'life' || profTab === 'story' || profTab === 'src' || profTab === 'info') evEnsure(p);
   if (profTab === 'life') setUntag(lifeUntag);
+  if (profTab === 'story') setUntag(storyUntag);
   if (profTab === 'info') galMount(main, { fam: famOfP(p), pid: id, editor: S.isEditor(), upload: uploadPhoto, render, onProfile: (url) => { const q = M.byId.get(id); if (q) { if (url) q.data.photo = url; else delete q.data.photo; } } });
 }
 
@@ -652,6 +656,7 @@ const evDirect = (fam) => !modeOf(fam); // editors write at once; others send a 
 const evMemberOf = (fam) => isMemberRole(S.roleIn(fam));
 const evNameOf = (fam) => { const names = new Map(personsOf(fam).map((x) => [x.id, x.data.name])); return (id) => names.get(id) || ''; };
 const evPickList = (fam) => personsOf(fam).map((x) => ({ id: x.id, name: x.data.name, years: years(x.data), data: x.data })); // data: for the fuzzy picker
+const storyPickList = (fam, ownerId) => evPickList(fam).filter((x) => x.id !== ownerId); // a story's tagged people (not its owner)
 async function evLoad(fam, pid, force = false) {
   const k = evKey(fam, pid); const cur = EVD.get(k);
   if (!force && cur && cur.loaded) return cur;
@@ -740,7 +745,7 @@ function lifeModel(p) {
 }
 
 let profTab = 'info'; let profFor = '';
-const PTABS = [['info', 'Thông tin'], ['life', 'Dòng đời'], ['src', 'Tư liệu']]; // Quan hệ and Tổ tiên sit on Thông tin
+const PTABS = [['info', 'Thông tin'], ['life', 'Dòng đời'], ['story', STORIES_VI.tab], ['src', 'Tư liệu']]; // Quan hệ and Tổ tiên sit on Thông tin
 let LIFE = null; // the person whose timeline is on screen: { p }
 function profTabsHtml() {
   return `<nav class="ptabs" role="tablist" aria-label="Hồ sơ">${PTABS.map(([k, l]) => `<button type="button" role="tab" class="ptab${profTab === k ? ' on' : ''}" data-ptab="${k}" aria-selected="${profTab === k}">${l}</button>`).join('')}</nav>`;
@@ -809,7 +814,7 @@ function eventPage(pid) {
     + '</div>';
   const root = main.querySelector('[data-evx]'); wireEvx(root, persons, { fam });
   const fail = (m) => { const e = root.querySelector('[data-evx-err]'); e.hidden = false; e.textContent = m; };
-  const done = async (msg) => { if (msg) toast(msg); if (direct) { evInvalidate(fam, p.id); await evLoad(fam, p.id, true).catch(() => {}); } profTab = 'life'; location.hash = hf(`person/${p.id}`); };
+  const done = async (msg) => { if (msg) toast(msg); if (direct) { evInvalidate(fam, p.id); await evLoad(fam, p.id, true).catch(() => {}); } profTab = 'life'; location.hash = hf(`person/${p.id}?tab=life`); };
   root.querySelector('[data-evx-cancel]').onclick = () => goBack();
   root.querySelector('[data-evx-save]').onclick = async (e) => {
     const r = readEvx(root); if (r.error) return fail(r.error);
@@ -824,10 +829,11 @@ function evDialog({ kind, p, id = null, item = {}, title }) {
   const persons = evPickList(fam);
   const d = document.createElement('dialog'); d.className = 'dlg evdlg';
   const body = kind === 'event' ? evEditorHtml(item, { people: item.people || [], persons, id: id || '' })
-    : storyEditorHtml(item, { summary: item.kind === 'tom_tat' });
+    : storyEditorHtml(item, { summary: item.kind === 'tom_tat', persons: storyPickList(fam, p.id), people: item.people || [] });
   d.innerHTML = `<div class="form-stack"><h2>${esc(title)}</h2>${direct ? '' : '<p class="sub">Quản trị sẽ duyệt trước khi hiển thị.</p>'}${body}</div>`;
   document.body.append(d); d.showModal();
   if (kind === 'event') wireEvx(d.querySelector('[data-evx]'), persons, { fam });
+  else if (item.kind !== 'tom_tat') wireEvx(d.querySelector('[data-stx]'), storyPickList(fam, p.id), {});
   const close = () => { d.close(); d.remove(); };
   d.querySelector('[data-evx-cancel]').onclick = close;
   const fail = (m) => { const e = d.querySelector('[data-evx-err]'); e.hidden = false; e.textContent = m; };
@@ -891,24 +897,59 @@ function contactCard(d, id, fam) {
   const edit = S.isEditor() && id ? `<p><button type="button" class="btn ter sm" data-ct-edit="${esc(id)}">${items.length ? 'Sửa liên hệ' : 'Thêm liên hệ'}</button></p>` : '';
   return body || edit ? section('Liên hệ', `${body}${edit}`, { variant: 'card', label: 'Liên hệ', cls: 'consec sec-card', level: 2 }) : '';
 }
-// Câu chuyện đời on Thông tin (after the facts and contact, before Quan hệ): the events are loaded for this tab too.
-function storiesOnInfo(p) {
+// Câu chuyện: the shared list toolbar (search · Bộ lọc · +) over the list. The summary stays above the list and is not
+// filtered. Members add a story (editors save at once; other members send it to the suggestion queue). Guests read
+// what the viewing rules allow, and have no "+".
+const storyMe = () => { const a = S.myAccount(); return a.editor || a.name || a.email || ''; };
+const storyFilter = () => { const f = stLoad(); return storyMe() ? f : { ...f, who: f.who === 'mine' ? 'all' : f.who }; }; // "Do tôi kể" needs a sign-in
+function storyTabHtml(p) {
   const { fam, ev } = lifeModel(p);
-  if (!ev || !ev.loaded || ev.hidden || ev.error) return '';
-  return lifeStoriesHtml({ name: p.data.name, events: ev.items || [], summary: (ev.stories || []).find((s) => s.kind === 'tom_tat') || null, stories: ev.stories || [], canEdit: true, canAdd: evDirect(fam) });
+  if (!ev || !ev.loaded) return `<div class="skel" role="status"><p class="sub">${esc(STORIES_VI.loading)}</p><span class="skel-l"></span><span class="skel-l w2"></span></div>`;
+  if (ev.error && !(ev.items || []).length) return `<p class="sub">${esc(ev.error)}</p>`;
+  if (ev.hidden) return `${card(`<p class="sub">Thông tin của người đang sống chỉ thành viên xem được.</p>${S.signedIn() ? '' : '<p><button type="button" class="btn sm" data-acct="in">Đăng nhập</button></p>'}`)}`;
+  LIFE = { p }; // the Câu chuyện actions (add, edit, Đọc tiếp, Xem tất cả, search, filter) read the person from LIFE
+  const f = storyFilter();
+  return `<div class="tl-bar stk" id="st-bar">${stBarHtml(f, { canAdd: evMemberOf(fam) })}</div><div id="st-body">${storyBodyHtml(p)}</div>${stSheetDialog(f, { me: storyMe() })}`;
+}
+// The list part (repainted by the search and the filter, the bar stays): the summary, the chips, the stories.
+function storyBodyHtml(p) {
+  const { fam, ev } = lifeModel(p);
+  const member = evMemberOf(fam); const names = evNameOf(fam);
+  const stories = ev.stories || [];
+  const html = storiesBodyHtml({ name: p.data.name, events: ev.items || [], summary: stories.find((x) => x.kind === 'tom_tat') || null, stories,
+    canEdit: member, selfId: p.id, personName: names, personHref: (x) => hf('person/' + x), f: storyFilter(), me: storyMe(), nameOf: names });
+  const pend = member && !evDirect(fam) ? `<p class="sub">${esc(STORIES_VI.pending)}</p>` : '';
+  return `${html || emptyState(STORIES_VI.empty)}${pend}`;
+}
+const paintStoryBody = () => { if (!LIFE) return; const el = document.getElementById('st-body'); if (el) el.innerHTML = storyBodyHtml(LIFE.p); };
+// A filter or search change (the bar is repainted, the search box keeps its caret).
+function storyChange(f) { stSave(f); paintStoryBody(); }
+function storyUntag(k) {
+  stSave(stApplyUntag(stLoad(), k));
+  const bar = document.getElementById('st-bar'); if (bar && LIFE) bar.innerHTML = stBarHtml(storyFilter(), { canAdd: evMemberOf(LIFE.p && famOfP(LIFE.p)) });
+  const sheet = document.querySelector('dialog.fpanel'); if (sheet && LIFE) { const t = document.createElement('div'); t.innerHTML = stSheetDialog(storyFilter(), { me: storyMe() }); sheet.replaceWith(t.firstElementChild); }
+  paintStoryBody();
 }
 function profBody(p, { groups, id, d }) {
   if (profTab === 'life') return lifePanelHtml(p);
+  if (profTab === 'story') return storyTabHtml(p);
   if (profTab === 'src') return srcHtml(p);
-  LIFE = { p }; // the Câu chuyện đời actions (add, edit, Đọc tiếp, Xem tất cả) read the person from LIFE
+  LIFE = { p };
   const facts = factCardHtml(factGroups(groups));
-  return `${d.verify ? `<div class="ntc warn"><b>Cần xác minh</b><span class="sub">${esc(d.verify)}</span></div>` : ''}${facts}${codeOf(M, id) ? `<p class="sub">Vị trí trong cây <span class="ppos" title="${esc(CODE_HELP)}">${esc(codeOf(M, id))}</span></p>` : ''}${contactCard(d, id, p.fam || S.curFamily())}${storiesOnInfo(p)}`
+  return `${d.verify ? `<div class="ntc warn"><b>Cần xác minh</b><span class="sub">${esc(d.verify)}</span></div>` : ''}${facts}${codeOf(M, id) ? `<p class="sub">Vị trí trong cây <span class="ppos" title="${esc(CODE_HELP)}">${esc(codeOf(M, id))}</span></p>` : ''}${contactCard(d, id, p.fam || S.curFamily())}`
     + `${(LK.ensure(p.fam || S.curFamily()), '')}${relSection(M, p, { editable: S.isEditor(), relpathHref: (x) => hf(`relpath/${encodeURIComponent(x)}`), treeHref: hf(`tree/@${id}`), treeOf: (x) => hf(`tree/@${x}`), personHref: (x) => hf(`person/${x}`), links: LK.linesHtml(p.fam || S.curFamily(), id, { clan: CL.clanLinkHtml(S.familyName(p.fam || S.curFamily()), 'clan-in', S.familyMeta(p.fam || S.curFamily())?.country) }) + (BT.ensureBranches(p.fam || S.curFamily()), BT.rootLinkHtml(p.fam || S.curFamily(), id)) })}${pedigreeHtml(M, id, 4, { personHref: (x) => hf(`person/${x}`) })}`;
+}
+// The open tab is in the address (?tab=…), so a reload or a shared link opens it. Thông tin is the default (no parameter).
+function setTabUrl() {
+  const qs = new URLSearchParams(route().qs);
+  if (profTab === 'info') qs.delete('tab'); else qs.set('tab', profTab);
+  const q = qs.toString(); const base = location.hash.split('?')[0];
+  try { history.replaceState(null, '', location.pathname + location.search + base + (q ? '?' + q : '')); } catch {}
 }
 // Delegated clicks for the profile tabs, the timeline and the event/story dialogs.
 document.addEventListener('click', (e) => {
   const tab = e.target.closest('[data-ptab]');
-  if (tab && main.contains(tab)) { profTab = tab.dataset.ptab; render(); return; }
+  if (tab && main.contains(tab)) { profTab = tab.dataset.ptab; setTabUrl(); render(); return; }
   if (!LIFE || !main.contains(e.target)) return;
   const p = LIFE.p;
   const add = e.target.closest('[data-ev-add]');
@@ -940,6 +981,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('change', (e) => {
   if (!LIFE || !main.contains(e.target)) return;
   const t = e.target;
+  if (t.dataset.stWho) { storyChange({ ...storyFilter(), who: t.dataset.stWho }); const bar = document.getElementById('st-bar'); if (bar) bar.innerHTML = stBarHtml(storyFilter(), { canAdd: evMemberOf(famOfP(LIFE.p)) }); return; }
   if (t.dataset.tlType) tlChange((f) => ({ ...f, types: t.checked ? [...f.types, t.dataset.tlType] : f.types.filter((x) => x !== t.dataset.tlType) }));
   else if (t.dataset.tlStage) tlChange((f) => ({ ...f, stages: t.checked ? [...f.stages, t.dataset.tlStage] : f.stages.filter((x) => x !== t.dataset.tlStage) }));
   else if (t.dataset.tlF) tlChange((f) => ({ ...f, [t.dataset.tlF]: t.checked }));
@@ -952,6 +994,11 @@ document.addEventListener('click', (e) => {
   if (b) { tlChange((f) => ({ ...f, [b.dataset.tlF]: !f[b.dataset.tlF] })); paintLifeBar(); }
 });
 document.addEventListener('input', (e) => {
+  if (LIFE && e.target.id === 'stq') { // live search: the list repaints, the caret stays in the box
+    const pos = e.target.selectionStart; storyChange({ ...storyFilter(), q: e.target.value });
+    const bar = document.getElementById('st-bar'); if (bar) { bar.innerHTML = stBarHtml(storyFilter(), { canAdd: evMemberOf(famOfP(LIFE.p)) }); const i = document.getElementById('stq'); i?.focus(); i?.setSelectionRange(pos, pos); }
+    return;
+  }
   if (!LIFE || e.target.id !== 'tlq') return;
   tlChange((f) => ({ ...f, q: e.target.value }));
 });
@@ -1047,7 +1094,9 @@ function evFormLoad(st) {
 function evPaintEd(st) {
   const ev = document.getElementById('fev-ed'); const sv = document.getElementById('fst-ed');
   if (ev) ev.innerHTML = st.evEd && st.evEd.kind === 'event' ? evEditorHtml(st.evEd.item, { people: st.evEd.item.people || [], persons: evPickList(st.fam), id: st.evEd.id || '' }) : '';
-  if (sv) sv.innerHTML = st.evEd && st.evEd.kind === 'story' ? storyEditorHtml(st.evEd.item) : '';
+  const sp = st.p ? storyPickList(st.fam, st.p.id) : evPickList(st.fam);
+  if (sv) sv.innerHTML = st.evEd && st.evEd.kind === 'story' ? storyEditorHtml(st.evEd.item, { persons: sp, people: st.evEd.item.people || [] }) : '';
+  if (st.evEd && st.evEd.kind === 'story' && sv && st.evEd.item.kind !== 'tom_tat') wireEvx(sv.querySelector('[data-stx]'), sp, {});
   if (st.evEd && st.evEd.kind === 'event' && ev) wireEvx(ev.querySelector('[data-evx]'), evPickList(st.fam), { fam: st.fam });
   if (st.evEd && (st.evEd.kind === 'event' ? ev : sv)) (st.evEd.kind === 'event' ? ev : sv).querySelector('input,textarea,select')?.focus();
 }
@@ -1066,7 +1115,7 @@ function evFormClick(form, st, e) {
   if (fd) { const k = fd.dataset.fevDel; confirmDanger({ title: 'Xóa sự kiện này?', lose: 'Sự kiện bị xóa khỏi dòng đời khi bạn lưu.', restore: 'Trước khi lưu, có thể bỏ thay đổi để giữ lại.', confirm: 'Xóa sự kiện', onConfirm: () => { evqDel(st, 'event', k); evAfterChange(st); } }); return true; }
   if (t.closest('[data-fst-add]')) { st.evEd = { kind: 'story', id: null, item: {} }; evPaintEd(st); return true; }
   const fse = t.closest('[data-fst-edit]');
-  if (fse) { const s = evMergedStories(st).find((x) => x.id === fse.dataset.fstEdit); if (s) st.evEd = { kind: 'story', id: s.id, item: { title: s.title, body: s.body, photos: s.photos } }; evPaintEd(st); return true; }
+  if (fse) { const s = evMergedStories(st).find((x) => x.id === fse.dataset.fstEdit); if (s) st.evEd = { kind: 'story', id: s.id, item: { title: s.title, body: s.body, photos: s.photos, people: s.people || [] } }; evPaintEd(st); return true; }
   const fsd = t.closest('[data-fst-del]');
   if (fsd) { const k = fsd.dataset.fstDel; confirmDanger({ title: 'Xóa câu chuyện này?', lose: 'Câu chuyện bị xóa khi bạn lưu.', restore: 'Trước khi lưu, có thể bỏ thay đổi để giữ lại.', confirm: 'Xóa câu chuyện', onConfirm: () => { evqDel(st, 'story', k); evAfterChange(st); } }); return true; }
   if (t.closest('#fev-ed [data-evx-cancel], #fst-ed [data-evx-cancel]')) { st.evEd = null; evPaintEd(st); return true; }

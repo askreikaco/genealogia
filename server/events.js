@@ -13,7 +13,7 @@ const rules = () => rulesMod || (rulesMod = import(pathToFileURL(path.join(__dir
 const SRC = require('./sources'); // reusable sources: a citation's source_id is checked and its title/url copied here
 
 const EV_COLS = 'id, family_id, person_id, type, title, date_text, date_kind, date_from, date_to, lunar, place, place_new, description, people, sources, photos, is_preferred, alt_of, created_by, created_at, updated_at';
-const ST_COLS = 'id, family_id, person_id, kind, title, body, photos, created_by, created_at, updated_at';
+const ST_COLS = 'id, family_id, person_id, kind, title, body, photos, people, created_by, created_at, updated_at';
 const iso = (d) => (d instanceof Date ? d.toISOString() : d);
 
 function eventOut(r) {
@@ -23,7 +23,7 @@ function eventOut(r) {
     created_by: r.created_by || '', created_at: iso(r.created_at), updated_at: iso(r.updated_at) };
 }
 function storyOut(r) {
-  return { id: r.id, person_id: r.person_id, kind: r.kind, title: r.title || '', body: r.body || '', photos: r.photos || [],
+  return { id: r.id, person_id: r.person_id, kind: r.kind, title: r.title || '', body: r.body || '', photos: r.photos || [], people: r.people || [],
     created_by: r.created_by || '', created_at: iso(r.created_at), updated_at: iso(r.updated_at) };
 }
 
@@ -44,9 +44,34 @@ function cleanEvent(e) {
     is_preferred: e.is_preferred !== false,
   };
 }
-function cleanStory(s) {
-  return { kind: s.kind === 'tom_tat' ? 'tom_tat' : 'chuyen', title: String(s.title || '').trim().slice(0, 300), body: String(s.body || '').trim(),
-    photos: Array.isArray(s.photos) ? s.photos.slice(0, 30) : [] };
+// personId: the owner. The owner is not repeated in people; a summary (tom_tat) tags nobody.
+function cleanStory(s, personId) {
+  const kind = s.kind === 'tom_tat' ? 'tom_tat' : 'chuyen';
+  const people = Array.isArray(s.people) ? [...new Set(s.people.filter((x) => typeof x === 'string' && x && x !== personId))].slice(0, 20) : [];
+  return { kind, title: String(s.title || '').trim().slice(0, 300), body: String(s.body || '').trim(),
+    photos: Array.isArray(s.photos) ? s.photos.slice(0, 30) : [], people: kind === 'tom_tat' ? [] : people };
+}
+// Tagged people must be living records of this family (not deleted): a tag never reaches another family. 422 otherwise.
+async function checkStoryPeople(client, famId, input, personId) {
+  const ids = cleanStory(input || {}, personId).people;
+  if (!ids.length) return;
+  const { rows } = await client.query('select id from persons where family_id=$1 and deleted=false and id = any($2)', [famId, ids]);
+  if (rows.length !== ids.length) throw new EvError(422, 'Người liên quan không có trong dòng họ này.');
+}
+// A guest's view of stories: a living person's name is not shown, neither as a tagged person nor as the teller
+// (created_by becomes '' with created_by_hidden, and the client shows the private label). Members see everything.
+async function forViewer(pool, famId, stories, member) {
+  if (member || !stories.length) return stories.map((s) => ({ ...s, created_by_hidden: false }));
+  const ids = [...new Set(stories.flatMap((s) => s.people))];
+  const names = [...new Set(stories.map((s) => s.created_by).filter(Boolean))];
+  const { rows } = await pool.query('select id, data from persons where family_id=$1 and deleted=false and (id = any($2) or data->>\'name\' = any($3))', [famId, ids, names]);
+  const R = await rules();
+  const livingIds = new Set(); const livingNames = new Set();
+  for (const r of rows) if (R.isLiving(r.data)) { livingIds.add(r.id); if (r.data.name) livingNames.add(r.data.name); }
+  return stories.map((s) => {
+    const hide = !!s.created_by && livingNames.has(s.created_by);
+    return { ...s, people: s.people.filter((x) => !livingIds.has(x)), created_by: hide ? '' : s.created_by, created_by_hidden: hide };
+  });
 }
 
 // Idempotency: a retried op is applied once (same table as person ops). Returns false when already applied.
@@ -78,8 +103,9 @@ async function listEvents(pool, famId, personId) {
   const { rows } = await pool.query(`select ${EV_COLS} from events where family_id=$1 and person_id=$2`, [famId, personId]);
   return rows.map(eventOut);
 }
+// The stories of a person: the ones about them and the ones that tag them (people).
 async function listStories(pool, famId, personId) {
-  const { rows } = await pool.query(`select ${ST_COLS} from stories where family_id=$1 and person_id=$2 order by created_at`, [famId, personId]);
+  const { rows } = await pool.query(`select ${ST_COLS} from stories where family_id=$1 and (person_id=$2 or people ? $2) order by created_at`, [famId, personId]);
   return rows.map(storyOut);
 }
 
@@ -116,8 +142,9 @@ async function deleteEvent(client, famId, eventId, byUser) {
 }
 
 // Stories: kind 'tom_tat' is one row per person; saving it again updates that row.
-async function upsertStory(client, famId, personId, input, byUser) {
-  const c = cleanStory(input);
+// createdBy: the teller shown as "Kể bởi" (a suggestion's sender); the editor's name when not given.
+async function upsertStory(client, famId, personId, input, byUser, createdBy = byUser) {
+  const c = cleanStory(input, personId);
   const cur = await client.query(`select ${ST_COLS} from stories where person_id=$1 and family_id=$2 and kind=$3 order by created_at limit 1 for update`,
     [personId, famId, c.kind]);
   if (c.kind === 'tom_tat' && cur.rows[0]) {
@@ -128,17 +155,18 @@ async function upsertStory(client, famId, personId, input, byUser) {
   }
   const id = 'S' + crypto.randomBytes(6).toString('hex');
   const { rows } = await client.query(
-    `insert into stories (id, family_id, person_id, kind, title, body, photos, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8) returning ${ST_COLS}`,
-    [id, famId, personId, c.kind, c.title, c.body, JSON.stringify(c.photos), byUser]);
+    `insert into stories (id, family_id, person_id, kind, title, body, photos, people, created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning ${ST_COLS}`,
+    [id, famId, personId, c.kind, c.title, c.body, JSON.stringify(c.photos), JSON.stringify(c.people), createdBy]);
   await writeHistory(client, personId, 'cau_chuyen', null, storySummary(rows[0]), byUser);
   return storyOut(rows[0]);
 }
+// An edit keeps the teller (created_by); the history row names the editor.
 async function updateStory(client, famId, storyId, input, byUser) {
   const cur = await client.query(`select ${ST_COLS} from stories where id=$1 and family_id=$2 for update`, [storyId, famId]);
   if (!cur.rows[0]) return null;
-  const c = cleanStory(input);
-  const { rows } = await client.query('update stories set kind=$2, title=$3, body=$4, photos=$5, updated_at=now(), created_by=$6 where id=$1 returning ' + ST_COLS,
-    [storyId, c.kind, c.title, c.body, JSON.stringify(c.photos), byUser]);
+  const c = cleanStory(input, cur.rows[0].person_id);
+  const { rows } = await client.query('update stories set kind=$2, title=$3, body=$4, photos=$5, people=$6, updated_at=now() where id=$1 returning ' + ST_COLS,
+    [storyId, c.kind, c.title, c.body, JSON.stringify(c.photos), JSON.stringify(c.people)]);
   await writeHistory(client, cur.rows[0].person_id, 'cau_chuyen', storySummary(cur.rows[0]), storySummary(rows[0]), byUser);
   return storyOut(rows[0]);
 }
@@ -185,21 +213,25 @@ async function applyEvSuggestion(client, famId, s, author) {
     const r = await client.query(`select 1 from ${table} where id=$1 and family_id=$2 and person_id=$3`, [ev.id, famId, pid]);
     if (!r.rowCount) throw new EvError(409, 'Mục này không còn để sửa hoặc xóa.');
   };
+  // a story sent by a member is shown as told by that member (by_name), the editor who approved it is in history
+  const teller = s.by_name || author;
   if (ev.action === 'add') {
     const item = ev.kind === 'event' ? await withSources(client, famId, ev.item) : ev.item;
     const err = ev.kind === 'event' ? R.validateEvent(item) : R.validateStory(item);
     if (err) throw new EvError(422, err);
-    return ev.kind === 'event' ? { event: await insertEvent(client, famId, pid, item, author) } : { story: await upsertStory(client, famId, pid, item, author) };
+    if (ev.kind === 'story') await checkStoryPeople(client, famId, item, pid);
+    return ev.kind === 'event' ? { event: await insertEvent(client, famId, pid, item, author) } : { story: await upsertStory(client, famId, pid, item, author, teller) };
   }
   await owned();
   if (ev.action === 'delete') return ev.kind === 'event' ? deleteEvent(client, famId, ev.id, author) : deleteStory(client, famId, ev.id, author);
   const item = ev.kind === 'event' ? await withSources(client, famId, ev.item) : ev.item;
   const err = ev.kind === 'event' ? R.validateEvent(item) : R.validateStory(item);
   if (err) throw new EvError(422, err);
+  if (ev.kind === 'story') await checkStoryPeople(client, famId, item, pid);
   return ev.kind === 'event' ? { event: await updateEvent(client, famId, ev.id, item, author) } : { story: await updateStory(client, famId, ev.id, item, author) };
 }
 
 module.exports = {
   EvError, applyEvSuggestion, rules, withSources, eventOut, storyOut, claimOp, personIn, listEvents, listStories, titleSuggestions, insertEvent, updateEvent, deleteEvent,
-  upsertStory, updateStory, deleteStory, checkEvSuggest, evLabel, evSummary,
+  upsertStory, updateStory, deleteStory, checkEvSuggest, evLabel, evSummary, checkStoryPeople, forViewer,
 };

@@ -4,7 +4,9 @@ import { esc } from './model.js';
 import { searchPeople } from './fuzzy.js';
 import { sourcesAreaHtml, readCites, wireSources } from './sources-ui.js';
 import { SRC_VI } from './sources-vi.js';
-import { toolbar, ltags, fpanel, cic, addBtn, tag, card } from './ui.js';
+import { STORIES_VI } from './stories-vi.js';
+import { nameOf } from './hidden.js';
+import { toolbar, ltags, fpanel, fsheet, cic, addBtn, tag, card, emptyState } from './ui.js';
 import { EVENT_TYPES, EVENT_TYPE_KEYS, parseEventDate, formatEventDate, sortEvents, eventDays, yearOfDays,
   birthIso, ageAt, stageOf, STAGES, autoSummary, eventTitle } from './events.js';
 import { EVT_VI } from './ev-title-vi.js';
@@ -209,12 +211,58 @@ export function tlList(rows, { nameOf, canEdit, editLbl = 'Sửa', span = false,
   return `<ol class="tl2">${out}</ol>`;
 }
 
-// Câu chuyện đời at the top of Dòng đời: the summary (saved, or auto from the events), then the stories (title, body, photos).
-// Each body clamps to 3 lines with "Đọc tiếp" (inline, a tap). More than 2 stories: 2 show, then "Xem tất cả N câu chuyện".
-// Viewers get nothing when there is no summary and no story; editors (canAdd) always get "+ Thêm câu chuyện".
+// ---- Câu chuyện tab: the shared list toolbar (search · Bộ lọc · +), the summary (never filtered), then the stories ----
+// Filter state per device (like Dòng đời's gp_tl): q (search text) and who: all | about (this person's stories) |
+// tagged (stories that mention this person) | mine (stories I told; signed in only).
+export const ST_DEFAULT = { q: '', who: 'all' };
+const ST_KEY = 'gp_st'; const ST_WHO = ['all', 'about', 'tagged', 'mine'];
+export function stLoad() { try { return { ...ST_DEFAULT, ...JSON.parse(localStorage.getItem(ST_KEY) || '{}') }; } catch { return { ...ST_DEFAULT }; } }
+export function stSave(f) { try { localStorage.setItem(ST_KEY, JSON.stringify(f)); } catch {} }
+// The teller as shown (a living teller hidden from the viewer is shown as the private label, so it is not searched by name).
+const stTeller = (s) => (s.created_by_hidden ? '' : (s.created_by || ''));
+// One story against the filter. selfId: the profile's person; personName: id -> name; me: the signed-in teller name.
+export function stMatch(s, f, { selfId = '', personName = () => '', me = '' } = {}) {
+  if (f.who === 'about' && s.person_id !== selfId) return false;
+  if (f.who === 'tagged' && !(s.people || []).includes(selfId)) return false;
+  if (f.who === 'mine' && (!me || s.created_by !== me)) return false;
+  const q = fold(f.q).trim();
+  if (q) {
+    const hay = fold([s.title, s.body, stTeller(s), ...[s.person_id, ...(s.people || [])].map((x) => personName(x) || '')].join(' '));
+    if (!hay.includes(q)) return false;
+  }
+  return true;
+}
+// Chips for the active filters (removable): the same shape as tlTags.
+export function stTags(f) {
+  const t = [];
+  if (f.q.trim()) t.push(['q', `“${f.q.trim()}”`]);
+  if (f.who !== 'all') t.push(['who', STORIES_VI[`who_${f.who}`]]);
+  return t;
+}
+export function stApplyUntag(f, key) {
+  if (key === '*') return { ...ST_DEFAULT };
+  if (key === 'q') return { ...f, q: '' };
+  if (key === 'who') return { ...f, who: 'all' };
+  return f;
+}
+// The toolbar: the search box (live), the filter button (with the count of active filters), and "+" for members.
+export function stBarHtml(f, { canAdd }) {
+  return toolbar({ id: 'stq', ph: STORIES_VI.search_ph, val: f.q, active: stTags(f).length, add: canAdd ? addBtn('data-st-add', STORIES_VI.add_title) : '' });
+}
+// The filter sheet: one choice of who the stories are about or by. "Do tôi kể" only when signed in.
+export function stSheetDialog(f, { me = '' } = {}) {
+  const opts = ST_WHO.filter((k) => k !== 'mine' || me).map((k) => `<label class="chk"><input type="radio" name="st-who" data-st-who="${k}" ${f.who === k ? 'checked' : ''}> ${esc(STORIES_VI[`who_${k}`])}</label>`).join('');
+  return fsheet(STORIES_VI.filter_title, `<fieldset class="fp-field"><legend>${esc(STORIES_VI.who_legend)}</legend><div class="chkg">${opts}</div></fieldset>`,
+    '<button type="button" class="btn ter fp-reset" data-untag="*">Xóa tất cả</button>');
+}
+// The list part: the summary (saved, or auto from the events), the active filter chips, then the stories that match
+// (newest first, 2 show and "Xem tất cả N"). Each body clamps to 3 lines with "Đọc tiếp". Empty: '' when there is
+// neither summary nor story; "no match" when the filter hides every story.
 const STORY_SHOW = 2; const STORY_LONG = 150;
-export function lifeStoriesHtml({ name, events, summary, stories, canEdit, canAdd, photosOnly = false }) {
-  const list = stories.filter((s) => s.kind !== 'tom_tat' && (!photosOnly || (s.photos || []).length));
+export function storiesBodyHtml({ name, events, summary, stories, canEdit, selfId = '', personName = () => '', personHref = () => '#', f, me = '', nameOf = () => '' }) {
+  const all = stories.filter((s) => s.kind !== 'tom_tat');
+  const list = all.filter((s) => stMatch(s, f, { selfId, personName, me }))
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
   const body = summary ? summary.body : autoSummary(name, events);
   const more = (text) => (text.length > STORY_LONG ? '<button type="button" class="btn gh sm" data-st-more>Đọc tiếp</button>' : '');
   const clamp = (text) => `<p${text.length > STORY_LONG ? ' class="rv-clamp"' : ''}>${esc(text)}</p>`;
@@ -223,14 +271,18 @@ export function lifeStoriesHtml({ name, events, summary, stories, canEdit, canAd
     + `${clamp(body)}${more(body)}`, { tag: 'section', cls: 'lifestory', attrs: `aria-label="Câu chuyện đời"` })}` : '';
   const storyCard = (s) => {
     const photos = (s.photos || []).length ? `<div class="stry-ph">${s.photos.map((u) => `<img src="${esc(u)}" alt="" loading="lazy">`).join('')}</div>` : '';
-    return `${card(`<h3>${esc(s.title || 'Câu chuyện')}</h3>${photos}${clamp(s.body || '')}${more(s.body || '')}`, { tag: 'article', cls: 'stry' })}`;
+    const teller = s.created_by_hidden ? nameOf({ hidden_living: true }) : (s.created_by || '');
+    const others = [s.person_id, ...(s.people || [])].filter((x, i, a) => x && x !== selfId && a.indexOf(x) === i);
+    const withLine = others.length ? others.map((x) => `<a href="${esc(personHref(x))}">${esc(personName(x) || '')}</a>`).join(', ') : '';
+    const by = teller || withLine ? `<p class="sub stry-by">${teller ? `${esc(STORIES_VI.told_by)} ${esc(teller)}` : ''}${teller && withLine ? ' · ' : ''}${withLine ? `${esc(STORIES_VI.with)} ${withLine}` : ''}</p>` : '';
+    return `${card(`<h3>${esc(s.title || 'Câu chuyện')}</h3>${by}${photos}${clamp(s.body || '')}${more(s.body || '')}`, { tag: 'article', cls: 'stry' })}`;
   };
-  const add = canAdd ? '<button type="button" class="btn ter sm" data-st-add>+ Thêm câu chuyện</button>' : '';
-  if (!add && !sumCard && !list.length) return '';
   const folded = list.length > STORY_SHOW;
   const cards = list.slice(0, STORY_SHOW).map(storyCard).join('');
-  const rest = folded ? `<button type="button" class="btn ter sm" data-st-all>Xem tất cả ${list.length} câu chuyện</button><div class="stry-more" hidden>${list.slice(STORY_SHOW).map(card).join('')}</div>` : '';
-  return `<div class="stories lifeblock">${add}${sumCard}${cards}${rest}</div>`;
+  const rest = folded ? `<button type="button" class="btn ter sm" data-st-all>Xem tất cả ${list.length} câu chuyện</button><div class="stry-more" hidden>${list.slice(STORY_SHOW).map(storyCard).join('')}</div>` : '';
+  const none = !list.length && all.length ? emptyState(STORIES_VI.no_match) : '';
+  if (!sumCard && !all.length) return '';
+  return `${sumCard}${ltags(stTags(f))}<div class="stories lifeblock">${cards}${rest}${none}</div>`;
 }
 
 // ---- event editor (dialog on the timeline, and inline in the person form). Values live in data-f attributes. ----
@@ -330,17 +382,24 @@ export function wireEvx(root, persons, opts = {}) {
 }
 
 // Story editor (title, body, photo links one per line). The summary edit uses the same markup with body only.
-export function storyEditorHtml(s = {}, { summary = false } = {}) {
+// persons: the family's people to pick from ({id, name, years}); people: the ids already tagged. A summary tags nobody.
+export function storyEditorHtml(s = {}, { summary = false, persons = [], people = [] } = {}) {
+  const chips = summary ? '' : people.map((pid) => personChip(pid, persons)).join('');
+  const tags = summary ? '' : `<div class="evx-people"><span class="sub">${esc(STORIES_VI.tag_label)}</span><div class="chips" data-chips>${chips}</div>
+      <input class="pk-q" type="search" placeholder="Tìm người…" autocomplete="off" aria-label="${esc(STORIES_VI.tag_label)}" data-pk-q>
+      <div class="pk-res" data-pk-res></div><p class="sub">${esc(STORIES_VI.tag_hint)}</p></div>`;
   return `<div class="evx" data-stx data-kind="${summary ? 'tom_tat' : 'chuyen'}">`
     + (summary ? '' : `<label class="fld">Tiêu đề<input data-s="title" value="${esc(s.title || '')}" maxlength="300" autocomplete="off"></label>`)
     + `<label class="fld">Nội dung<textarea data-s="body" rows="${summary ? 8 : 6}" maxlength="20000">${esc(s.body || '')}</textarea></label>`
+    + tags
     + (summary ? '' : `<label class="fld">Link ảnh (mỗi dòng một link)<textarea data-s="photos" rows="2">${esc((s.photos || []).join('\n'))}</textarea></label>`)
     + `<p class="err" data-evx-err role="alert" hidden></p><div class="row end evx-acts"><button type="button" class="btn gh" data-evx-cancel>Hủy</button><button type="button" class="btn" data-stx-save>Lưu</button></div></div>`;
 }
 export function readStx(root) {
   const body = root.querySelector('[data-s="body"]').value.trim();
   const titleEl = root.querySelector('[data-s="title"]'); const photosEl = root.querySelector('[data-s="photos"]');
+  const people = [...root.querySelectorAll('[data-chips] [data-pid]')].map((el) => el.dataset.pid);
   return { kind: root.dataset.kind === 'tom_tat' ? 'tom_tat' : 'chuyen', title: titleEl ? titleEl.value.trim() : 'Câu chuyện đời', body,
-    photos: photosEl ? photosEl.value.split('\n').map((x) => x.trim()).filter(Boolean) : [] };
+    photos: photosEl ? photosEl.value.split('\n').map((x) => x.trim()).filter(Boolean) : [], people };
 }
 
