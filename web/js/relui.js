@@ -6,6 +6,7 @@ import { index, siblingsOf, descendantLevels, ancestorLevels, coupleNotes, PC_LA
 import { kinPath, lineDesc, term as kinTerm, resolveRegion, KIN_REGION_KEY } from './kin/index.js';
 import { calmRow, calmAct, popMenu, cic, surnameTile, toolbar, ltags, fpanel, addBtn, setUntag, section, sheet as openDialog, KEEP } from './ui.js';
 import { relPrefill, nextOrder } from './prefill.js';
+import { gopYNote, joinHrefOf, isMemberRole } from './plus.js';
 import { VI as RPV } from './relpath-vi.js';
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger, undoToast, restoreTrash } from './danger.js';
 
@@ -263,6 +264,7 @@ function openAdd(M, anchorId, preset = null, start = null) {
         ${st.type === 'child' ? `<label class="fld">Thứ tự tính (con thứ mấy)<input id="ord" inputmode="numeric" placeholder="để trống nếu chưa rõ" value="${nextOrder(rowsFor(M, anchorId).kids.map((k) => k.r.birth_order))}"></label>` : ''}
         ${st.type === 'child' && partnersOf(M, anchorId).length ? `<label class="fld">Cha/mẹ còn lại<select id="otherp"><option value="">Không ghi</option>${partnersOf(M, anchorId).map((x, i) => `<option value="${esc(x)}"${i === 0 ? ' selected' : ''}>${esc(pname(M, x))}</option>`).join('')}</select></label>` : ''}
         <label class="rel-tog"><input id="priv" type="checkbox"> Riêng tư (chỉ thành viên thấy)</label>
+        ${isMemberRole(S.roleIn(anchor.fam || 'duong')) ? '' : gopYNote(joinHrefOf(anchor.fam || 'duong'))}
         ${S.signedIn() ? '' : '<label class="fld">Tên của bạn (để quản trị biết)<input id="byn" autocomplete="name"></label>'}
         <div class="rel-foot"><button class="btn ter" type="button" data-back>Quay lại</button><button class="btn" type="button" data-save>Lưu quan hệ</button></div>`;
       b.querySelectorAll('[data-kind]').forEach((x) => x.addEventListener('click', () => { st.kind = x.dataset.kind; draw(d); }));

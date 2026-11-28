@@ -1,5 +1,19 @@
 {
   "modules": {
+    "plus-for-everyone": {
+      "paths": [
+        "web/js/plus.js",
+        "web/js/plus-vi.js",
+        "web/js/relui.js",
+        "web/js/events-ui.js",
+        "web/js/app.js",
+        "server/server.js",
+        "server/test/stories-people.test.js"
+      ],
+      "e2e": [
+        "test/e2e/plus-*.test.js"
+      ]
+    },
     "living-vis": {
       "paths": [
         "server/core.js",

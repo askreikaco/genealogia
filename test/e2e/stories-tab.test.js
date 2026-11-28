@@ -186,7 +186,7 @@ test('an editor adds a story tagging two people: it shows on the owner and on bo
   } finally { await ctx.close(); }
 });
 
-test('a member (not an editor) cannot save directly: the story goes to the queue and says so; a guest sees no add button', { skip }, async () => {
+test('a member (not an editor) cannot save directly: the story goes to the queue and says so; a guest has the + too (a suggestion)', { skip }, async () => {
   const { ctx, page, errs } = await newPage(390, MEMBER);
   try {
     await goProfile(page, FATHER, '?tab=story');
@@ -205,7 +205,7 @@ test('a member (not an editor) cannot save directly: the story goes to the queue
   try {
     await goProfile(guest.page, FATHER, '?tab=story');
     await guest.page.waitForSelector('.lifestory, #main h1, .emp, .empty', { timeout: 15000 }).catch(() => {});
-    assert.equal(await guest.page.locator('[data-st-add]').count(), 0, 'no add button for a guest');
+    assert.equal(await guest.page.locator('[data-st-add]').count(), 1, 'a guest has the + (it sends a suggestion)');
     assert.deepEqual(guest.errs, []);
   } finally { await guest.ctx.close(); }
   assert.deepEqual(errs, []);
@@ -273,13 +273,13 @@ test('toolbar: search narrows live, each filter works, the summary is not filter
   } finally { await ctx.close(); }
 });
 
-test('toolbar for a guest: no "+", no "Do tôi kể"; at 360 px the bar and the tabs fit with no page overflow', { skip }, async () => {
+test('toolbar for a guest: "+", no "Do tôi kể"; at 360 px the bar and the tabs fit with no page overflow', { skip }, async () => {
   const guest = await newPage(360, null);
   try {
     // a living person is hidden from a guest: the deceased owner's tab
     await goProfile(guest.page, FATHER, '?tab=story');
     await guest.page.waitForSelector('#stq');
-    assert.equal(await guest.page.locator('[data-st-add]').count(), 0, 'no + for a guest');
+    assert.equal(await guest.page.locator('[data-st-add]').count(), 1, 'a guest has the + (a suggestion)');
     await guest.page.click('[data-fp]');
     await guest.page.waitForSelector('dialog.fpanel[open]');
     assert.equal(await guest.page.locator('dialog.fpanel input[data-st-who="mine"]').count(), 0, 'no "Do tôi kể" for a guest');

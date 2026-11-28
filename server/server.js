@@ -855,8 +855,10 @@ app.post('/api/suggest', async (req, res, next) => {
     const err = isEv ? (Object.keys(b.changes).length === 1 ? await EV.checkEvSuggest(b.changes._ev) : 'Một góp ý sự kiện chỉ gồm một mục.') : await checkSuggestChanges(b.changes);
     if (err) return res.status(400).json({ error: err });
     if (isEv && !personId) return res.status(400).json({ error: 'Chọn người cần góp ý sự kiện.' });
-    if (isEv && b.changes._ev.kind === 'story') { // stories: members only (editors save at once); the tagged people are of this family
-      if (!canSeePrivate(await who(req, f.id))) return res.status(403).json({ error: 'Chỉ thành viên mới góp được câu chuyện.' });
+    if (isEv && b.changes._ev.kind === 'story') { // stories: anyone may suggest text; members review it (editors save at once); the tagged people are of this family
+      const member = canSeePrivate(await who(req, f.id));
+      const photos = b.changes._ev.item && b.changes._ev.item.photos;
+      if (!member && Array.isArray(photos) && photos.length) return res.status(400).json({ error: 'Khách chỉ gửi được chữ và đường dẫn; đăng nhập và tham gia dòng họ để tải ảnh.' });
       try { await EV.checkStoryPeople(pool, f.id, b.changes._ev.item, personId); } catch (e) { return res.status(400).json({ error: e.message }); }
     }
     const isRel = Object.prototype.hasOwnProperty.call(b.changes, '_rel');

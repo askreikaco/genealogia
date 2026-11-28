@@ -68,7 +68,7 @@ const SHELL = [
   '/js/kin/packs/vi.js',
   '/js/kin/packs/zh-Hans.js',
   '/js/kin/packs/zh-Hant.js',
-  '/js/lunar.js', '/js/calendars.js', '/js/calendars-vi.js', '/js/date-field.js', '/js/digest-vi.js',
+  '/js/lunar.js', '/js/calendars.js', '/js/calendars-vi.js', '/js/plus.js', '/js/plus-vi.js', '/js/date-field.js', '/js/digest-vi.js',
   '/js/model.js',
   '/js/relgraph.js',
   '/js/relui.js',

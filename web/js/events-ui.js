@@ -391,7 +391,7 @@ export function wireEvx(root, persons, opts = {}) {
 
 // Story editor (title, body, photo links one per line). The summary edit uses the same markup with body only.
 // persons: the family's people to pick from ({id, name, years}); people: the ids already tagged. A summary tags nobody.
-export function storyEditorHtml(s = {}, { summary = false, persons = [], people = [] } = {}) {
+export function storyEditorHtml(s = {}, { summary = false, persons = [], people = [], photos = true } = {}) {
   const chips = summary ? '' : people.map((pid) => personChip(pid, persons)).join('');
   const tags = summary ? '' : `<div class="evx-people"><span class="sub">${esc(STORIES_VI.tag_label)}</span><div class="chips" data-chips>${chips}</div>
       <input class="pk-q" type="search" placeholder="Tìm người…" autocomplete="off" aria-label="${esc(STORIES_VI.tag_label)}" data-pk-q>
@@ -400,7 +400,7 @@ export function storyEditorHtml(s = {}, { summary = false, persons = [], people 
     + (summary ? '' : `<label class="fld">Tiêu đề<input data-s="title" value="${esc(s.title || '')}" maxlength="300" autocomplete="off"></label>`)
     + `<label class="fld">Nội dung<textarea data-s="body" rows="${summary ? 8 : 6}" maxlength="20000">${esc(s.body || '')}</textarea></label>`
     + tags
-    + (summary ? '' : `<label class="fld">Link ảnh (mỗi dòng một link)<textarea data-s="photos" rows="2">${esc((s.photos || []).join('\n'))}</textarea></label>`)
+    + (summary || !photos ? '' : `<label class="fld">Link ảnh (mỗi dòng một link)<textarea data-s="photos" rows="2">${esc((s.photos || []).join('\n'))}</textarea></label>`)
     + `<p class="err" data-evx-err role="alert" hidden></p><div class="row end evx-acts"><button type="button" class="btn gh" data-evx-cancel>Hủy</button><button type="button" class="btn" data-stx-save>Lưu</button></div></div>`;
 }
 export function readStx(root) {

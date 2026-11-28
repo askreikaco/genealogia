@@ -66,6 +66,8 @@ import { index as relIndex } from './relgraph.js';
 import { evIcon, typeIcon, headline, tlLoad, tlSave, tlTags, tlApplyUntag, tlToolbar, tlSheetDialog, tlEntries, tlMatch, tlList, tlCount, storiesBodyHtml, stLoad, stSave, stBarHtml, stSheetDialog, stApplyUntag, approxHtml,
   evEditorHtml, readEvx, wireEvx, storyEditorHtml, readStx, photoRow, PHOTO_PREVIEW } from './events-ui.js';
 import { STORIES_VI } from './stories-vi.js';
+import { PLUS_VI } from './plus-vi.js';
+import { srcLoad, srcSave, srcBarHtml, srcSheetHtml, srcAddHtml, gopYNote, joinHrefOf } from './plus.js';
 import { sourcesPage } from './sources-ui.js';
 const fold = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/đ/g, 'd');
 
@@ -832,14 +834,40 @@ const paintLifeBar = () => { if (!LIFE) return; const el = document.getElementBy
 // Filter changes: state per device; the sheet stays open, the list repaints.
 function tlChange(fn) { const f = fn(tlLoad()); tlSave(f); paintLifeBody(); }
 function lifeUntag(k) { tlSave(tlApplyUntag(tlLoad(), k)); paintLifeBar(); paintLifeBody(); }
+// Tư liệu: the sources of the events and the photos of the stories, with the shared toolbar (search · Bộ lọc · "+").
+// The filter sheet has Nguồn and Ảnh; "+" offers a sourced event or a story with photos.
 function srcHtml(p) {
   const { ev } = lifeModel(p);
   if (!ev || !ev.loaded) return '<p class="sub">Đang tải…</p>';
-  const items = ev.items.filter((e) => (e.sources || []).length);
-  const photos = (ev.stories || []).flatMap((s) => (s.photos || []).map((u) => ({ u, title: s.title })));
-  if (!items.length && !photos.length) return emptyState('Chưa có nguồn hay ảnh nào.');
-  return `${items.length ? `<h3 class="tl-lbl">Nguồn</h3><ul class="srcl">${items.map((e) => e.sources.map((s) => `<li><b>${esc(headline(e))}</b> · ${esc(s.title)}${s.url ? ` · <a href="${esc(s.url)}" target="_blank" rel="noopener">Mở</a>` : ''}${s.quality ? ` <span class="sub">${esc(SOURCE_QUALITY[s.quality] || '')}</span>` : ''}</li>`).join('')).join('')}</ul>` : ''}`
-    + `${photos.length ? `<h3 class="tl-lbl">Ảnh</h3><div class="stry-ph">${photos.map((x) => `<img src="${esc(x.u)}" alt="${esc(x.title)}" loading="lazy">`).join('')}</div>` : ''}`;
+  LIFE = { p };
+  const f = srcLoad();
+  return `<div class="tl-bar stk" id="src-bar">${srcBarHtml(f)}</div><div id="src-body">${srcBodyHtml(p)}</div>${srcSheetHtml(f)}`;
+}
+function srcBodyHtml(p) {
+  const { ev } = lifeModel(p); const f = srcLoad(); const q = f.q.trim().toLowerCase();
+  const has = (t) => !q || String(t).toLowerCase().includes(q);
+  const rows = f.src ? (ev.items || []).flatMap((e) => (e.sources || []).filter((c) => has(headline(e) + ' ' + c.title)).map((c) => ({ e, c }))) : [];
+  const photos = f.photo ? (ev.stories || []).flatMap((s) => (s.photos || []).filter(() => has(s.title)).map((u) => ({ u, title: s.title }))) : [];
+  if (!rows.length && !photos.length) {
+    const any = (ev.items || []).some((e) => (e.sources || []).length) || (ev.stories || []).some((s) => (s.photos || []).length);
+    return emptyState(any ? PLUS_VI.src_empty_q : 'Chưa có nguồn hay ảnh nào.');
+  }
+  return `${rows.length ? `<h3 class="tl-lbl">${esc(PLUS_VI.f_src)}</h3><ul class="srcl">${rows.map(({ e, c }) => `<li><b>${esc(headline(e))}</b> · ${esc(c.title)}${c.url ? ` · <a href="${esc(c.url)}" target="_blank" rel="noopener">Mở</a>` : ''}${c.quality ? ` <span class="sub">${esc(SOURCE_QUALITY[c.quality] || '')}</span>` : ''}</li>`).join('')}</ul>` : ''}`
+    + `${photos.length ? `<h3 class="tl-lbl">${esc(PLUS_VI.f_photo)}</h3><div class="stry-ph">${photos.map((x) => `<img src="${esc(x.u)}" alt="${esc(x.title)}" loading="lazy">`).join('')}</div>` : ''}`;
+}
+const paintSrcBody = () => { if (!LIFE) return; const el = document.getElementById('src-body'); if (el) el.innerHTML = srcBodyHtml(LIFE.p); };
+const paintSrcBar = () => { const el = document.getElementById('src-bar'); if (el) el.innerHTML = srcBarHtml(srcLoad()); };
+// The "+" sheet: a sourced event (the event editor with its sources part open) or a story with photos (for a
+// non-member, the story editor without the photo field).
+function srcAddDialog(p) {
+  const d = document.createElement('dialog'); d.className = 'dlg';
+  d.innerHTML = `<div class="form-stack">${srcAddHtml()}<div class="row end"><button type="button" class="btn gh" data-x>Hủy</button></div></div>`;
+  document.body.append(d); d.showModal();
+  const close = () => { d.close(); d.remove(); };
+  d.querySelector('[data-x]').onclick = close;
+  d.querySelector('[data-src-ev]').onclick = () => { close(); location.hash = hf(`su-kien/${p.id}?src=1`); };
+  d.querySelector('[data-src-story]').onclick = () => { close(); evDialog({ kind: 'story', p, title: 'Viết câu chuyện' }); };
+  d.addEventListener('close', () => d.remove());
 }
 // Event editor page (owner 2026-11-24: a big form is a page, not a sheet): #/<fam>/su-kien/<personId>[?id=<eventId>].
 // Back and Hủy return; the sticky bar holds Hủy · Lưu; delete sits apart in "Vùng nguy hiểm" and always confirms.
@@ -866,6 +894,8 @@ function eventPage(pid) {
     + evEditorHtml(item, { people: item.people || [], persons, id: id || '', page: true })
     + (id && direct ? dangerZone([dangerButton('Xóa sự kiện', 'data-evp-del')], { note: 'Xóa sự kiện khỏi dòng đời. Không thể hoàn tác.' }) : '')
     + '</div>';
+  // from Tư liệu's "+" (?src=1): the "Thêm chi tiết" part that holds the sources is open
+  if (lk.get('src') === '1') main.querySelector('[data-srcarea]')?.closest('details')?.setAttribute('open', '');
   const root = main.querySelector('[data-evx]'); wireEvx(root, persons, { fam });
   const fail = (m) => { const e = root.querySelector('[data-evx-err]'); e.hidden = false; e.textContent = m; discOpenErr(root); };
   // Saved from the person form's link: back to the profile's Thông tin (where the current value shows); else Dòng đời.
@@ -880,12 +910,13 @@ function eventPage(pid) {
 }
 // Event / story editor dialog (timeline). Editors save at once; others send a suggestion.
 function evDialog({ kind, p, id = null, item = {}, title }) {
-  const fam = famOfP(p); const direct = evDirect(fam);
+  const fam = famOfP(p); const direct = evDirect(fam); const member = evMemberOf(fam);
   const persons = evPickList(fam);
   const d = document.createElement('dialog'); d.className = 'dlg evdlg';
   const body = kind === 'event' ? evEditorHtml(item, { people: item.people || [], persons, id: id || '' })
-    : storyEditorHtml(item, { summary: item.kind === 'tom_tat', persons: storyPickList(fam, p.id), people: item.people || [] });
-  d.innerHTML = `<div class="form-stack"><h2>${esc(title)}</h2>${direct ? '' : '<p class="sub">Quản trị sẽ duyệt trước khi hiển thị.</p>'}${body}</div>`;
+    : storyEditorHtml(item, { summary: item.kind === 'tom_tat', persons: storyPickList(fam, p.id), people: item.people || [], photos: member });
+  // a non-member's góp ý: who reviews it, and the join link
+  d.innerHTML = `<div class="form-stack"><h2>${esc(title)}</h2>${direct ? '' : member ? '<p class="sub">Quản trị sẽ duyệt trước khi hiển thị.</p>' : gopYNote(joinHrefOf(fam))}${body}</div>`;
   document.body.append(d); d.showModal();
   if (kind === 'event') wireEvx(d.querySelector('[data-evx]'), persons, { fam });
   else if (item.kind !== 'tom_tat') wireEvx(d.querySelector('[data-stx]'), storyPickList(fam, p.id), {});
@@ -895,7 +926,7 @@ function evDialog({ kind, p, id = null, item = {}, title }) {
   const save = async (changes) => {
     try {
       const j = await evApiSave({ fam, p, kind, id, item: changes, direct });
-      close(); toast(j.queued ? 'Chưa gửi: sẽ lưu lên máy chủ khi có mạng' : direct ? 'Đã lưu' : 'Đã gửi góp ý. Quản trị sẽ duyệt.'); if (direct) evInvalidate(fam, p.id); if (direct) await evLoad(fam, p.id, true).catch(() => {}); render(); return j;
+      close(); toast(j.queued ? 'Chưa gửi: sẽ lưu lên máy chủ khi có mạng' : direct ? 'Đã lưu' : member ? 'Đã gửi góp ý. Quản trị sẽ duyệt.' : PLUS_VI.toast_sent); if (direct) evInvalidate(fam, p.id); if (direct) await evLoad(fam, p.id, true).catch(() => {}); render(); return j;
     } catch (e) { fail(e.message); }
   };
   const evSave = d.querySelector('[data-evx-save]'); if (evSave) evSave.onclick = () => { const r = readEvx(d.querySelector('[data-evx]')); if (r.error) return fail(r.error); save(r.item); };
@@ -964,7 +995,7 @@ function storyTabHtml(p) {
   if (ev.hidden) return `${card(`<p class="sub">Thông tin của người đang sống chỉ thành viên xem được.</p>${S.signedIn() ? '' : '<p><button type="button" class="btn sm" data-acct="in">Đăng nhập</button></p>'}`)}`;
   LIFE = { p }; // the Câu chuyện actions (add, edit, Đọc tiếp, Xem tất cả, search, filter) read the person from LIFE
   const f = storyFilter();
-  return `<div class="tl-bar stk" id="st-bar">${stBarHtml(f, { canAdd: evMemberOf(fam) })}</div><div id="st-body">${storyBodyHtml(p)}</div>${stSheetDialog(f, { me: storyMe() })}`;
+  return `<div class="tl-bar stk" id="st-bar">${stBarHtml(f, { canAdd: true })}</div><div id="st-body">${storyBodyHtml(p)}</div>${stSheetDialog(f, { me: storyMe() })}`;
 }
 // The list part (repainted by the search and the filter, the bar stays): the summary, the chips, the stories.
 function storyBodyHtml(p) {
@@ -981,7 +1012,7 @@ const paintStoryBody = () => { if (!LIFE) return; const el = document.getElement
 function storyChange(f) { stSave(f); paintStoryBody(); }
 function storyUntag(k) {
   stSave(stApplyUntag(stLoad(), k));
-  const bar = document.getElementById('st-bar'); if (bar && LIFE) bar.innerHTML = stBarHtml(storyFilter(), { canAdd: evMemberOf(LIFE.p && famOfP(LIFE.p)) });
+  const bar = document.getElementById('st-bar'); if (bar && LIFE) bar.innerHTML = stBarHtml(storyFilter(), { canAdd: true });
   const sheet = document.querySelector('dialog.fpanel'); if (sheet && LIFE) { const t = document.createElement('div'); t.innerHTML = stSheetDialog(storyFilter(), { me: storyMe() }); sheet.replaceWith(t.firstElementChild); }
   paintStoryBody();
 }
@@ -1027,6 +1058,7 @@ document.addEventListener('click', (e) => {
     return;
   }
   if (e.target.closest('[data-st-add]')) { evDialog({ kind: 'story', p, title: 'Viết câu chuyện' }); return; }
+  if (e.target.closest('[data-src-add]')) { srcAddDialog(p); return; }
   const stm = e.target.closest('[data-st-more]'); // "Đọc tiếp": the body opens inline
   if (stm) { stm.parentElement.querySelector('.rv-clamp')?.classList.remove('rv-clamp'); stm.remove(); return; }
   const sta = e.target.closest('[data-st-all]'); // "Xem tất cả N câu chuyện": the rest of the stories show
@@ -1036,7 +1068,8 @@ document.addEventListener('click', (e) => {
 document.addEventListener('change', (e) => {
   if (!LIFE || !main.contains(e.target)) return;
   const t = e.target;
-  if (t.dataset.stWho) { storyChange({ ...storyFilter(), who: t.dataset.stWho }); const bar = document.getElementById('st-bar'); if (bar) bar.innerHTML = stBarHtml(storyFilter(), { canAdd: evMemberOf(famOfP(LIFE.p)) }); return; }
+  if (t.dataset.srcF) { srcSave({ ...srcLoad(), [t.dataset.srcF]: t.checked }); paintSrcBody(); return; }
+  if (t.dataset.stWho) { storyChange({ ...storyFilter(), who: t.dataset.stWho }); const bar = document.getElementById('st-bar'); if (bar) bar.innerHTML = stBarHtml(storyFilter(), { canAdd: true }); return; }
   if (t.dataset.tlType) tlChange((f) => ({ ...f, types: t.checked ? [...f.types, t.dataset.tlType] : f.types.filter((x) => x !== t.dataset.tlType) }));
   else if (t.dataset.tlStage) tlChange((f) => ({ ...f, stages: t.checked ? [...f.stages, t.dataset.tlStage] : f.stages.filter((x) => x !== t.dataset.tlStage) }));
   else if (t.dataset.tlF) tlChange((f) => ({ ...f, [t.dataset.tlF]: t.checked }));
@@ -1049,9 +1082,14 @@ document.addEventListener('click', (e) => {
   if (b) { tlChange((f) => ({ ...f, [b.dataset.tlF]: !f[b.dataset.tlF] })); paintLifeBar(); }
 });
 document.addEventListener('input', (e) => {
+  if (LIFE && e.target.id === 'srq') { // Tư liệu search: the list repaints, the caret stays in the box
+    const pos = e.target.selectionStart; srcSave({ ...srcLoad(), q: e.target.value }); paintSrcBody(); paintSrcBar();
+    const i = document.getElementById('srq'); i?.focus(); i?.setSelectionRange(pos, pos);
+    return;
+  }
   if (LIFE && e.target.id === 'stq') { // live search: the list repaints, the caret stays in the box
     const pos = e.target.selectionStart; storyChange({ ...storyFilter(), q: e.target.value });
-    const bar = document.getElementById('st-bar'); if (bar) { bar.innerHTML = stBarHtml(storyFilter(), { canAdd: evMemberOf(famOfP(LIFE.p)) }); const i = document.getElementById('stq'); i?.focus(); i?.setSelectionRange(pos, pos); }
+    const bar = document.getElementById('st-bar'); if (bar) { bar.innerHTML = stBarHtml(storyFilter(), { canAdd: true }); const i = document.getElementById('stq'); i?.focus(); i?.setSelectionRange(pos, pos); }
     return;
   }
   if (!LIFE || e.target.id !== 'tlq') return;

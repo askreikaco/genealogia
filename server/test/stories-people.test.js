@@ -67,17 +67,19 @@ test.after(async () => {
   await pool.end();
 });
 
-test('member: no direct write (403); the story goes to the suggestion queue; a guest is refused (403)', { skip }, async () => {
+test('member: no direct write (403); the story goes to the suggestion queue; a guest may suggest text (200)', { skip }, async () => {
   const direct = await call('POST', `/api/stories?family=${FAM}`, { op_id: op(1), person_id: DEAD, story: story() }, memberCookie);
   assert.equal(direct.status, 403);
   const sug = await call('POST', '/api/suggest', { family: FAM, person_id: DEAD, changes: { _ev: { action: 'add', kind: 'story', item: story() } }, by_name: 'x' }, memberCookie);
   assert.equal(sug.status, 200, sug.text);
   const guest = await call('POST', '/api/suggest', { family: FAM, person_id: DEAD, changes: { _ev: { action: 'add', kind: 'story', item: story() } }, by_name: 'Khách' });
-  assert.equal(guest.status, 403);
-  assert.match(guest.json.error, /thành viên/);
-  // the guest's refusal does not reach the queue
+  assert.equal(guest.status, 200, guest.text);
+  // the guest's text-only story joins the queue beside the member's
   const q = await call('GET', `/api/suggestions?family=${FAM}`, undefined, editorCookie);
-  assert.equal(q.json.items.filter((x) => x.ev_label && /câu chuyện/.test(x.ev_label)).length, 1);
+  assert.equal(q.json.items.filter((x) => x.ev_label && /câu chuyện/.test(x.ev_label)).length, 2);
+  // rejected here, so the approval test below meets the member's story alone
+  const rj = await call('POST', `/api/suggestions/${guest.json.id}/reject?family=${FAM}`, { reason: 'test' }, editorCookie);
+  assert.equal(rj.status, 200, rj.text);
 });
 
 test('editor: saved directly; the teller is the editor; an approved member story is told by the member', { skip }, async () => {
@@ -151,4 +153,13 @@ test('a summary tags nobody', { skip }, async () => {
   const s = await call('POST', `/api/stories?family=${FAM}`, { op_id: op(8), person_id: DEAD, story: { kind: 'tom_tat', title: 'Câu chuyện đời', body: 'Tóm tắt.', people: [DEAD2] } }, editorCookie);
   assert.equal(s.status, 200, s.text);
   assert.deepEqual(s.json.story.people, []);
+});
+
+test('guest story: text and links only; photos are refused for non-members (400), members may attach them', { skip }, async () => {
+  const withPhoto = story({ photos: ['https://example.test/a.jpg'] });
+  const guestPhoto = await call('POST', '/api/suggest', { family: FAM, person_id: DEAD, changes: { _ev: { action: 'add', kind: 'story', item: withPhoto } }, by_name: 'Khách' });
+  assert.equal(guestPhoto.status, 400);
+  assert.equal(guestPhoto.json.error, 'Khách chỉ gửi được chữ và đường dẫn; đăng nhập và tham gia dòng họ để tải ảnh.');
+  const memberPhoto = await call('POST', '/api/suggest', { family: FAM, person_id: DEAD, changes: { _ev: { action: 'add', kind: 'story', item: withPhoto } }, by_name: 'x' }, memberCookie);
+  assert.equal(memberPhoto.status, 200, memberPhoto.text);
 });

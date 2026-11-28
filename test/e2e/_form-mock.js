@@ -22,7 +22,7 @@ async function open(browser, opts) {
   if (opts.init) await ctx.addInitScript(opts.init);
   return { ...(await openIn(ctx, opts)), ctx };
 }
-async function openIn(ctx, { role, path: hash, persons = PERSONS, personsDelay = 0, rel, ready = '#fpform, .fp-form, main h1' }) {
+async function openIn(ctx, { role, path: hash, persons = PERSONS, personsDelay = 0, rel, events, ready = '#fpform, .fp-form, main h1' }) {
   const page = await ctx.newPage();
   const log = { ops: [], suggest: [], errors: [], logout: 0, personsServed: 0 };
   page.on('pageerror', (e) => log.errors.push(e.message));
@@ -45,6 +45,7 @@ async function openIn(ctx, { role, path: hash, persons = PERSONS, personsDelay =
     }
     if (p === '/api/ops') { const b = req.postDataJSON(); log.ops.push(...b.ops); return json({ applied: b.ops.map((o) => o.op_id), rejected: [] }); }
     if (p === '/api/suggest') { log.suggest.push(req.postDataJSON()); return json({ id: 'S' + log.suggest.length, receipt: 'R'.repeat(32) }); }
+    if (p === '/api/events') return json(events || {}); // a person's events and stories (optional fixture)
     if (p === '/api/logout' || p === '/api/accounts/signout') { log.logout++; return json({ ok: true, active: null, accounts: 0 }); }
     if (p === '/api/me/prefs') return json({ prefs: {} });
     if (p === '/api/me/claim') return json({});
