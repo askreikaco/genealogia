@@ -327,6 +327,9 @@
         "server/events.js",
         "web/js/events*.js",
         "web/js/ev-title-vi.js",
+        "web/js/disc-rules.js",
+        "web/js/forms-vi.js",
+        "server/test/forms-disc-lunar.test.js",
         "server/migrations/042_event_title.sql",
         "server/test/events*.test.js",
         "server/test/event-title-*.test.js",
@@ -338,7 +341,8 @@
       ],
       "e2e": [
         "test/e2e/events*.test.js",
-        "test/e2e/event-title.test.js"
+        "test/e2e/event-title.test.js",
+        "test/e2e/forms-minimal-a.test.js"
       ]
     },
     "gallery": {

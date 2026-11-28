@@ -10,6 +10,7 @@
 // mat DEAT, an_tang BURI, khac EVEN.
 
 import { parseReignYear } from './events-history.js';
+import { solarToLunar } from './lunar.js';
 import { EVT_VI } from './ev-title-vi.js';
 
 export const EVENT_TYPES = {
@@ -125,6 +126,17 @@ export function formatEventDate(ev) {
   return (lbl ? lbl + ' ' : '') + show(ev.date_from);
 }
 
+// Lunar date of an event, auto from Thời gian: only for an exact day (date_from is Y-M-D), stored as the person form does
+// ("15/8", "2/8 nhuận"). A year or month only, a range, "khoảng" or "trước"/"sau" give ''. A display hint only: it is
+// never saved (the Âm lịch field stores what the user typed).
+export function eventAutoLunar(text) {
+  const p = parseEventDate(text);
+  if (p.kind !== 'exact' || !p.from) return '';
+  const iso = parseIso(p.from);
+  if (!iso || iso.d === null || iso.m === null) return '';
+  const l = solarToLunar(iso.d, iso.m, iso.y);
+  return `${l.day}/${l.month}${l.leap ? ' nhuận' : ''}`;
+}
 // Birth date of a person record as ISO partial: birth_date "5/3/1963", else born "1963". null when unknown.
 export function birthIso(d) {
   if (!d) return null;

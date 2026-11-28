@@ -102,6 +102,8 @@ test('event edit is a page with back and a sticky Hủy · Lưu bar; delete is i
       assert.equal(bar.pos, 'fixed', 'sticky bottom bar');
       assert.equal(bar.txt, 'Hủy Lưu sự kiện');
       assert.equal(bar.danger, 0, 'no destructive button beside Save');
+      // the sources sit inside "Thêm chi tiết" (a closed fold unless it holds a value): open it to measure them
+      await page.evaluate(() => { document.querySelector('[data-evx] details[data-disc]').open = true; });
       // sources as cards: every field full width on a phone
       const src = await page.evaluate(() => { const c = document.querySelector('.srow').getBoundingClientRect(); return [...document.querySelectorAll('.srow .fld')].map((f) => Math.round(f.getBoundingClientRect().width / (c.width - 32) * 100)); });
       // a free-text citation: title, link, page, quality (E2 added the page field)

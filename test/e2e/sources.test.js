@@ -84,6 +84,10 @@ async function openEventPage(page, id) {
 }
 const noSideScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
 
+// Sources sit inside "Thêm chi tiết" (a closed native fold on a new event): open it, as a user would before adding one.
+// Idempotent (a summary click would toggle it shut again).
+const openFold = (page) => page.evaluate(() => { document.querySelector('[data-evx] details[data-disc]').open = true; });
+
 test('the editor adds a new source inside an event, sets its page and quality; the card shows the citation', { skip }, async () => {
   const { ctx, page, errs } = await newPage(390, true);
   try {
@@ -92,7 +96,7 @@ test('the editor adds a new source inside an event, sets its page and quality; t
     await page.fill('[data-evx] input[data-f="date_text"]', '1980');
     await page.fill('[data-evx] input[data-f="place"]', 'Huế');
     await page.fill('[data-evx] textarea[data-f="description"]', 'Học trường làng');
-    await page.click('[data-evx] [data-src-add]');
+    await openFold(page); await page.click('[data-evx] [data-src-add]');
     await page.click('[data-evx] [data-src-newbtn]');
     await page.fill('[data-evx] [data-sr="title"]', 'Gia phả viết tay 1950');
     await page.selectOption('[data-evx] [data-sr="kind"]', 'gia_pha');
@@ -102,7 +106,7 @@ test('the editor adds a new source inside an event, sets its page and quality; t
     await page.waitForSelector('[data-evx] [data-src][data-src-id]', { timeout: 20000 });
     await page.fill('[data-evx] [data-src][data-src-id] [data-sf="page"]', 'tr. 12');
     await page.selectOption('[data-evx] [data-src][data-src-id] [data-sf="quality"]', 'goc');
-    await page.click('[data-evx] [data-src-add]');
+    await openFold(page); await page.click('[data-evx] [data-src-add]');
     await page.waitForSelector('[data-evx] [data-srcpick]:not([hidden])');
     await shot(page, 'form-sources-390.png');
     await page.click('[data-evx] [data-src-close]');
@@ -128,7 +132,7 @@ test('a second event picks the same source from the list; the Nguồn tài liệ
     await openEventPage(page, DEAD_B);
     await page.selectOption('[data-evx] select[data-f="type"]', 'nghe');
     await page.fill('[data-evx] textarea[data-f="description"]', 'Thợ dệt');
-    await page.click('[data-evx] [data-src-add]');
+    await openFold(page); await page.click('[data-evx] [data-src-add]');
     await page.waitForSelector('[data-evx] [data-src-res] [data-src-pick]', { timeout: 20000 });
     await page.fill('[data-evx] [data-src-q]', 'gia phả');
     await page.click('[data-evx] [data-src-res] [data-src-pick]');
@@ -161,7 +165,7 @@ test('360 px: the picker and the list do not scroll sideways; a guest is refused
   const { ctx, page, errs } = await newPage(360, true);
   try {
     await openEventPage(page, DEAD_A);
-    await page.click('[data-evx] [data-src-add]');
+    await openFold(page); await page.click('[data-evx] [data-src-add]');
     assert.equal(await noSideScroll(page), true, 'the picker at 360');
     await page.goto(`${base}/#/${SLUG}/nguon-tai-lieu`);
     await page.waitForSelector('[data-sp-id]', { timeout: 20000 });

@@ -44,6 +44,8 @@ const SHELL = [
   '/js/sources-vi.js',
   '/js/stories-vi.js',
   '/js/ev-title-vi.js',
+  '/js/disc-rules.js',
+  '/js/forms-vi.js',
   '/js/gallery.js',
   '/js/gallery-ui.js',
   '/js/gallery-vi.js',

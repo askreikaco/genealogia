@@ -18,7 +18,7 @@ import { locate } from './geo.js';
 import { chartLayout, chartSvg } from './treechart.js';
 import { emblemField, bindEmblem } from './emblem.js';
 import { openConfirm } from '../vendor/reika-ds/js/index.js';
-import { isWide, isDesk, layoutAtLeast, emptyState, cic, iconButton, toolbar, addBtn, ltags, fpanel, fsheet, sheet, closeSheets, setUntag, deviceNote, toast, fmtTime, fmtDate, fieldDiff, frow, accItem, accToggle, confirmModal, CFM_CANCEL, closeConfirms, famChip, familyCrest, calmRow, calmAct, surnameTile, surnameTileOf, popMenu, closeMenu, sexMark, sexClass, SEX_LABEL, tag, section, card } from './ui.js';
+import { isWide, isDesk, layoutAtLeast, emptyState, cic, iconButton, toolbar, addBtn, ltags, fpanel, fsheet, sheet, closeSheets, setUntag, deviceNote, toast, fmtTime, fmtDate, fieldDiff, frow, accItem, accToggle, confirmModal, CFM_CANCEL, closeConfirms, famChip, familyCrest, calmRow, calmAct, surnameTile, surnameTileOf, popMenu, closeMenu, sexMark, sexClass, SEX_LABEL, tag, section, card , discOpenErr } from './ui.js';
 import { BUILD, BUILD_DATE, createUpdater, updateNotice, buildLabel } from './update.js';
 import { searchPeople } from './fuzzy.js';
 import { nameHit, listPrefill, gioPrefill, eventPrefill } from './prefill.js';
@@ -857,7 +857,7 @@ function eventPage(pid) {
     + (id && direct ? dangerZone([dangerButton('Xóa sự kiện', 'data-evp-del')], { note: 'Xóa sự kiện khỏi dòng đời. Không thể hoàn tác.' }) : '')
     + '</div>';
   const root = main.querySelector('[data-evx]'); wireEvx(root, persons, { fam });
-  const fail = (m) => { const e = root.querySelector('[data-evx-err]'); e.hidden = false; e.textContent = m; };
+  const fail = (m) => { const e = root.querySelector('[data-evx-err]'); e.hidden = false; e.textContent = m; discOpenErr(root); };
   const done = async (msg) => { if (msg) toast(msg); if (direct) { evInvalidate(fam, p.id); await evLoad(fam, p.id, true).catch(() => {}); } profTab = 'life'; location.hash = hf(`person/${p.id}?tab=life`); };
   root.querySelector('[data-evx-cancel]').onclick = () => goBack();
   root.querySelector('[data-evx-save]').onclick = async (e) => {
@@ -880,7 +880,7 @@ function evDialog({ kind, p, id = null, item = {}, title }) {
   else if (item.kind !== 'tom_tat') wireEvx(d.querySelector('[data-stx]'), storyPickList(fam, p.id), {});
   const close = () => { d.close(); d.remove(); };
   d.querySelector('[data-evx-cancel]').onclick = close;
-  const fail = (m) => { const e = d.querySelector('[data-evx-err]'); e.hidden = false; e.textContent = m; };
+  const fail = (m) => { const e = d.querySelector('[data-evx-err]'); e.hidden = false; e.textContent = m; discOpenErr(d); };
   const save = async (changes) => {
     try {
       const j = await evApiSave({ fam, p, kind, id, item: changes, direct });

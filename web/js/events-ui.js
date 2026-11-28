@@ -6,10 +6,15 @@ import { sourcesAreaHtml, readCites, wireSources } from './sources-ui.js';
 import { SRC_VI } from './sources-vi.js';
 import { STORIES_VI } from './stories-vi.js';
 import { nameOf } from './hidden.js';
-import { toolbar, ltags, fpanel, fsheet, cic, addBtn, tag, card, emptyState } from './ui.js';
-import { EVENT_TYPES, EVENT_TYPE_KEYS, parseEventDate, formatEventDate, sortEvents, eventDays, yearOfDays,
+import { toolbar, ltags, fpanel, fsheet, cic, addBtn, tag, card, emptyState, moreFold, discWire } from './ui.js';
+import { EVENT_TYPES, EVENT_TYPE_KEYS, parseEventDate, formatEventDate, eventAutoLunar, sortEvents, eventDays, yearOfDays,
   birthIso, ageAt, stageOf, STAGES, autoSummary, eventTitle } from './events.js';
 import { EVT_VI } from './ev-title-vi.js';
+import { FORMS_VI } from './forms-vi.js';
+import { discHasValue } from './disc-rules.js';
+// The date help: a native details (tap to show, as the "Cách tính" help does), beside Thời gian. The example stays the placeholder.
+const DATE_HELP = 'Nhập năm, tháng/năm, hoặc “khoảng 1980”, “trước 1975”, “sau 1990”, “1980–1985”.';
+const lunarHint = (v) => FORMS_VI.lunar_hint.replace('{v}', v);
 
 const P = (d) => `<path d="${d}"/>`;
 // 24-unit stroke icons for the event types (one per type icon key in events.js).
@@ -291,23 +296,25 @@ export function evEditorHtml(item = {}, { people = [], persons = [], id = '', pa
   if (item.date_kind && !v.date_text) v.date_text = formatEventDate(item);
   const chips = people.map((pid) => personChip(pid, persons)).join('');
   const photos = (item.photos || []).map((u) => photoRow(u)).join('');
+  const dtId = `evx-dt-${id || 'new'}`;
+  const autoLu = eventAutoLunar(v.date_text); // the lunar of an exact Thời gian: a hint under it, never stored
   return `<div class="evx" data-evx data-id="${esc(id)}">
     <label class="fld">Loại sự kiện<select data-f="type">${EVENT_TYPE_KEYS.map((k) => `<option value="${k}" ${k === v.type ? 'selected' : ''}>${esc(typeLabel(k))}</option>`).join('')}</select></label>
     <div class="evx-title" data-tt-wrap${v.type === 'khac' ? '' : ' hidden'}>
       <label class="fld">${EVT_VI.title_label}<input data-f="title" value="${esc(v.title || '')}" maxlength="80" autocomplete="off" placeholder="${esc(EVT_VI.title_ph)}" data-tt-q></label>
       <div class="pk-res" data-tt-res></div></div>
-    <label class="fld">Thời gian<input data-f="date_text" value="${esc(v.date_text)}" autocomplete="off" placeholder="vd 1981, 3/1981, 1980–1981"></label>
-    <p class="sub">Nhập năm, tháng/năm, hoặc “khoảng 1980”, “trước 1975”, “sau 1990”, “1980–1985”.</p>
-    <label class="fld">Âm lịch (tuỳ chọn)<input data-f="lunar" value="${esc(v.lunar)}" autocomplete="off"></label>
+    <div class="fld evx-dt"><span class="evx-dt-h"><label for="${dtId}">Thời gian</label><details class="evx-help"><summary aria-label="${esc(FORMS_VI.date_help_label)}">ⓘ</summary><p class="sub">${esc(DATE_HELP)}</p></details></span><input id="${dtId}" data-f="date_text" value="${esc(v.date_text)}" autocomplete="off" placeholder="vd 1981, 3/1981, 1980–1981"><p class="sub evx-lunar" data-lunar-hint${autoLu ? '' : ' hidden'}>${autoLu ? esc(lunarHint(autoLu)) : ''}</p></div>
     <label class="fld">Địa điểm<input data-f="place" value="${esc(v.place)}" autocomplete="off"></label>
-    <label class="fld">Tên mới (sau 2025), nếu khác<input data-f="place_new" value="${esc(v.place_new)}" autocomplete="off"></label>
     <label class="fld">Mô tả<textarea data-f="description" rows="3" maxlength="2000">${esc(v.description)}</textarea></label>
-    <div class="evx-people"><span class="sub">Người liên quan</span><div class="chips" data-chips>${chips}</div>
-      <input class="pk-q" type="search" placeholder="Tìm người…" autocomplete="off" aria-label="Tìm người liên quan" data-pk-q>
-      <div class="pk-res" data-pk-res></div></div>
-    <div class="evx-ph"><span class="sub">Ảnh (tối đa 10)</span><div class="evx-phs" data-phs>${photos}</div>
-      <label class="btn ter sm">+ Thêm ảnh<input type="file" accept="image/*" hidden data-evx-photo></label><span class="sub" data-evx-photomsg aria-live="polite"></span></div>
-    ${sourcesAreaHtml(item.sources || [])}
+    ${moreFold(FORMS_VI.more, `<label class="fld" data-disc-part="${esc(FORMS_VI.lunar)}">Âm lịch (tuỳ chọn)<input data-f="lunar" value="${esc(v.lunar)}" autocomplete="off"></label>
+      <label class="fld" data-disc-part="${esc(FORMS_VI.new_name)}">Tên mới (sau 2025), nếu khác<input data-f="place_new" value="${esc(v.place_new)}" autocomplete="off"></label>
+      <div class="evx-people" data-disc-count="[data-pid]" data-disc-unit="${esc(FORMS_VI.unit_person)}"><span class="sub">Người liên quan</span><div class="chips" data-chips>${chips}</div>
+        <input class="pk-q" type="search" placeholder="Tìm người…" autocomplete="off" aria-label="Tìm người liên quan" data-pk-q>
+        <div class="pk-res" data-pk-res></div></div>
+      <div class="evx-ph" data-disc-count="[data-ph]" data-disc-unit="${esc(FORMS_VI.unit_photo)}"><span class="sub">Ảnh (tối đa 10)</span><div class="evx-phs" data-phs>${photos}</div>
+        <label class="btn ter sm">+ Thêm ảnh<input type="file" accept="image/*" hidden data-evx-photo></label><span class="sub" data-evx-photomsg aria-live="polite"></span></div>
+      <div data-disc-count="[data-src]" data-disc-unit="${esc(FORMS_VI.unit_source)}">${sourcesAreaHtml(item.sources || [])}</div>`,
+      discHasValue([v.lunar, v.place_new, people, item.photos || [], item.sources || []]), { disc: true })}
     <p class="err" data-evx-err role="alert" hidden></p>
     <div class="row end evx-acts${page ? ' fp-bar' : ''}"><button type="button" class="btn gh" data-evx-cancel>Hủy</button><button type="button" class="btn" data-evx-save>Lưu sự kiện</button></div>
   </div>`;
@@ -361,10 +368,23 @@ function wireTitles(root, fam) {
   typeSel?.addEventListener('change', () => { wrap.hidden = typeSel.value !== 'khac'; if (!wrap.hidden) q.focus(); });
   if (fam) titlesOf(fam).then((list) => { all = list; if (document.activeElement === q) paint(); });
 }
+// Lunar hint: an exact Thời gian shows "≈ 15/8 ÂL" under it. The hint is display only: the Âm lịch field keeps what the
+// user typed (or what was saved), and nothing is stored from the date.
+function wireDateLunar(root) {
+  const dt = root.querySelector('[data-f="date_text"]'); const hint = root.querySelector('[data-lunar-hint]');
+  if (!dt || !hint) return;
+  dt.addEventListener('input', () => {
+    const auto = eventAutoLunar(dt.value);
+    hint.hidden = !auto;
+    hint.textContent = auto ? lunarHint(auto) : '';
+  });
+}
 export function wireEvx(root, persons, opts = {}) {
   const res = root.querySelector('[data-pk-res]'); const q = root.querySelector('[data-pk-q]');
   const chips = root.querySelector('[data-chips]');
   if (root.querySelector('[data-tt-wrap]')) wireTitles(root, opts.fam);
+  wireDateLunar(root);
+  discWire(root);
   const paint = () => {
     const term = q.value.trim(); const have = new Set([...chips.querySelectorAll('[data-pid]')].map((x) => x.dataset.pid));
     const hits = term ? searchPeople(persons.filter((p) => !have.has(p.id)), term, { limit: 8 }) : [];
