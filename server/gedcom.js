@@ -12,8 +12,12 @@ const { contactsOf } = require('./contact-rules');
 const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const LUNAR_PREFIX = 'Âm lịch: ';
 const GIO_PREFIX = 'Giỗ (âm lịch): ';
+// Citation quality <-> QUAY (GEDCOM 5.5.1 "quality of data"): goc (original record) = 3 "direct and primary",
+// loi_ke (someone's account) = 2 "secondary", suy_doan (inferred, not proven) = 1 "questionable". No quality = no QUAY line.
+// Import reads the same numbers back. 0 ("unreliable") is not used.
 const QUALITY_TO_QUAY = { goc: '3', loi_ke: '2', suy_doan: '1' };
 const QUAY_TO_QUALITY = { 3: 'goc', 2: 'loi_ke', 1: 'suy_doan' };
+const SOURCE_KINDS = ['gia_pha', 'bia_mo', 'giay_to', 'loi_ke', 'web', 'khac'];
 const EVEN_LABEL = { quan_ngu: 'Quân ngũ', thanh_tich: 'Thành tích', khac: 'Khác' };
 const LABEL_TO_EVEN = Object.fromEntries(Object.entries(EVEN_LABEL).map(([k, v]) => [v.toLowerCase(), k]));
 const VALUE_TAGS = ['EDUC', 'OCCU', 'RELI']; // event tags whose value is the description (an empty one is written as Y)
@@ -162,13 +166,20 @@ function storyOf(text) {
 // families: { xref, husb, wife, chil[], marr, div, kind, ordA, ordB, private, noteText[] }
 function readGedcom(R, text) {
   const { roots, warnings } = parseTree(text);
-  const sours = new Map(); const notes = new Map();
+  const sours = new Map(); const notes = new Map(); const sourceRecs = [];
   let version = '5.5.1'; let lang = '';
   for (const r of roots) {
     if (r.tag === 'HEAD') { const v = subOf(subOf(r, 'GEDC') || { children: [] }, 'VERS'); version = textOf(v) || version; lang = textOf(subOf(r, 'LANG')).toLowerCase().slice(0, 2); }
     if (r.tag === 'SOUR' && r.xref) {
-      const url = subsOf(r, 'NOTE').map(textOf).find((x) => /^https?:\/\//i.test(x)) || '';
-      sours.set(ptr(r.xref), { title: textOf(subOf(r, 'TITL')), url });
+      // a source record (top level): the URL is the first NOTE that is a link (the exporter's form); other NOTEs are the note
+      const texts = subsOf(r, 'NOTE').map(textOf).filter(Boolean);
+      const url = texts.find((x) => /^https?:\/\//i.test(x)) || '';
+      const note = texts.filter((x) => x !== url).join('\n');
+      const yr = /^\s*(\d{4})/.exec(textOf(subOf(r, 'PUBL'))); const kind = textOf(subOf(r, '_KIND'));
+      const rec = { title: textOf(subOf(r, 'TITL')), url, author: textOf(subOf(r, 'AUTH')), year: yr ? Number(yr[1]) : null,
+        kind: SOURCE_KINDS.includes(kind) ? kind : 'khac', note };
+      sours.set(ptr(r.xref), rec);
+      if (rec.title) sourceRecs.push({ xref: ptr(r.xref), ...rec });
     }
     if ((r.tag === 'NOTE' || r.tag === 'SNOTE') && r.xref) notes.set(ptr(r.xref), String(r.value || ''));
   }
@@ -177,13 +188,17 @@ function readGedcom(R, text) {
     const v = String(n.value || '').trim();
     return /^@[^@]+@$/.test(v) ? (notes.get(ptr(v)) || '') : String(n.value || '');
   };
+  // A citation: title and url of its source record, quality (QUAY), the page (PAGE) and the record's xref (ref).
   const citation = (n) => {
-    const rec = sours.get(ptr(n.value)) || { title: '', url: '' };
+    const ref = ptr(n.value);
+    const rec = sours.get(ref) || { title: '', url: '' };
     const q = QUAY_TO_QUALITY[Number(textOf(subOf(n, 'QUAY')))];
     const out = {};
     if (rec.title) out.title = rec.title;
     if (rec.url) out.url = rec.url;
     if (q) out.quality = q;
+    const page = textOf(subOf(n, 'PAGE')); if (page) out.page = page;
+    if (rec.title) out.ref = ref;
     return out;
   };
   const factOf = (n) => {
@@ -254,7 +269,7 @@ function readGedcom(R, text) {
       families.push(f);
     }
   }
-  return { version, persons, families, warnings: [...warnings], unknownTags };
+  return { version, persons, families, sources: sourceRecs, warnings: [...warnings], unknownTags };
 }
 
 // GEDCOM coordinate (N12.5, S3, E106.7, W0.1) -> the stored text ("12.5", "-3"); '' when it is not one.
@@ -330,7 +345,7 @@ function groupFamilies(pcRows, cpRows) {
 // buildExport({ R, family, persons, events, pc, cp, living, now }) -> GEDCOM text (UTF-8).
 // persons: [{ id, data }] (not deleted). events: rows of the events table. pc / cp: relation rows (table or legacy).
 // living: 'show' (default) or 'hide' (people who are alive are left out, with their events and relations).
-function buildExport({ R, family, persons, events = [], pc = [], cp = [], stories = [], living = 'show', now = new Date() }) {
+function buildExport({ R, family, persons, events = [], pc = [], cp = [], stories = [], sources = [], living = 'show', now = new Date() }) {
   const keep = (d) => living !== 'hide' || isDead(d || {});
   const people = persons.filter((p) => keep(p.data)).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const ids = new Set(people.map((p) => p.id));
@@ -351,12 +366,13 @@ function buildExport({ R, family, persons, events = [], pc = [], cp = [], storie
     for (const s of [e.husb, e.wife]) if (s) { if (!famsOf.has(s)) famsOf.set(s, []); famsOf.get(s).push(e.xref); }
     for (const k of e.kids) { if (!famcOf.has(k.child)) famcOf.set(k.child, []); famcOf.get(k.child).push({ e, k }); }
   }
+  // Source records (top level, S<n>): the family's sources (sources.js) first, then citations written without one.
   const srcs = new Map();
-  const srcRef = (title, url) => {
-    const key = JSON.stringify([title, url || '']);
-    if (!srcs.has(key)) srcs.set(key, { xref: `S${srcs.size + 1}`, title, url: url || '' });
-    return srcs.get(key).xref;
-  };
+  const srcPut = (key, rec) => { if (!srcs.has(key)) srcs.set(key, { xref: `S${srcs.size + 1}`, ...rec }); return srcs.get(key).xref; };
+  const srcRef = (title, url) => srcPut(JSON.stringify([title, url || '']), { title, url: url || '' });
+  const srcRefById = new Map(sources.map((s) => [s.id, srcPut('id:' + s.id, { title: s.title, url: s.url || '', author: s.author || '', year: s.year, kind: s.kind, note: s.note || '' })]));
+  // the xref of one citation: its family source when it has one, else a record of its own
+  const citeRef = (s) => (s.source_id && srcRefById.has(s.source_id) ? srcRefById.get(s.source_id) : srcRef(s.title, s.url));
 
   const lines = [];
   const vn = new Date(now.getTime() + 7 * 3600e3);
@@ -410,7 +426,7 @@ function buildExport({ R, family, persons, events = [], pc = [], cp = [], storie
       lines.push('1 MAP'); lines.push(`2 LATI ${String(d.lat).startsWith('-') ? 'S' + String(d.lat).slice(1) : 'N' + d.lat}`);
       lines.push(`2 LONG ${String(d.lon).startsWith('-') ? 'W' + String(d.lon).slice(1) : 'E' + d.lon}`);
     }
-    for (const e of evs) writeEvent(lines, R, e, srcRef);
+    for (const e of evs) writeEvent(lines, R, e, citeRef);
     for (const x of famsOf.get(p.id) || []) lines.push(`1 FAMS @${x}@`);
     for (const { e, k } of famcOf.get(p.id) || []) {
       // One link per child and family: the kind of the first parent row (a child with two different kinds loses one).
@@ -446,12 +462,19 @@ function buildExport({ R, family, persons, events = [], pc = [], cp = [], storie
       if (c.private) lines.push('1 _PRIVATE yes');
     } else if (e.parents.length === 2) lines.push('1 _KIND none');
   }
-  for (const s of srcs.values()) { lines.push(`0 @${s.xref}@ SOUR`); tagLine(lines, 1, 'TITL', s.title); if (s.url) tagLine(lines, 1, 'NOTE', s.url); }
+  for (const s of srcs.values()) {
+    lines.push(`0 @${s.xref}@ SOUR`); tagLine(lines, 1, 'TITL', s.title);
+    if (s.author) tagLine(lines, 1, 'AUTH', s.author);
+    if (s.year) lines.push(`1 PUBL ${s.year}`);
+    if (s.kind) lines.push(`1 _KIND ${s.kind}`);
+    if (s.url) tagLine(lines, 1, 'NOTE', s.url);
+    if (s.note) emit(lines, 1, 'NOTE', s.note);
+  }
   lines.push('0 TRLR');
   return lines.join('\n') + '\n';
 }
 
-function writeEvent(lines, R, e, srcRef) {
+function writeEvent(lines, R, e, citeRef) {
   const tag = R.EVENT_TYPES[e.type]?.gedcom || 'EVEN';
   const desc = String(e.description || '').trim();
   if (tag === 'EVEN') { tagLine(lines, 1, 'EVEN', desc); lines.push(`2 TYPE ${EVEN_LABEL[e.type] || 'Khác'}`); }
@@ -464,13 +487,15 @@ function writeEvent(lines, R, e, srcRef) {
   if (e.lunar) emit(lines, 2, 'NOTE', LUNAR_PREFIX + e.lunar);
   for (const s of e.sources || []) {
     if (!s || !s.title) continue;
-    lines.push(`2 SOUR @${srcRef(s.title, s.url)}@`);
+    lines.push(`2 SOUR @${citeRef(s)}@`);
+    if (s.page) tagLine(lines, 3, 'PAGE', String(s.page).replace(/\n/g, ' '));
     if (QUALITY_TO_QUAY[s.quality]) lines.push(`3 QUAY ${QUALITY_TO_QUAY[s.quality]}`);
   }
 }
 
 // ---------- import plan ----------
 // Description of an event fact: the tag value when it has one ('Y' is the empty value), else its NOTE lines.
+const squash0 = (v) => String(v ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 const descOf = (f) => (f.value && f.value !== 'Y' ? f.value : f.notes.join('\n'));
 // Stories: a story note is planned as a new story unless the person already has the same one (kind, title and body,
 // whitespace squashed: a file written from this app matches on a second import). A second "Câu chuyện đời" with other
@@ -483,8 +508,23 @@ const descOf = (f) => (f.value && f.value !== 'Y' ? f.value : f.notes.join('\n')
 // Per person: fields that are empty here are filled; a field with a different value is a conflict (the apply step
 // sends it to the review queue); events are added when not already there. Nothing is overwritten.
 function planImport(doc, ctx) {
-  const { R, F, persons = [], events = [], stories = [], pc = [], cp = [], relMode = 'table', newId } = ctx;
+  const { R, F, persons = [], events = [], stories = [], pc = [], cp = [], relMode = 'table', newId, sources: famSources = [] } = ctx;
   const warnings = [...(doc.warnings || [])];
+  // Citations: a source of the family with the same title and url is used (source_id); any other one is planned as a new
+  // source (source_key, created by the apply step). Keyed by title and url, so a second import of the same file adds nothing.
+  const srcKey = (t, u) => `${squash0(t)}|${squash0(u)}`;
+  const famSrc = new Map(famSources.map((x) => [srcKey(x.title, x.url), x.id]));
+  const recOf = new Map(doc.sources.map((r) => [r.xref, r]));
+  const newSources = new Map();
+  const citeOf = (c) => {
+    const key = srcKey(c.title, c.url);
+    if (famSrc.has(key)) return { source_id: famSrc.get(key) };
+    if (!newSources.has(key)) {
+      const rec = recOf.get(c.ref) || {};
+      newSources.set(key, { key, input: { title: c.title, url: c.url || '', kind: rec.kind || 'khac', author: rec.author || '', year: rec.year ?? null, note: rec.note || '' } });
+    }
+    return { source_key: key };
+  };
   const byId = new Map(persons.map((p) => [p.id, { id: p.id, data: p.data || {} }]));
   const evBy = new Map();
   for (const e of events) { if (!evBy.has(e.person_id)) evBy.set(e.person_id, []); evBy.get(e.person_id).push(e); }
@@ -557,7 +597,8 @@ function planImport(doc, ctx) {
       const input = { type, date_kind: date ? date.kind : null, date_from: date ? date.from : null, date_to: date ? (date.to || null) : null,
         date_text: date ? R.formatEventDate({ date_kind: date.kind, date_from: date.from, date_to: date.to }) : (f.dateRaw || ''),
         place: f.place || '', description: description ?? f.notes.join('\n'), lunar: f.lunar || '',
-        sources: (f.sources || []).filter((s) => s.title).map((s) => ({ title: s.title, ...(s.url ? { url: s.url } : {}), ...(s.quality ? { quality: s.quality } : {}) })),
+        sources: (f.sources || []).filter((s) => s.title).map((s) => ({ title: s.title, ...(s.url ? { url: s.url } : {}), ...(s.quality ? { quality: s.quality } : {}),
+          ...(s.page ? { page: s.page } : {}), ...citeOf(s) })),
         is_preferred: true, people: [] };
       const err = R.validateEvent(input);
       if (err) { warnings.push(`${x.name}: sự kiện ${type} bỏ qua (${err}).`); return; }
@@ -688,6 +729,8 @@ function planImport(doc, ctx) {
     out.relations.push({ ...r, status: same ? 'same' : 'new' });
   }
   counts.sources = doc.persons.reduce((n, p) => n + p.sources.length, 0);
+  counts.sources_new = newSources.size;
+  out.newSources = [...newSources.values()];
   counts.stories_in_file = doc.persons.reduce((n, p) => n + p.stories, 0);
   return out;
 }

@@ -58,6 +58,7 @@ import { HISTORY_ALL } from './events-history.js';
 import { index as relIndex } from './relgraph.js';
 import { evIcon, typeIcon, headline, tlLoad, tlSave, tlTags, tlApplyUntag, tlToolbar, tlSheetDialog, tlEntries, tlMatch, tlList, tlCount, lifeStoriesHtml, approxHtml,
   evEditorHtml, readEvx, wireEvx, storyEditorHtml, readStx, photoRow, PHOTO_PREVIEW } from './events-ui.js';
+import { sourcesPage } from './sources-ui.js';
 const fold = (x) => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/đ/g, 'd');
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -281,7 +282,7 @@ function route() {
   return { view: view || 'tree', arg: decodeURIComponent(arg || ''), qs: new URLSearchParams(qi < 0 ? '' : raw.slice(qi + 1)), fam };
 }
 // Level of the current page: root pages (the bottom tabs and the desktop primaries) or inner pages with a parent.
-const MORE_KIDS = ['map', 'stats', 'verify', 'consistency', 'export', 'gop-y', 'mine', 'review', 'members', 'join', 'settings', 'tai-khoan', 'nhan-quan-ly'];
+const MORE_KIDS = ['map', 'stats', 'verify', 'consistency', 'export', 'gop-y', 'mine', 'review', 'members', 'join', 'settings', 'tai-khoan', 'nhan-quan-ly', 'nguon-tai-lieu'];
 function navLevel(r = route()) {
   const { view, arg } = r;
   if (view === 'person') return { root: false, parent: hf('list'), tab: 'list' };
@@ -290,7 +291,7 @@ function navLevel(r = route()) {
   if (view === 'tin') return { root: false, parent: hf('lich'), tab: 'lich' };
   if (view === 'tin-sua') return { root: false, parent: hf('tin'), tab: 'lich' };
   if (view === 'relpath') return { root: false, parent: arg ? hf(`person/${encodeURIComponent(arg)}`) : hf('list'), tab: 'list' };
-  if (view === 'thung-rac') return { root: false, parent: hf('more'), tab: 'more' };
+  if (view === 'thung-rac' || view === 'nguon-tai-lieu') return { root: false, parent: hf('more'), tab: 'more' };
   if (view === 'bieu-quyet') return { root: false, parent: hf('more'), tab: 'more' };
   if (view === 'place') return { root: false, parent: hf('list'), tab: 'list' };
   if (view === 'ho') return { root: false, parent: '#/' + S.ALL_FAMS + '/tree', tab: 'more' };
@@ -357,7 +358,7 @@ function render() {
   if (view === 'tim-dong-ho') { location.replace('#/' + S.ALL_FAMS + '/tree'); return; } // old find-page link: the all-families tree
   if (!famGate(view)) return;
   const loadingNow = !S.isAll() && DATA_VIEWS.includes(view) && !S.hasData(fam) && S.loading(fam);
-  const v = loadingNow ? skeleton : { consistency: (a) => CS.consistencyPage(main, { fam: S.curFamily(), hf }), relpath: (a) => RP.relpathPage(main, { hf, M, a, b: route().qs.get('b') || '' }), tree, list: listView, person, lich: gio, verify, tin: (a) => (a ? NW.detailPage(main, { fam: S.curFamily(), hf, id: a, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() }) : NW.feedPage(main, { fam: S.curFamily(), hf, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() })), 'tin-sua': (a) => NW.editorPage(main, { fam: S.curFamily(), hf, id: a, kind: route().qs.get('kind') === 'gathering' ? 'gathering' : 'notice' }), map, stats, settings, export: exportView, more, book: bookLink, review, members, join, mine, 'gop-y': gopyOpen, 'cai-dat-dong-ho': famSettings, 'su-kien': eventPage, 'bieu-quyet': () => CN.decisionsPage(main, { fam: S.curFamily() }), 'thung-rac': () => TR.trashPage(main, { fam: S.curFamily(), isAdmin: S.isAdmin() }), 'nguoi-ke-nhiem': successionPage, 'vai-tro': rolesPage, 'doi-chi': statsGenPage, 'cach-goi': kinRegionView, 'tai-khoan': () => accountPage(main, { qs: route().qs, sub: route().arg, icon }), 'dang-nhap-2fa': () => twoStepPage(main), place: (a) => PL.placePage(main, a, { fam: S.curFamily(), personOf: (x) => M.byId.get(x), personHref: (x) => hf(`person/${x}`), nameOf: (pp) => `${rank(pp.data)} ${pp.data.name}`.trim() }), ho: (a) => CL.clanPage(main, a, { page: Number(route().qs.get('trang')) || 1, country: route().qs.get('qg') || '' }), sua: formPage, them: formPage, offer: (a) => SUC.offerView(a), trusted: (a) => SUC.trustedView(a), 'lap-gia-pha': () => SUC.createView(), 'nhan-quan-ly': () => CLM.reviewPage(main) }[view] || tree;
+  const v = loadingNow ? skeleton : { consistency: (a) => CS.consistencyPage(main, { fam: S.curFamily(), hf }), relpath: (a) => RP.relpathPage(main, { hf, M, a, b: route().qs.get('b') || '' }), tree, list: listView, person, lich: gio, verify, tin: (a) => (a ? NW.detailPage(main, { fam: S.curFamily(), hf, id: a, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() }) : NW.feedPage(main, { fam: S.curFamily(), hf, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() })), 'tin-sua': (a) => NW.editorPage(main, { fam: S.curFamily(), hf, id: a, kind: route().qs.get('kind') === 'gathering' ? 'gathering' : 'notice' }), map, stats, settings, export: exportView, more, book: bookLink, review, members, join, mine, 'gop-y': gopyOpen, 'cai-dat-dong-ho': famSettings, 'su-kien': eventPage, 'bieu-quyet': () => CN.decisionsPage(main, { fam: S.curFamily() }), 'thung-rac': () => TR.trashPage(main, { fam: S.curFamily(), isAdmin: S.isAdmin() }), 'nguon-tai-lieu': () => sourcesPage(main, { fam: S.curFamily(), canEdit: S.isEditor() && !S.isAll() }), 'nguoi-ke-nhiem': successionPage, 'vai-tro': rolesPage, 'doi-chi': statsGenPage, 'cach-goi': kinRegionView, 'tai-khoan': () => accountPage(main, { qs: route().qs, sub: route().arg, icon }), 'dang-nhap-2fa': () => twoStepPage(main), place: (a) => PL.placePage(main, a, { fam: S.curFamily(), personOf: (x) => M.byId.get(x), personHref: (x) => hf(`person/${x}`), nameOf: (pp) => `${rank(pp.data)} ${pp.data.name}`.trim() }), ho: (a) => CL.clanPage(main, a, { page: Number(route().qs.get('trang')) || 1, country: route().qs.get('qg') || '' }), sua: formPage, them: formPage, offer: (a) => SUC.offerView(a), trusted: (a) => SUC.trustedView(a), 'lap-gia-pha': () => SUC.createView(), 'nhan-quan-ly': () => CLM.reviewPage(main) }[view] || tree;
   // all-families tree (the family list): a same-route re-render (a sync) keeps the list on screen until the new one is painted
   const cayHere = S.isAll() && view === 'tree' && !!main.querySelector('#flist') && !!main.querySelector('#fq');
   if (kept) { if (view === 'map') { mapFilterOpts(); paintMap(); } } // the book iframe and the map stay as they are
@@ -806,7 +807,7 @@ function eventPage(pid) {
     + evEditorHtml(item, { people: item.people || [], persons, id: id || '', page: true })
     + (id && direct ? dangerZone([dangerButton('Xóa sự kiện', 'data-evp-del')], { note: 'Xóa sự kiện khỏi dòng đời. Không thể hoàn tác.' }) : '')
     + '</div>';
-  const root = main.querySelector('[data-evx]'); wireEvx(root, persons);
+  const root = main.querySelector('[data-evx]'); wireEvx(root, persons, { fam });
   const fail = (m) => { const e = root.querySelector('[data-evx-err]'); e.hidden = false; e.textContent = m; };
   const done = async (msg) => { if (msg) toast(msg); if (direct) { evInvalidate(fam, p.id); await evLoad(fam, p.id, true).catch(() => {}); } profTab = 'life'; location.hash = hf(`person/${p.id}`); };
   root.querySelector('[data-evx-cancel]').onclick = () => goBack();
@@ -826,7 +827,7 @@ function evDialog({ kind, p, id = null, item = {}, title }) {
     : storyEditorHtml(item, { summary: item.kind === 'tom_tat' });
   d.innerHTML = `<div class="form-stack"><h2>${esc(title)}</h2>${direct ? '' : '<p class="sub">Quản trị sẽ duyệt trước khi hiển thị.</p>'}${body}</div>`;
   document.body.append(d); d.showModal();
-  if (kind === 'event') wireEvx(d.querySelector('[data-evx]'), persons);
+  if (kind === 'event') wireEvx(d.querySelector('[data-evx]'), persons, { fam });
   const close = () => { d.close(); d.remove(); };
   d.querySelector('[data-evx-cancel]').onclick = close;
   const fail = (m) => { const e = d.querySelector('[data-evx-err]'); e.hidden = false; e.textContent = m; };
@@ -1047,7 +1048,7 @@ function evPaintEd(st) {
   const ev = document.getElementById('fev-ed'); const sv = document.getElementById('fst-ed');
   if (ev) ev.innerHTML = st.evEd && st.evEd.kind === 'event' ? evEditorHtml(st.evEd.item, { people: st.evEd.item.people || [], persons: evPickList(st.fam), id: st.evEd.id || '' }) : '';
   if (sv) sv.innerHTML = st.evEd && st.evEd.kind === 'story' ? storyEditorHtml(st.evEd.item) : '';
-  if (st.evEd && st.evEd.kind === 'event' && ev) wireEvx(ev.querySelector('[data-evx]'), evPickList(st.fam));
+  if (st.evEd && st.evEd.kind === 'event' && ev) wireEvx(ev.querySelector('[data-evx]'), evPickList(st.fam), { fam: st.fam });
   if (st.evEd && (st.evEd.kind === 'event' ? ev : sv)) (st.evEd.kind === 'event' ? ev : sv).querySelector('input,textarea,select')?.focus();
 }
 function evAfterChange(st) {
@@ -1925,7 +1926,7 @@ function more() {
   const grp = (title, rows) => (rows.filter(Boolean).length ? section(title, `<div class="mg-g">${rows.filter(Boolean).join('')}</div>`) : '');
   const view = grp('Xem', [row('map', 'Bản đồ'), row('stats', 'Thống kê'), row('verify', 'Cần bổ sung'), calmRow({ href: hf('consistency'), icon: tile(icon('info')), title: CSV.more_link, subtitle: CSV.more_sub, dense: true }), row('export', 'Tải về')]);
   const joinRow = signed && !S.isMember() ? calmRow({ href: hf('join'), icon: tile(icon('user')), title: acct.status === 'pending' ? 'Yêu cầu tham gia đang chờ duyệt' : 'Tham gia dòng họ', dense: true }) : '';
-  const fam = grp('Dòng họ', [calmRow({ href: `#/${S.ALL_FAMS}/tree`, icon: tile(icon('search')), title: 'Tìm / lập dòng họ', dense: true }), S.isEditor() && !S.isAll() ? calmRow({ attrs: 'data-contact-import-fam', icon: tile(icon('user')), title: 'Nhập danh bạ', subtitle: 'vCard (.vcf) hoặc CSV, khớp với người trong họ', dense: true }) : '', row('gop-y', 'Góp ý', canAdminHere() ? bdg(sugCount) : ''), canAdminHere() ? row('members', 'Thành viên & quyền', bdg(joinCount)) : '', joinRow, signed ? row('nhan-quan-ly', 'Nhận quản lý cây', '', 'tree') : '', S.isMember() && !S.isAll() ? row('bieu-quyet', 'Biểu quyết', '', 'user') : '', S.isEditor() && !S.isAll() ? row('thung-rac', 'Thùng rác', '<span data-trash-badge></span>', 'trash') : '']);
+  const fam = grp('Dòng họ', [calmRow({ href: `#/${S.ALL_FAMS}/tree`, icon: tile(icon('search')), title: 'Tìm / lập dòng họ', dense: true }), S.isEditor() && !S.isAll() ? calmRow({ attrs: 'data-contact-import-fam', icon: tile(icon('user')), title: 'Nhập danh bạ', subtitle: 'vCard (.vcf) hoặc CSV, khớp với người trong họ', dense: true }) : '', row('gop-y', 'Góp ý', canAdminHere() ? bdg(sugCount) : ''), canAdminHere() ? row('members', 'Thành viên & quyền', bdg(joinCount)) : '', joinRow, signed ? row('nhan-quan-ly', 'Nhận quản lý cây', '', 'tree') : '', S.isMember() && !S.isAll() ? row('bieu-quyet', 'Biểu quyết', '', 'user') : '', S.isMember() && !S.isAll() ? row('nguon-tai-lieu', 'Nguồn tài liệu', '', 'note') : '', S.isEditor() && !S.isAll() ? row('thung-rac', 'Thùng rác', '<span data-trash-badge></span>', 'trash') : '']);
   // Ứng dụng: settings and the build in use; the check asks the server now (same unsaved-changes guard as the notice)
   const verRow = calmRow({ attrs: 'id="chkupd"', icon: tile(icon('info')), title: 'Phiên bản', subtitle: buildLabel(BUILD), trailing: '<span class="mo-act">Kiểm tra cập nhật</span>', dense: true });
   const app = grp('Ứng dụng', [row('settings', 'Cài đặt'), verRow]);

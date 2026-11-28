@@ -24,6 +24,7 @@ test('every destructive label in web/js goes through the shared component', () =
   const bad = [];
   for (const f of files) {
     if (f === 'danger.js') continue;
+    if (f === 'sources-vi.js') continue; // copy only: its Xóa labels reach the screen through sources-ui.js (dangerButton, confirmDanger)
     fs.readFileSync(path.join(DIR, f), 'utf8').split('\n').forEach((line, i) => {
       if (/^\s*\/\//.test(line)) return; // comments
       const m = LABEL.exec(line); if (!m) return;

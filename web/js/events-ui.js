@@ -2,8 +2,10 @@
 // Plain ES module, no build step. Imported by app.js. Styles: app.css ("Dòng đời").
 import { esc } from './model.js';
 import { searchPeople } from './fuzzy.js';
+import { sourcesAreaHtml, readCites, wireSources } from './sources-ui.js';
+import { SRC_VI } from './sources-vi.js';
 import { toolbar, ltags, fpanel, cic, addBtn, tag, card } from './ui.js';
-import { EVENT_TYPES, EVENT_TYPE_KEYS, SOURCE_QUALITY, parseEventDate, formatEventDate, sortEvents, eventDays, yearOfDays,
+import { EVENT_TYPES, EVENT_TYPE_KEYS, parseEventDate, formatEventDate, sortEvents, eventDays, yearOfDays,
   birthIso, ageAt, stageOf, STAGES, autoSummary } from './events.js';
 
 const P = (d) => `<path d="${d}"/>`;
@@ -171,6 +173,9 @@ function cardHtml(row, { ageLabel, canEdit, nameOf, editLbl, personHref = null, 
   const kind = d ? `<span class="kind">${e.group === 'hist' ? '' : evIcon('fam', 16)}${esc(grp[1])}${e.group === 'hist' ? '' : ' <span class="tag gray sm">tự động</span>'}</span>`
     : `<span class="kind">${typeIcon(e.type, 16)}${esc(typeLabel(e.type))}</span>`;
   const src = e.group === 'hist' && e.source ? `<a class="sub" href="${esc(e.source)}" target="_blank" rel="noopener">Nguồn ›</a>` : '';
+  // the first citation (title, then its page) and how many more: one short line, cut at the card's edge
+  const cites = (e.sources || []).filter((c) => c.title);
+  const citeLine = !d && cites.length ? `<span class="sub src-line">${esc(cites[0].title)}${cites[0].page ? ` · ${esc(cites[0].page)}` : ''}${cites.length > 1 ? ` · ${esc(SRC_VI.cite_more.replace('{n}', cites.length - 1))}` : ''}</span>` : '';
   const peopleHtml = (e.people || []).filter((pid) => nameOf(pid)).map((pid) => (personHref ? `<a class="tl-pp" href="${esc(personHref(pid))}">${esc(nameOf(pid))}</a>` : esc(nameOf(pid)))).join(' · ');
   const meta = e.place_new ? `Nay: ${e.place_new}` : '';
   const title = d && e.person_id && e.person_id !== selfId ? linkName(headline(e), e.person_id, nameOf(e.person_id), personHref) : esc(headline(e));
@@ -183,7 +188,7 @@ function cardHtml(row, { ageLabel, canEdit, nameOf, editLbl, personHref = null, 
     + `<div class="rail"><span class="dot"></span></div>`
     + `<div class="card">${kind}${pend}<h3>${title}</h3>`
     + (e.description && !d ? `<p>${esc(firstLine(e.description))}${e.description.includes('\n') || e.description.length > 90 ? '…' : ''}</p>` : '')
-    + whenLine + (meta || peopleHtml ? `<span class="pl">${[meta ? esc(meta) : '', peopleHtml].filter(Boolean).join(' · ')}</span>` : '')
+    + whenLine + citeLine + (meta || peopleHtml ? `<span class="pl">${[meta ? esc(meta) : '', peopleHtml].filter(Boolean).join(' · ')}</span>` : '')
     + (e.grouped && e.names && e.names.length ? `<details class="tl-why"><summary>Xem tên ›</summary><p class="sub tl-why-body">${esc(e.names.join(', '))}</p></details>` : '')
     + (!d && (e.photos || []).length ? `<div class="ev-ph">${e.photos.map((u) => `<img src="${esc(u)}" alt="" loading="lazy">`).join('')}</div>` : '')
     + `<div class="ft">${cnt}${src}${edit}</div></div></li>`;
@@ -232,7 +237,6 @@ export function evEditorHtml(item = {}, { people = [], persons = [], id = '', pa
   const v = { type: 'sinh', date_text: '', place: '', place_new: '', description: '', lunar: '', ...item };
   if (item.date_kind && !v.date_text) v.date_text = formatEventDate(item);
   const chips = people.map((pid) => personChip(pid, persons)).join('');
-  const srcs = (item.sources || []).map((s) => sourceRow(s)).join('');
   const photos = (item.photos || []).map((u) => photoRow(u)).join('');
   return `<div class="evx" data-evx data-id="${esc(id)}">
     <label class="fld">Loại sự kiện<select data-f="type">${EVENT_TYPE_KEYS.map((k) => `<option value="${k}" ${k === v.type ? 'selected' : ''}>${esc(typeLabel(k))}</option>`).join('')}</select></label>
@@ -247,18 +251,12 @@ export function evEditorHtml(item = {}, { people = [], persons = [], id = '', pa
       <div class="pk-res" data-pk-res></div></div>
     <div class="evx-ph"><span class="sub">Ảnh (tối đa 10)</span><div class="evx-phs" data-phs>${photos}</div>
       <label class="btn ter sm">+ Thêm ảnh<input type="file" accept="image/*" hidden data-evx-photo></label><span class="sub" data-evx-photomsg aria-live="polite"></span></div>
-    <div class="evx-src"><span class="sub">Nguồn</span><div data-srcs>${srcs}</div><button type="button" class="btn ter sm src-add" data-src-add>+ Thêm nguồn</button></div>
+    ${sourcesAreaHtml(item.sources || [])}
     <p class="err" data-evx-err role="alert" hidden></p>
     <div class="row end evx-acts${page ? ' fp-bar' : ''}"><button type="button" class="btn gh" data-evx-cancel>Hủy</button><button type="button" class="btn" data-evx-save>Lưu sự kiện</button></div>
   </div>`;
 }
 const personChip = (pid, persons) => { const p = persons.find((x) => x.id === pid); return tag(esc(p ? p.name : pid), { kind: 'person', x: true, attrs: `data-pid="${esc(pid)}"` }); };
-// One source as a card: name, link and quality, each full width on a phone, side by side when there is room.
-const sourceRow = (s = {}) => `<div class="srow" data-src><div class="srow-h"><span class="sub">Nguồn</span><button type="button" class="linkbtn" data-src-del aria-label="Bỏ nguồn">×</button></div>`
-  + `<label class="fld">Tên nguồn<input data-sf="title" value="${esc(s.title || '')}" placeholder="vd Gia phả viết tay 1950" maxlength="300" aria-label="Tên nguồn" autocomplete="off"></label>`
-  + `<label class="fld">Link (tuỳ chọn)<input data-sf="url" value="${esc(s.url || '')}" placeholder="https://…" maxlength="2000" aria-label="Link nguồn" autocomplete="off"></label>`
-  + `<label class="fld">Chất lượng<select data-sf="quality" aria-label="Chất lượng nguồn"><option value="">Chưa rõ</option>${Object.entries(SOURCE_QUALITY).map(([k, l]) => `<option value="${k}" ${s.quality === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label></div>`;
-
 // One photo of an event: a thumbnail and a remove button (the link is kept on the element).
 // Uploaded photos not saved yet are shown from the device (the server serves a photo only with its record).
 export const PHOTO_PREVIEW = new Map();
@@ -271,18 +269,16 @@ export function readEvx(root) {
   const dp = parseEventDate(g('date_text'));
   if (dp.error) return { error: dp.error, field: 'date_text' };
   const people = [...root.querySelectorAll('[data-chips] [data-pid]')].map((el) => el.dataset.pid);
-  const sources = [...root.querySelectorAll('[data-src]')].map((row) => ({
-    title: row.querySelector('[data-sf="title"]').value.trim(), url: row.querySelector('[data-sf="url"]').value.trim(),
-    quality: row.querySelector('[data-sf="quality"]').value || null,
-  })).filter((s) => s.title || s.url);
+  const sources = readCites(root);
   const item = { type: g('type'), date_text: g('date_text'), date_kind: dp.kind || null, date_from: dp.from || null, date_to: dp.to || null,
     lunar: g('lunar'), place: g('place'), place_new: g('place_new'), description: root.querySelector('[data-f="description"]').value.trim(),
     people, sources, photos: [...root.querySelectorAll('[data-ph]')].map((el) => el.dataset.ph), is_preferred: true };
   return { item };
 }
 
-// Wires a rendered editor: chips, people picker, sources. persons: [{id, name, years}]
-export function wireEvx(root, persons) {
+// Wires a rendered editor: chips, people picker, sources. persons: [{id, name, years}]; opts: { fam } (the family whose
+// sources the picker offers: sources-ui.js).
+export function wireEvx(root, persons, opts = {}) {
   const res = root.querySelector('[data-pk-res]'); const q = root.querySelector('[data-pk-q]');
   const chips = root.querySelector('[data-chips]');
   const paint = () => {
@@ -292,15 +288,11 @@ export function wireEvx(root, persons) {
       + (term && !hits.length ? '<p class="sub">Không thấy người nào khớp.</p>' : '');
   };
   q.addEventListener('input', paint);
+  if (opts.fam) wireSources(root, { fam: opts.fam });
   root.addEventListener('click', (e) => {
     const pick = e.target.closest('[data-pick]');
     if (pick) { chips.insertAdjacentHTML('beforeend', personChip(pick.dataset.pick, persons)); q.value = ''; paint(); q.focus(); return; }
     const x = e.target.closest('[data-pchip-x]'); if (x) { x.closest('[data-pid]').remove(); paint(); return; }
-    if (e.target.closest('[data-src-add]')) {
-      root.querySelector('[data-srcs]').insertAdjacentHTML('beforeend', sourceRow({}));
-      const titles = root.querySelectorAll('[data-srcs] [data-sf="title"]'); titles[titles.length - 1]?.focus(); return;
-    }
-    const del = e.target.closest('[data-src-del]'); if (del) { del.closest('[data-src]').remove(); }
     const pdel = e.target.closest('[data-ph-del]'); if (pdel) { pdel.closest('[data-ph]').remove(); }
   });
 }

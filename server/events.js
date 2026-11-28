@@ -10,6 +10,8 @@ let rulesMod = null;
 // The shared rules module (ESM in web/js), loaded once.
 const rules = () => rulesMod || (rulesMod = import(pathToFileURL(path.join(__dirname, '..', 'web', 'js', 'events.js')).href));
 
+const SRC = require('./sources'); // reusable sources: a citation's source_id is checked and its title/url copied here
+
 const EV_COLS = 'id, family_id, person_id, type, date_text, date_kind, date_from, date_to, lunar, place, place_new, description, people, sources, photos, is_preferred, alt_of, created_by, created_at, updated_at';
 const ST_COLS = 'id, family_id, person_id, kind, title, body, photos, created_by, created_at, updated_at';
 const iso = (d) => (d instanceof Date ? d.toISOString() : d);
@@ -35,7 +37,9 @@ function cleanEvent(e) {
     lunar: s(e.lunar).slice(0, 200), place: s(e.place).slice(0, 2000), place_new: s(e.place_new).slice(0, 2000),
     description: s(e.description).slice(0, 2000),
     people: Array.isArray(e.people) ? e.people.slice(0, 20) : [],
-    sources: Array.isArray(e.sources) ? e.sources.slice(0, 20).map((x) => ({ title: s(x.title).slice(0, 300), url: s(x.url).slice(0, 2000), quality: x.quality || null })) : [],
+    // a citation: title and url (copied from the source when source_id is set), quality, and the page of the source
+    sources: Array.isArray(e.sources) ? e.sources.slice(0, 20).map((x) => ({ title: s(x.title).slice(0, 300), url: s(x.url).slice(0, 2000), quality: x.quality || null,
+      ...(typeof x.source_id === 'string' && x.source_id ? { source_id: x.source_id.slice(0, 20) } : {}), ...(s(x.page) ? { page: s(x.page).slice(0, 200) } : {}) })) : [],
     photos: Array.isArray(e.photos) ? e.photos.slice(0, 10).filter((u) => typeof u === 'string') : [],
     is_preferred: e.is_preferred !== false,
   };
@@ -159,6 +163,11 @@ function evLabel(ev, typeLabel) {
 
 // Approved suggestion (or an editor's own): applies one _ev change for the person, with history under `author`.
 class EvError extends Error { constructor(status, msg) { super(msg); this.status = status; } }
+// The event input with its citations resolved against the family's sources (sources.js resolveCitations).
+// A citation's source that is not in this family (or deleted) is a 422, like any bad field.
+async function withSources(client, famId, input) {
+  try { return await SRC.resolveCitations(client, famId, input); } catch (e) { if (e instanceof SRC.SrcError) throw new EvError(e.status, e.message); throw e; }
+}
 async function applyEvSuggestion(client, famId, s, author) {
   const ev = s.changes._ev; const pid = s.person_id;
   if (!pid || !(await personIn(client, famId, pid))) throw new EvError(409, 'Người này không còn trong dữ liệu.');
@@ -169,18 +178,20 @@ async function applyEvSuggestion(client, famId, s, author) {
     if (!r.rowCount) throw new EvError(409, 'Mục này không còn để sửa hoặc xóa.');
   };
   if (ev.action === 'add') {
-    const err = ev.kind === 'event' ? R.validateEvent(ev.item) : R.validateStory(ev.item);
+    const item = ev.kind === 'event' ? await withSources(client, famId, ev.item) : ev.item;
+    const err = ev.kind === 'event' ? R.validateEvent(item) : R.validateStory(item);
     if (err) throw new EvError(422, err);
-    return ev.kind === 'event' ? { event: await insertEvent(client, famId, pid, ev.item, author) } : { story: await upsertStory(client, famId, pid, ev.item, author) };
+    return ev.kind === 'event' ? { event: await insertEvent(client, famId, pid, item, author) } : { story: await upsertStory(client, famId, pid, item, author) };
   }
   await owned();
   if (ev.action === 'delete') return ev.kind === 'event' ? deleteEvent(client, famId, ev.id, author) : deleteStory(client, famId, ev.id, author);
-  const err = ev.kind === 'event' ? R.validateEvent(ev.item) : R.validateStory(ev.item);
+  const item = ev.kind === 'event' ? await withSources(client, famId, ev.item) : ev.item;
+  const err = ev.kind === 'event' ? R.validateEvent(item) : R.validateStory(item);
   if (err) throw new EvError(422, err);
-  return ev.kind === 'event' ? { event: await updateEvent(client, famId, ev.id, ev.item, author) } : { story: await updateStory(client, famId, ev.id, ev.item, author) };
+  return ev.kind === 'event' ? { event: await updateEvent(client, famId, ev.id, item, author) } : { story: await updateStory(client, famId, ev.id, item, author) };
 }
 
 module.exports = {
-  EvError, applyEvSuggestion, rules, eventOut, storyOut, claimOp, personIn, listEvents, listStories, insertEvent, updateEvent, deleteEvent,
+  EvError, applyEvSuggestion, rules, withSources, eventOut, storyOut, claimOp, personIn, listEvents, listStories, insertEvent, updateEvent, deleteEvent,
   upsertStory, updateStory, deleteStory, checkEvSuggest, evLabel, evSummary,
 };

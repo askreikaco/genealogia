@@ -340,6 +340,20 @@
         "test/e2e/gallery.test.js"
       ]
     },
+    "sources": {
+      "paths": [
+        "server/sources.js",
+        "server/sources-routes.js",
+        "server/migrations/041_sources.sql",
+        "web/js/sources-ui.js",
+        "web/js/sources-vi.js",
+        "server/test/sources-api.test.js",
+        "server/test/sources-rules.test.js"
+      ],
+      "e2e": [
+        "test/e2e/sources.test.js"
+      ]
+    },
     "estimate": {
       "paths": [
         "web/js/estimate-graph.js",

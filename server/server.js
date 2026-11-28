@@ -27,6 +27,7 @@ const mountPlaces = require('./places-routes').mount;
 const mountPlacesCurate = require('./places-curate-routes').mount;
 const mountVariants = require('./variants-routes').mount;
 const mountGedcom = require('./gedcom-routes');
+const mountSources = require('./sources-routes'); // reusable family sources (sources-routes.js)
 const TWO = require('./totp-routes');
 const TOTP_RULES = require('./totp-rules');
 const EV = require('./events');
@@ -632,17 +633,17 @@ const evPersonInput = async (client, f, b) => {
   return p;
 };
 app.post('/api/events', need('editor'), (req, res, next) => evWrite(req, res, next, async (client, f, w, opId) => {
-  const R = await EV.rules(); const err = R.validateEvent(req.body?.event); if (err) throw new HttpError(400, err);
+  const R = await EV.rules(); const item = await EV.withSources(client, f.id, req.body?.event); const err = R.validateEvent(item); if (err) throw new HttpError(400, err);
   const p = await evPersonInput(client, f, req.body);
   if (!(await EV.claimOp(client, opId, p.id))) return { duplicate: true };
-  return { event: await EV.insertEvent(client, f.id, p.id, req.body.event, actorName(w)) };
+  return { event: await EV.insertEvent(client, f.id, p.id, item, actorName(w)) };
 }));
 app.put('/api/events/:id', need('editor'), (req, res, next) => evWrite(req, res, next, async (client, f, w, opId) => {
-  const R = await EV.rules(); const err = R.validateEvent(req.body?.event); if (err) throw new HttpError(400, err);
+  const R = await EV.rules(); const item = await EV.withSources(client, f.id, req.body?.event); const err = R.validateEvent(item); if (err) throw new HttpError(400, err);
   const cur = await client.query('select person_id from events where id=$1 and family_id=$2', [req.params.id, f.id]);
   if (!cur.rows[0]) return null;
   if (!(await EV.claimOp(client, opId, cur.rows[0].person_id))) return { duplicate: true };
-  return { event: await EV.updateEvent(client, f.id, req.params.id, req.body.event, actorName(w)) };
+  return { event: await EV.updateEvent(client, f.id, req.params.id, item, actorName(w)) };
 }));
 app.post('/api/events/:id/delete', need('editor'), (req, res, next) => evWrite(req, res, next, async (client, f, w, opId) => {
   const cur = await client.query('select person_id from events where id=$1 and family_id=$2', [req.params.id, f.id]);
@@ -1474,6 +1475,7 @@ mountOAuth(app, aiDeps);
 mountMcp(app, aiDeps);
 // GEDCOM export and import (gedcom-routes.js): same gates as the rest of the API.
 mountGedcom(app, { pool, need, famOf, who, HttpError, applyOp, actorName, clearBookCache: () => bookCache.clear() });
+mountSources(app, { pool, H, HttpError, findFamily, requireRole }); // E2: /api/families/:ref/sources
 // Gallery per person (G1, gallery-routes.js): up to 20 photos with captions and years; one is the profile photo.
 require('./gallery-routes')(app, { pool, need, famOf, who, canRead, canSeePrivate, HttpError, actorName, TRASH, EV });
 

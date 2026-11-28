@@ -186,7 +186,10 @@ export function validateEvent(e) {
     for (const s of e.sources) {
       if (!s || typeof s !== 'object' || typeof s.title !== 'string' || !s.title.trim() || s.title.length > 300) return 'Mỗi nguồn cần tên (tối đa 300 ký tự).';
       if (s.url && (typeof s.url !== 'string' || !/^https?:\/\//i.test(s.url) || s.url.length > 2000)) return 'Link nguồn phải bắt đầu bằng http(s)://';
-      if (s.quality !== undefined && !Object.keys(SOURCE_QUALITY).includes(s.quality)) return 'Chất lượng nguồn không hợp lệ.';
+      if (s.quality !== undefined && s.quality !== null && !Object.keys(SOURCE_QUALITY).includes(s.quality)) return 'Chất lượng nguồn không hợp lệ.';
+      // a source from the family's list (sources.js): the server copies its title and url; page is the place in it
+      if (s.source_id !== undefined && (typeof s.source_id !== 'string' || !/^D[0-9a-f]{12}$/.test(s.source_id))) return 'Nguồn không hợp lệ.';
+      if (s.page !== undefined && (typeof s.page !== 'string' || s.page.length > 200)) return 'Trang hoặc đoạn trích quá dài (tối đa 200 ký tự).';
     }
   }
   if (e.is_preferred !== undefined && typeof e.is_preferred !== 'boolean') return 'is_preferred phải là đúng/sai.';

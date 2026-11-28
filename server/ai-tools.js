@@ -122,7 +122,10 @@ async function getTimeline(ctx, { person_id }) {
   if (!R.canSeeEventsOf(p.data, { member: full, familyReadable: true })) return { hidden: true, items: [], stories: [] };
   const items = await EV.listEvents(ctx.deps.pool, fam.id, person_id);
   const stories = await EV.listStories(ctx.deps.pool, fam.id, person_id);
-  return { hidden: false, items: items.slice(0, 200), stories: stories.slice(0, 50) };
+  // a citation: its source's title and the page in it (the ids stay in the app)
+  const cite = (c) => ({ title: c.title || '', ...(c.url ? { url: c.url } : {}), ...(c.quality ? { quality: c.quality } : {}), ...(c.page ? { page: c.page } : {}) });
+  const out = items.slice(0, 200).map((e) => ({ ...e, sources: (e.sources || []).map(cite) }));
+  return { hidden: false, items: out, stories: stories.slice(0, 50) };
 }
 async function getBookLink(ctx, args) {
   const { fam } = await readable(ctx);

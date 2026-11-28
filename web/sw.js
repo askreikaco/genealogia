@@ -40,6 +40,8 @@ const SHELL = [
   '/vendor/simplewebauthn-browser.umd.min.js',
   '/js/events.js',
   '/js/events-ui.js',
+  '/js/sources-ui.js',
+  '/js/sources-vi.js',
   '/js/gallery.js',
   '/js/gallery-ui.js',
   '/js/gallery-vi.js',

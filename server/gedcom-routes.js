@@ -12,6 +12,7 @@ const G = require('./gedcom');
 const REL = require('./relations');
 const BRN = require('./branch-routes'); // a branch exports its scope (exportRows)
 const EV = require('./events');
+const SRC = require('./sources');
 const { validateOp } = require('./core');
 
 const LIB = (file) => import(pathToFileURL(path.join(__dirname, '..', 'web', 'js', file)).href);
@@ -33,9 +34,10 @@ module.exports = function mountGedcom(app, deps) {
     const { rows: events } = await q.query(
       'select id, person_id, type, date_kind, date_from, date_to, place, description, lunar from events where family_id = $1', [f.id]);
     const { rows: stories } = await q.query('select person_id, kind, title, body from stories where family_id = $1', [f.id]);
+    const { rows: sources } = await q.query('select id, title, url from sources where family_id = $1 and deleted_at is null', [f.id]);
     const table = await REL.isTable(q, f.id);
     const rel = await REL.readRel(q, f.id, true);
-    const plan = G.planImport(doc, { R, F, persons, events, stories, pc: rel.pc, cp: rel.cp, relMode: table ? 'table' : 'legacy', newId });
+    const plan = G.planImport(doc, { R, F, persons, events, stories, sources, pc: rel.pc, cp: rel.cp, relMode: table ? 'table' : 'legacy', newId });
     return { doc, plan, table };
   }
 
@@ -49,7 +51,10 @@ module.exports = function mountGedcom(app, deps) {
     const actor = `${IMPORT_BY}: ${actorName(w)}`;
     const batch = crypto.randomBytes(6).toString('hex');
     let seq = 0; const opId = () => `gx-${batch}-${++seq}`;
-    const out = { persons_created: 0, persons_filled: 0, events_added: 0, stories_added: 0, suggestions_queued: 0, relations_added: 0, relations_skipped: [] };
+    const out = { persons_created: 0, persons_filled: 0, events_added: 0, stories_added: 0, suggestions_queued: 0, relations_added: 0, relations_skipped: [], sources_added: 0 };
+    // new sources first (the citations of the events below point at them)
+    const srcId = new Map();
+    for (const ns of plan.newSources || []) { srcId.set(ns.key, (await SRC.insertSource(q, f.id, ns.input, actor)).id); out.sources_added++; }
     for (const pp of plan.persons) {
       const fields = { ...pp.fill };
       if (Object.keys(fields).length) {
@@ -60,7 +65,8 @@ module.exports = function mountGedcom(app, deps) {
         if (pp.isNew) out.persons_created++; else out.persons_filled++;
       }
       for (const ev of pp.events) {
-        await EV.insertEvent(q, f.id, pp.id, ev, actor);
+        const sources = (ev.sources || []).map((c) => (c.source_key ? { ...c, source_id: srcId.get(c.source_key) } : c));
+        await EV.insertEvent(q, f.id, pp.id, { ...ev, sources }, actor);
         out.events_added++;
       }
       for (const st of pp.stories) {
@@ -110,8 +116,9 @@ module.exports = function mountGedcom(app, deps) {
     const { rows: events } = await pool.query(
       'select id, person_id, type, date_kind, date_from, date_to, place, description, lunar, sources from events where family_id = $1', [view.famId]);
     const { rows: stories } = await pool.query('select person_id, kind, title, body from stories where family_id = $1 order by created_at', [view.famId]);
+    const { rows: sources } = await pool.query('select id, title, kind, author, year, url, note from sources where family_id = $1 and deleted_at is null order by lower(title), id', [view.famId]);
     const rel = view.rel || await REL.readRel(pool, f.id, true);
-    return { persons: pick(persons, 'id'), events: pick(events, 'person_id'), stories: pick(stories, 'person_id'), rel };
+    return { persons: pick(persons, 'id'), events: pick(events, 'person_id'), stories: pick(stories, 'person_id'), sources, rel };
   }
 
   app.get('/api/gedcom', need('member'), async (req, res, next) => {
@@ -119,8 +126,8 @@ module.exports = function mountGedcom(app, deps) {
       const f = req.fam;
       const living = req.query.living === 'hide' ? 'hide' : 'show';
       const R = await EV.rules();
-      const { persons, events, stories, rel } = await exportRows(f);
-      const text = G.buildExport({ R, family: f, persons, events, pc: rel.pc, cp: rel.cp, stories, living });
+      const { persons, events, stories, sources, rel } = await exportRows(f);
+      const text = G.buildExport({ R, family: f, persons, events, pc: rel.pc, cp: rel.cp, stories, sources, living });
       res.set('Cache-Control', 'no-store');
       res.set('Content-Type', 'text/plain; charset=utf-8');
       res.set('Content-Disposition', `attachment; filename="${String(f.slug || f.id).replace(/[^a-z0-9-]/g, '')}.ged"`);
@@ -136,12 +143,12 @@ module.exports = function mountGedcom(app, deps) {
       const living = req.query.living === 'hide' ? 'hide' : 'show';
       const id = String(req.params.id || '');
       const R = await EV.rules();
-      const { persons: all, events, stories, rel } = await exportRows(f);
+      const { persons: all, events, stories, sources, rel } = await exportRows(f);
       const root = all.find((p) => p.id === id);
       if (!root) return res.status(404).json({ error: 'Không tìm thấy người này.' });
       const set = G.branchIds(id, rel.pc, rel.cp);
       const persons = all.filter((p) => set.has(p.id));
-      const text = G.buildExport({ R, family: f, persons, events, pc: rel.pc, cp: rel.cp, stories, living });
+      const text = G.buildExport({ R, family: f, persons, events, pc: rel.pc, cp: rel.cp, stories, sources, living });
       res.set('Cache-Control', 'no-store');
       res.set('Content-Type', 'text/plain; charset=utf-8');
       res.set('Content-Disposition', `attachment; filename="${G.asciiBase(root.data?.name)}-nhanh.ged"`);

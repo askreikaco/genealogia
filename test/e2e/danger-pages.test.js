@@ -104,7 +104,8 @@ test('event edit is a page with back and a sticky Hủy · Lưu bar; delete is i
       assert.equal(bar.danger, 0, 'no destructive button beside Save');
       // sources as cards: every field full width on a phone
       const src = await page.evaluate(() => { const c = document.querySelector('.srow').getBoundingClientRect(); return [...document.querySelectorAll('.srow .fld')].map((f) => Math.round(f.getBoundingClientRect().width / (c.width - 32) * 100)); });
-      assert.equal(src.length, 3); for (const w of src) assert.ok(w >= 95, `source field full width (${w}%)`);
+      // a free-text citation: title, link, page, quality (E2 added the page field)
+      assert.equal(src.length, 4); for (const w of src) assert.ok(w >= 95, `source field full width (${w}%)`);
       assert.ok(await page.locator('.evx-src [data-src-add].btn').isVisible(), '+ Thêm nguồn is an outlined button');
       await shot(page, `event-page-390-${scheme}.png`);
       const del = page.locator('.dzone [data-evp-del]');
