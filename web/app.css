@@ -628,7 +628,7 @@ a.ptab{display:inline-flex;align-items:center;text-decoration:none} /* route tab
 a.tl-band{display:block;color:var(--c-text-3);text-decoration:none;min-height:24px}
 a.tl-band:hover{color:var(--c-text-2);background:var(--c-layer-hover, var(--c-layer-2, var(--c-layer)))}
 a.tl-band:focus-visible{outline:2px solid var(--c-focus, var(--c-accent));outline-offset:1px}
-.tl2 .card a.tl-pp,.tl-pp{display:inline;color:inherit;text-decoration:underline;text-decoration-color:var(--c-border-strong);text-underline-offset:3px}
+.tl2 .card a.tl-pp,.tl-pp{display:inline;color:inherit;text-decoration:underline;text-decoration-color:var(--c-border-strong);text-underline-offset:.2em}
 .tl-pp:hover{color:var(--c-link, var(--c-accent))}
 .tl2 li.band .dt{padding-top:calc(var(--sp-2) + var(--sp-1))}
 .tl2 li.band .dt b{font-size:var(--fs-1);line-height:var(--lh-1)} /* year on the strip's first line */
@@ -816,7 +816,7 @@ body:has(.fp-bar) .updnote{bottom:calc(56px + var(--fp-bar-h) + env(safe-area-in
 .calm-act svg{width:20px;height:20px;fill:currentColor}
 
 /* Places: linked place text on the profile, the quiet picker button, the picker list, the place page sections */
-.pl-link{color:inherit;text-decoration:underline;text-decoration-color:var(--c-border-strong);text-underline-offset:3px}
+.pl-link{color:inherit;text-decoration:underline;text-decoration-color:var(--c-border-strong);text-underline-offset:.2em}
 .pl-link:hover{color:var(--c-link, var(--c-accent))}
 .facts .pl-pick{margin-left:var(--sp-2);min-height:32px;padding-block:0;vertical-align:baseline}
 .pl-sheet label{display:flex;flex-direction:column;align-items:stretch;gap:var(--sp-2)}
@@ -1105,3 +1105,12 @@ html[data-layout=phone] #pnote .pnote-ic{display:none}
 .gal-big{display:block;width:100%;height:auto;max-height:60vh;object-fit:contain}
 .gal-nav{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);margin-top:var(--sp-3)}
 .gal-ed{display:grid;gap:var(--sp-3);margin-top:var(--sp-4)}
+/* Ước tính (est-years.js): a year the data does not have, shown muted; the basis is behind "ước tính" (tooltip or ⓘ) */
+.est-yr{color:var(--c-text-2);font-style:italic}
+.est-tag{text-decoration:underline dotted;cursor:help}
+.prof-est{margin:var(--sp-2) 0 0;font-size:var(--fs-1);color:var(--c-text-2);display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-4)}
+.est-item{white-space:nowrap}
+.est-why{margin-top:var(--sp-2)}
+.est-why summary{cursor:pointer;color:var(--c-text-2)}
+.est-why-line{display:block}
+.cs-detail{margin-top:var(--sp-2)}

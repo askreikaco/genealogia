@@ -17,13 +17,20 @@ const RULE = {
   EVENT_AFTER_DEATH: 'event_after_death',
   SAME_NAME_SIBLING: 'same_name_sibling',
   SPOUSE_AGE_GAP: 'spouse_age_gap',
+  // review rules (checkReview): editors only in the UI; the estimate engine gives the year conflict its basis
+  YEAR_CONFLICT: 'year_conflict',
+  POSSIBLE_DUPLICATE: 'possible_duplicate',
+  MISSING_SEX: 'missing_sex',
+  VERIFY_NOTE: 'verify_note',
 };
 const SEVERITY = {
   death_before_birth: 'error', parent_too_young: 'error', father_too_old: 'warn', mother_too_old: 'warn',
   born_after_mother_death: 'error', born_after_father_death: 'error', married_too_young: 'error',
   probably_deceased: 'warn', event_before_birth: 'error', event_after_death: 'error',
   same_name_sibling: 'warn', spouse_age_gap: 'warn',
+  year_conflict: 'warn', possible_duplicate: 'warn', missing_sex: 'warn', verify_note: 'warn',
 };
+const REVIEW_RULES = new Set([RULE.YEAR_CONFLICT, RULE.POSSIBLE_DUPLICATE, RULE.MISSING_SEX, RULE.VERIFY_NOTE]);
 // Event types that belong after a death (memorial and burial): never flagged as after-death.
 const AFTER_DEATH_OK = new Set(['mat', 'an_tang']);
 const LIMITS = { parentMinAge: 12, fatherMaxAge: 70, motherMaxAge: 55, marriedMinAge: 12, oldAge: 110, spouseGap: 40, postDeathYears: 1 };
@@ -98,4 +105,79 @@ function checkTree({ persons = [], links = {}, events = [], now = new Date().get
   return out.map((i) => ({ ...i, key: key(i.personIds) }));
 }
 
-module.exports = { checkTree, RULE, SEVERITY, LIMITS, yearOf, key };
+// Name for comparing people: no diacritics (đ too), lower case, single spaces. "Nguyễn  Văn An" = "nguyen van an".
+function normName(s) {
+  return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd')
+    .toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Review items for editors (C1 "Cần xem lại"). persons as checkTree; estimates: Map id -> estimate-graph.js result
+// (year_conflict reads its conflict flag and basis). detail: the text the editor needs (basis, verify note).
+// Returns [{rule, severity, personIds, key, detail?}], one per finding.
+function checkReview({ persons = [], links = {}, estimates = new Map() } = {}) {
+  const byId = new Map(persons.map((p) => [p.id, p]));
+  const out = [];
+  const add = (rule, personIds, detail) => {
+    const i = { rule, severity: SEVERITY[rule], personIds: [...new Set(personIds)] };
+    if (detail && detail.length) i.detail = detail;
+    out.push({ ...i, key: key(i.personIds) });
+  };
+  for (const p of persons) {
+    const e = estimates.get(p.id);
+    if (e && e.conflict && (e.bornKnown || e.diedKnown)) add(RULE.YEAR_CONFLICT, [p.id], [...(e.bornBasis || []), ...(e.diedBasis || [])]);
+    if (!['m', 'f'].includes(p.sex)) add(RULE.MISSING_SEX, [p.id]);
+    if (p.verify) add(RULE.VERIFY_NOTE, [p.id], [String(p.verify)]);
+  }
+  // possible duplicate: the same normalized name under the same parent (each pair once)
+  const groups = new Map();
+  for (const r of links.pc || []) {
+    const c = byId.get(r.child_id); if (!c || !byId.has(r.parent_id)) continue;
+    const nm = normName(c.name); if (!nm) continue;
+    const k = nm + '|' + r.parent_id;
+    if (!groups.has(k)) groups.set(k, new Set());
+    groups.get(k).add(c.id);
+  }
+  const pairs = new Set();
+  for (const ids of groups.values()) {
+    const list = [...ids];
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const pk = [list[i], list[j]].sort().join('|');
+      if (pairs.has(pk)) continue; pairs.add(pk);
+      add(RULE.POSSIBLE_DUPLICATE, [list[i], list[j]]);
+    }
+  }
+  return out;
+}
+
+// The basis lines that are the lifespan defaults only (not evidence; est-years.js drops them too).
+const LIFESPAN_LINE = /^(sống tối đa 100 năm|đến hôm nay|quy tắc: sinh hơn 110 năm)/;
+
+// "Cần bổ sung thông tin" (members): people whose birth year is unknown, and whose death year is unknown when they are
+// known dead. est: the narrowest estimate shown (a range no wider than maxWidth years, no conflict), born first.
+// Order: narrowest estimate first (no estimate last), then generation (older first), then name.
+function needsRows({ persons = [], estimates = new Map(), maxWidth = 60 } = {}) {
+  const rows = [];
+  for (const p of persons) {
+    const e = estimates.get(p.id); if (!e) continue;
+    const need = [];
+    if (!e.bornKnown) need.push('born');
+    if (e.dead && !e.diedKnown) need.push('died');
+    if (!need.length) continue;
+    // a death year needs evidence from another rule (not the lifespan default alone), as est-years.js shows it
+    const cand = [['born', e.born, e.bornBasis], ['died', e.died, e.diedBasis]]
+      .filter(([k, r]) => need.includes(k) && r && !e.conflict && r[1] - r[0] <= maxWidth && (k !== 'died' || e.diedEvidence))
+      .map(([k, r, b]) => [k, r, (b || []).filter((t) => !LIFESPAN_LINE.test(t))]);
+    const pick = cand[0] || null;
+    const g = Number(p.gen); const gen = g > 0 ? g : null;
+    rows.push({
+      id: p.id, name: p.name || '', sex: p.sex || '', gen, need,
+      est: pick ? { kind: pick[0], lo: pick[1][0], hi: pick[1][1], basis: pick[2] || [] } : null,
+      width: pick ? pick[1][1] - pick[1][0] : null,
+    });
+  }
+  const inf = (x) => (x == null ? Infinity : x);
+  rows.sort((a, b) => inf(a.width) - inf(b.width) || inf(a.gen) - inf(b.gen) || a.name.localeCompare(b.name, 'vi'));
+  return rows;
+}
+
+module.exports = { checkTree, checkReview, needsRows, normName, RULE, SEVERITY, REVIEW_RULES, LIMITS, yearOf, key };

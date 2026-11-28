@@ -41,6 +41,7 @@ Tests skip (with a reason) when playwright, Chrome or the database URL is missin
 | `e2e-signin.test.js` | signed-in owner leaves the loading state, also when an old tab holds IndexedDB | yes |
 | `minimal-ui.test.js` | minimal UI cuts (one primary per screen, sub-pages, ⋯ menus, one-line copy): settings, person header, export, members, verify, form, create-family, emblem, stats, tree, more | no (mocked API) |
 | `succession.test.js` | trusted contact invite and accept; inactive owner (time injected): member banner, offer with email code, previous owner reclaims; create a family | yes (+ fake mail) |
+| `estimates-needs.test.js` | estimated years: the profile shows "≈ range · ước tính" (basis behind ⓘ) for a person with no birth year and none for one with a birth year; the tree card and the list rows show it; Kiểm tra dữ liệu: members see Cần bổ sung thông tin only (Góp ý opens the person's form), editors also see Cần xem lại; no horizontal scroll at 360 px; screenshots with `GP_SHOT_DIR` | yes |
 
 Unit tests (no browser): `npm test` in `server`.
 

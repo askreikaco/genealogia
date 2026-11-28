@@ -130,6 +130,7 @@
         "server/consistency-*.js",
         "server/test/consistency*.test.js",
         "web/js/consistency*.js",
+        "web/js/needs-vi.js",
         "server/migrations/038_consistency_ignores.sql"
       ],
       "e2e": [
@@ -371,14 +372,18 @@
     "estimate": {
       "paths": [
         "web/js/estimate-graph.js",
+        "web/js/est-years.js",
         "web/js/events-life.js",
         "web/js/events-ui.js",
         "server/test/estimate-graph.test.js",
-        "server/test/events-life.test.js"
+        "server/test/events-life.test.js",
+        "server/test/consistency-review.test.js",
+        "server/test/consistency-needs-api.test.js"
       ],
       "e2e": [
         "test/e2e/estimate-graph.test.js",
-        "test/e2e/timeline-auto.test.js"
+        "test/e2e/timeline-auto.test.js",
+        "test/e2e/estimates-needs.test.js"
       ]
     },
     "form": {

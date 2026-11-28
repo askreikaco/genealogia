@@ -54,6 +54,8 @@ import { KIN_REGION_KEY, resolveRegion } from './kin/index.js';
 import { EVENT_TYPES, SOURCE_QUALITY, formatEventDate, sortEvents, birthIso, autoSummary, canSeeEventsOf, parseEventDate, EVENT_PHOTO_MAX } from './events.js';
 import { deriveLifeEvents, historyRows, relAccess, legacyAccess, estimatedLifeRows } from './events-life.js';
 import { estimateFamilyCached, ageAtDeathOf } from './estimate-graph.js';
+import { estItems, estHtml, estPlain, estLabel, basisText } from './est-years.js';
+import { NEEDS_VI } from './needs-vi.js';
 import { HISTORY_ALL } from './events-history.js';
 import { index as relIndex } from './relgraph.js';
 import { evIcon, typeIcon, headline, tlLoad, tlSave, tlTags, tlApplyUntag, tlToolbar, tlSheetDialog, tlEntries, tlMatch, tlList, tlCount, storiesBodyHtml, stLoad, stSave, stBarHtml, stSheetDialog, stApplyUntag, approxHtml,
@@ -66,7 +68,7 @@ const $ = (s, el = document) => el.querySelector(s);
 const main = $('#main');
 // Views that are not about one family: no family prefix in the hash, no follow bar, no family in the preferences.
 const NO_FAM = ['tai-khoan', 'dang-nhap-2fa', 'offer', 'trusted', 'lap-gia-pha', 'cach-goi', 'ho', 'nhan-quan-ly'];
-let M = build();
+let M = withEst(build());
 const open = new Set(JSON.parse(localStorageGet('gp_open') || '[]'));
 function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
@@ -346,7 +348,7 @@ function render() {
   if (fam === S.ALL_FAMS && (view === 'person' || view === 'sua')) { const pp = S.get(arg); if (pp?.fam) { location.replace(`#/${pp.fam}/${view}/${arg}`); return; } } // a person lives in one family
   if (fam !== S.ALL_FAMS && !NO_FAM.includes(view) && (S.getPrefs().fam_used || [])[0] !== fam) S.setPrefs({ fam_used: [fam, ...(S.getPrefs().fam_used || []).filter((x) => x !== fam)].slice(0, 8) });
   S.setFamily(fam);
-  M = build(); chrome(); privNote(view, arg); refreshSugCount(); refreshFams(); refreshLichBadge();
+  M = withEst(build()); chrome(); privNote(view, arg); refreshSugCount(); refreshFams(); refreshLichBadge();
   const key = mountKey(view, arg, fam);
   const kept = !!key && key === mounted && keptNode(view);
   // same page drawn again (a sync, families arriving): the focused text field gets its focus and caret back after
@@ -359,7 +361,8 @@ function render() {
   if (view === 'tim-dong-ho') { location.replace('#/' + S.ALL_FAMS + '/tree'); return; } // old find-page link: the all-families tree
   if (!famGate(view)) return;
   const loadingNow = !S.isAll() && DATA_VIEWS.includes(view) && !S.hasData(fam) && S.loading(fam);
-  const v = loadingNow ? skeleton : { consistency: (a) => CS.consistencyPage(main, { fam: S.curFamily(), hf }), relpath: (a) => RP.relpathPage(main, { hf, M, a, b: route().qs.get('b') || '' }), tree, list: listView, person, lich: gio, verify, tin: (a) => (a ? NW.detailPage(main, { fam: S.curFamily(), hf, id: a, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() }) : NW.feedPage(main, { fam: S.curFamily(), hf, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() })), 'tin-sua': (a) => NW.editorPage(main, { fam: S.curFamily(), hf, id: a, kind: route().qs.get('kind') === 'gathering' ? 'gathering' : 'notice' }), map, stats, settings, export: exportView, more, book: bookLink, review, members, join, mine, 'gop-y': gopyOpen, 'cai-dat-dong-ho': famSettings, 'su-kien': eventPage, 'bieu-quyet': () => CN.decisionsPage(main, { fam: S.curFamily() }), 'thung-rac': () => TR.trashPage(main, { fam: S.curFamily(), isAdmin: S.isAdmin() }), 'nguon-tai-lieu': () => sourcesPage(main, { fam: S.curFamily(), canEdit: S.isEditor() && !S.isAll() }), 'nguoi-ke-nhiem': successionPage, 'vai-tro': rolesPage, 'doi-chi': statsGenPage, 'cach-goi': kinRegionView, 'tai-khoan': () => accountPage(main, { qs: route().qs, sub: route().arg, icon }), 'dang-nhap-2fa': () => twoStepPage(main), place: (a) => PL.placePage(main, a, { fam: S.curFamily(), personOf: (x) => M.byId.get(x), personHref: (x) => hf(`person/${x}`), nameOf: (pp) => `${rank(pp.data)} ${pp.data.name}`.trim() }), ho: (a) => CL.clanPage(main, a, { page: Number(route().qs.get('trang')) || 1, country: route().qs.get('qg') || '' }), sua: formPage, them: formPage, offer: (a) => SUC.offerView(a), trusted: (a) => SUC.trustedView(a), 'lap-gia-pha': () => SUC.createView(), 'nhan-quan-ly': () => CLM.reviewPage(main) }[view] || tree;
+  const suggestNeed = (pid) => { const p = M.byId.get(pid); if (p) goForm({ kind: 'sua', p, only: ['born', 'died'] }); }; // Góp ý (Cần bổ sung): the birth and death years of that person
+  const v = loadingNow ? skeleton : { consistency: (a) => CS.consistencyPage(main, { fam: S.curFamily(), hf, suggest: suggestNeed }), relpath: (a) => RP.relpathPage(main, { hf, M, a, b: route().qs.get('b') || '' }), tree, list: listView, person, lich: gio, verify, tin: (a) => (a ? NW.detailPage(main, { fam: S.curFamily(), hf, id: a, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() }) : NW.feedPage(main, { fam: S.curFamily(), hf, getPrefs: S.getPrefs, setPrefs: S.setPrefs, isMember: S.isMember() })), 'tin-sua': (a) => NW.editorPage(main, { fam: S.curFamily(), hf, id: a, kind: route().qs.get('kind') === 'gathering' ? 'gathering' : 'notice' }), map, stats, settings, export: exportView, more, book: bookLink, review, members, join, mine, 'gop-y': gopyOpen, 'cai-dat-dong-ho': famSettings, 'su-kien': eventPage, 'bieu-quyet': () => CN.decisionsPage(main, { fam: S.curFamily() }), 'thung-rac': () => TR.trashPage(main, { fam: S.curFamily(), isAdmin: S.isAdmin() }), 'nguon-tai-lieu': () => sourcesPage(main, { fam: S.curFamily(), canEdit: S.isEditor() && !S.isAll() }), 'nguoi-ke-nhiem': successionPage, 'vai-tro': rolesPage, 'doi-chi': statsGenPage, 'cach-goi': kinRegionView, 'tai-khoan': () => accountPage(main, { qs: route().qs, sub: route().arg, icon }), 'dang-nhap-2fa': () => twoStepPage(main), place: (a) => PL.placePage(main, a, { fam: S.curFamily(), personOf: (x) => M.byId.get(x), personHref: (x) => hf(`person/${x}`), nameOf: (pp) => `${rank(pp.data)} ${pp.data.name}`.trim() }), ho: (a) => CL.clanPage(main, a, { page: Number(route().qs.get('trang')) || 1, country: route().qs.get('qg') || '' }), sua: formPage, them: formPage, offer: (a) => SUC.offerView(a), trusted: (a) => SUC.trustedView(a), 'lap-gia-pha': () => SUC.createView(), 'nhan-quan-ly': () => CLM.reviewPage(main) }[view] || tree;
   // all-families tree (the family list): a same-route re-render (a sync) keeps the list on screen until the new one is painted
   const cayHere = S.isAll() && view === 'tree' && !!main.querySelector('#flist') && !!main.querySelector('#fq');
   if (kept) { if (view === 'map') { mapFilterOpts(); paintMap(); } } // the book iframe and the map stay as they are
@@ -474,7 +477,7 @@ function tree(arg) {
     if (show.size && !show.has(p.id)) return;
     const ks = M.kids(p.id); const isOpen = hits && !jump ? true : open.has(p.id) || depth < 2 && !open.has('!' + p.id);
     const d = p.data;
-    const sub = [depth ? '' : 'Đời ' + (d.gen || '?'), yearsHtml(d), d.gio_lunar || d.death_lunar ? 'Giỗ ' + esc(d.gio_lunar || d.death_lunar) + ' ÂL' : ''].filter(Boolean).join(' · ');
+    const sub = [depth ? '' : 'Đời ' + (d.gen || '?'), yearsHtmlOf(p), d.gio_lunar || d.death_lunar ? 'Giỗ ' + esc(d.gio_lunar || d.death_lunar) + ' ÂL' : ''].filter(Boolean).join(' · ');
     const toggle = ks.length ? `<button class="tg ${isOpen ? 'op' : ''}" data-tg="${p.id}" aria-expanded="${isOpen}" aria-label="${isOpen ? 'Đóng' : 'Mở'} nhánh">${isOpen ? '−' : '+' + ks.length}</button>` : '';
     out.push(personItem({ rank: isLabelOnly(d) ? '' : rank(d), name: nameOf(d), sex: d.sex }, { variant: 'tree', depth, href: hf(`person/${p.id}`), hit: !!hits?.has(p.id), badge: d.name_han ? ` <span class="nhan" lang="zh-Hant">${esc(d.name_han)}</span>` : '', sub, action: toggle }));
     for (const s of (M.inlaws(p.id).length ? M.inlaws(p.id).map((q) => ({ n: q.data.spouse_n, name: q.data.name, note: years(q.data), id: q.id })) : spousesOf(d))) out.push(`<${s.id ? 'a href="' + hf('person/' + s.id) + '"' : 'div'} class="tsp${s.id && s.id === inlawJump ? ' hit' : ''} ${d.sex === 'f' ? 'm' : 'f'}" style="--d:${depth}"><span class="tsl">${d.sex === 'f' ? 'Chồng' : 'Vợ'}${spousesOf(d).length > 1 ? ' ' + s.n : ''}</span><b>${esc(s.name)}</b>${s.note ? `<span class="sub">${esc(s.note)}</span>` : ''}</${s.id ? 'a' : 'div'}>` + (plain ? spouseTree(s, depth) : ''));
@@ -544,9 +547,9 @@ function listView(arg) {
    <label>Đời<select id="fgen"><option value="">Mọi đời</option>${gens.map((g) => `<option ${String(g) === F.gen ? 'selected' : ''}>${g}</option>`).join('')}</select></label>
    <div class="row wrap">${tag('Đang sống', { kind: 'chip', on: F.living, attrs: 'id="fliv"' })}${tag('Cần xác minh', { kind: 'chip', on: F.flag, attrs: 'id="fflag"' })}</div>`)}
    ${isWide() ? `<div class="kpis lk">${[['Tổng số', M.all.length, 'ia'], ['Nam / Nữ', M.all.filter((p) => p.data.sex !== 'f').length + ' / ' + M.all.filter((p) => p.data.sex === 'f').length, 'c2'], ['Có ngày giỗ', M.all.filter((p) => gioOf(p.data)).length, 'c3'], ['Cần xác minh', M.all.filter((p) => p.data.verify).length, 'warn']].map(([l, v, c]) => `<div class="kpi" style="border-top-color:var(--${c})"><span class="sub">${l}</span><b>${v}</b></div>`).join('')}</div>` : ''}
-   ${!isWide() ? `<div class="cards">${rows.slice(0, 400).map((p) => { const d = p.data; return personItem({ rank: isLabelOnly(d) ? '' : rank(d), name: nameOf(d), sex: d.sex }, { variant: 'card', href: ph(p, `person/${p.id}`), flag: !!d.verify, badge: famChipIf(p), sub: `${sidHits.length && d.sid ? esc(formatSid(d.sid)) + ' · ' : cq && codeOf(M, p.id) ? esc(codeOf(M, p.id)) + ' · ' : ''}${gd ? `Giỗ ${esc(gioOf(d).label)} ÂL` : `${d.hidden_living && !genOf(M, p) ? '' : `Đời ${genOf(M, p) || '?'}`}${years(d) ? ' · ' + yearsHtml(d) : ''}${d.place ? ' · ' + esc(d.place) : ''}`}`, foot: d.verify ? `${tag(`${esc(d.verify)}`, { tone: 'yellow', sm: true })}` : '', action: iconButton({ icon: 'more', label: 'Thao tác', attrs: `data-menu="${p.id}" aria-haspopup="menu"` }) }); }).join('')}</div>` : `<div class="scroll"><table class="tb"><thead><tr><th></th><th>Đời</th><th>Họ tên</th><th>Cha/Mẹ</th><th>Sinh</th><th>Mất</th><th>Giỗ ÂL</th><th>Nơi sống</th><th>Cần xác minh</th><th>Thao tác</th></tr></thead><tbody>
+   ${!isWide() ? `<div class="cards">${rows.slice(0, 400).map((p) => { const d = p.data; return personItem({ rank: isLabelOnly(d) ? '' : rank(d), name: nameOf(d), sex: d.sex }, { variant: 'card', href: ph(p, `person/${p.id}`), flag: !!d.verify, badge: famChipIf(p), sub: `${sidHits.length && d.sid ? esc(formatSid(d.sid)) + ' · ' : cq && codeOf(M, p.id) ? esc(codeOf(M, p.id)) + ' · ' : ''}${gd ? `Giỗ ${esc(gioOf(d).label)} ÂL` : `${d.hidden_living && !genOf(M, p) ? '' : `Đời ${genOf(M, p) || '?'}`}${yearsHtmlOf(p) ? ' · ' + yearsHtmlOf(p) : ''}${d.place ? ' · ' + esc(d.place) : ''}`}`, foot: d.verify ? `${tag(`${esc(d.verify)}`, { tone: 'yellow', sm: true })}` : '', action: iconButton({ icon: 'more', label: 'Thao tác', attrs: `data-menu="${p.id}" aria-haspopup="menu"` }) }); }).join('')}</div>` : `<div class="scroll"><table class="tb"><thead><tr><th></th><th>Đời</th><th>Họ tên</th><th>Cha/Mẹ</th><th>Sinh</th><th>Mất</th><th>Giỗ ÂL</th><th>Nơi sống</th><th>Cần xác minh</th><th>Thao tác</th></tr></thead><tbody>
    ${rows.map((p) => { const d = p.data; const par = M.byId.get(d.parent); return `<tr class="${d.verify ? 'flag' : ''}"><td>${sexMark(d.sex)}</td><td class="num">${genOf(M, p) || ''}</td>
-   <td><a href="${ph(p, `person/${p.id}`)}"><b>${isLabelOnly(d) ? esc(nameOf(d)) : `${esc(rank(d))} ${esc(d.name)}`}</b></a>${famChipIf(p)}</td><td>${esc(par?.data.name || '')}</td><td class="num">${esc(d.born || '')}</td><td class="num">${esc(d.died || '')}</td><td class="num">${esc(d.gio_lunar || d.death_lunar || '')}</td><td>${esc(d.place || '')}</td><td>${esc(d.verify || '')}</td>
+   <td><a href="${ph(p, `person/${p.id}`)}"><b>${isLabelOnly(d) ? esc(nameOf(d)) : `${esc(rank(d))} ${esc(d.name)}`}</b></a>${famChipIf(p)}</td><td>${esc(par?.data.name || '')}</td><td class="num">${esc(d.born || '')}${d.born ? '' : estCell(p, 'born')}</td><td class="num">${esc(d.died || '')}${d.died ? '' : estCell(p, 'died')}</td><td class="num">${esc(d.gio_lunar || d.death_lunar || '')}</td><td>${esc(d.place || '')}</td><td>${esc(d.verify || '')}</td>
    <td class="acts">${S.isEditor() ? `${iconButton({ icon: 'pencil', label: 'Sửa', attrs: `data-act="edit" data-id="${p.id}"` })}${iconButton({ icon: 'plus', label: 'Thêm con', attrs: `data-act="child" data-id="${p.id}"` })}` : ''}${iconButton({ icon: 'more', label: 'Thao tác', attrs: `data-menu="${p.id}" aria-haspopup="menu"` })}</td></tr>`; }).join('')}
    </tbody></table></div>`}`;
   $('#q').oninput = (e) => { clearTimeout(listView.t); listView.t = setTimeout(() => { history.replaceState(null, '', hf('list/' + encodeURIComponent(e.target.value))); render(); const i = $('#q'); i.focus({ preventScroll: true }); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
@@ -631,6 +634,7 @@ function person(id) {
   const surnG = SN.surnameGroup(id, d, M, { editor: S.isEditor() }); if (surnG) groups.splice(groups.length - 1, 0, surnG); // Họ qua các thời kỳ, before Ghi chú
   main.innerHTML = `<div class="prof">${d.photo ? `<img src="${esc(d.photo)}" alt="" class="photo">` : ''}<div><div class="row wrap">${sp ? `${tag(`${esc(inLaw(p))}`, { tone: 'purple' })}` : `${tag(`Đời ${d.gen || '?'}`, { tone: 'blue' })}`}${SEX_LABEL[d.sex] ? `<span class="tag gray sxtag">${sexMark(d.sex)}${SEX_LABEL[d.sex]}</span>` : ''}${d.sid ? `<button type="button" class="tag gray pcode" data-copy-code="${esc(formatSid(d.sid))}" title="${esc(SID_HELP)} Bấm để chép." aria-label="Mã người ${esc(formatSid(d.sid))}. Bấm để chép.">${esc(formatSid(d.sid))}</button>` : ''}${br ? `${tag(`Chi ${esc(rank(br.data))} ${esc(br.data.name)}`, { tone: 'gray' })}` : ''}${S.myPersonId() === id ? '<span class="tag green">Đây là bạn</span>' : ''}</div>
    <h1 class="big keep">${esc(rank(d))} ${esc(d.name)}</h1>${d.name_han ? `<div class="nhan nhan-h" lang="zh-Hant">${esc(d.name_han)}</div>` : ''}${vt('name') ? `<div class="var-name">${vt('name')}</div>` : ''}<div class="sub">${esc(sp ? (d.sex === 'm' ? 'chồng ' : 'vợ ') + rank(sp.data).toLowerCase() + ' ' + sp.data.name : relation(M, p))}${d.alias ? ' · ' + esc(d.alias) : ''}</div></div></div>
+   ${estHeadHtml(p)}
    <div class="kpis">${[['Mất', d.died || (d.death_lunar ? d.death_lunar + ' ÂL' : '—'), 'c2'], ['Giỗ (ÂL)', d.gio_lunar || d.death_lunar || '—', 'c3'], ['Con', ks.length, 'c5'], ['Cháu chắt', M.desc(sp ? sp.id : id) - ks.length, 'c1']].filter(([, v]) => v && v !== '—').map(([l, v]) => `<div class="kpi"><span class="sub">${l}</span><b>${esc(v)}</b></div>`).join('')}</div>
    <div class="row acts2"><div class="acts2-go">${gioOf(d) ? followBar(p) : ''}<button class="btn sm" data-act="${S.isEditor() ? 'edit' : 'suggest'}" data-id="${id}">${icon('pencil')}Sửa</button></div><button class="ib" data-menu="${id}" data-menu-ctx="prof" aria-label="Thêm thao tác">⋯</button></div>
    ${profTabsHtml()}
@@ -652,6 +656,46 @@ const EVD = new Map(); const evPending = new Set();
 const evKey = (fam, pid) => `${fam}|${pid}`;
 const famOfP = (p) => p.fam || 'duong';
 const personsOf = (fam) => M.all.filter((x) => (x.fam || 'duong') === fam);
+// Live estimates of one family (estimate-graph.js, memoized per model): the same inputs for Dòng đời, the profile, the
+// lists, the tree and the Cần bổ sung page. Nothing here is stored.
+const FEST = new WeakMap();
+function famEst(fam) {
+  let per = FEST.get(M); if (!per) { per = new Map(); FEST.set(M, per); }
+  if (!per.has(fam)) {
+    const dataOf = new Map(personsOf(fam).map((x) => [x.id, x.data]));
+    const r = S.relOf(fam); const eventsOf = (id) => (EVD.get(evKey(fam, id))?.items || []);
+    const rel = r.source === 'table' ? relAccess(relIndex(r.parent_child, r.couple)) : null;
+    per.set(fam, estimateFamilyCached(fam, dataOf, rel || legacyAccess(dataOf), { eventsOf, today: new Date().toISOString().slice(0, 10) }));
+  }
+  return per.get(fam);
+}
+// The estimates to show for a person (est-years.js): none for a hidden living person, a conflict or a wide range.
+function estOfP(p) { return estItems(p.data, famEst(famOfP(p)).get(p.id)); }
+// Attaches the estimate reader to a model, so the tree chart (treechart.js) reads it through M.estOf.
+function withEst(m) { m.estOf = estOfP; return m; }
+// Years of one row, as HTML: the stored years, then the estimate for a missing year (muted, "ước tính").
+function yearsHtmlOf(p) {
+  const d = p.data; const it = estOfP(p);
+  return [years(d) ? yearsHtml(d) : '', it.length ? estHtml(it, { hasOther: !!(d.died || d.death_date) }) : ''].filter(Boolean).join(' · ');
+}
+// A table cell for a missing year: the estimate of that kind only (muted), with the basis as its tooltip.
+function estCell(p, kind) {
+  return estOfP(p).filter((it) => it.kind === kind).map((it) => `<span class="est-yr" title="${esc(basisText(it))}">≈ ${esc(it.range)}</span>`).join('');
+}
+// The profile header: "≈ 1880–1910 · ước tính", and the basis under "Cách tính ›" (the repo's details pattern, tap to open).
+function estHeadHtml(p) {
+  const d = p.data; const items = estOfP(p);
+  if (!items.length) return '';
+  const line = items.map((it) => `<span class="est-item"><span class="est-yr">${esc(estLabel(it, !!(d.died || d.death_date)))} · ${esc(NEEDS_VI.est_label)}</span></span>`).join(' ');
+  // closed by default; one short line per basis (the lifespan defaults are not evidence, see est-years.js shownBasis)
+  const why = items.flatMap((it) => it.basis).map((b) => `<span class="est-why-line">${esc(b)}</span>`).join('');
+  return `<p class="prof-est">${line}</p><details class="est-why"><summary>${esc(NEEDS_VI.est_why)} ›</summary><div class="sub">${why}</div></details>`;
+}
+// The same as plain text (map rows, pickers, the tree chart label).
+function yearsPlainOf(p) {
+  const d = p.data; const it = estOfP(p);
+  return [years(d), it.length ? estPlain(it, !!(d.died || d.death_date)) : ''].filter(Boolean).join(' · ');
+}
 const evDirect = (fam) => !modeOf(fam); // editors write at once; others send a suggestion
 const evMemberOf = (fam) => isMemberRole(S.roleIn(fam));
 const evNameOf = (fam) => { const names = new Map(personsOf(fam).map((x) => [x.id, x.data.name])); return (id) => names.get(id) || ''; };
@@ -721,7 +765,7 @@ function lifeModel(p) {
   const r = S.relOf(fam); const eventsOf = (id) => (EVD.get(evKey(fam, id))?.items || []);
   const rel = r.source === 'table' ? relAccess(relIndex(r.parent_child, r.couple)) : null;
   // One estimate for the whole family (memoized): read for this person only; relatives' undated years give no row.
-  const fest = estimateFamilyCached(fam, dataOf, rel || legacyAccess(dataOf), { eventsOf, today: new Date().toISOString().slice(0, 10) });
+  const fest = famEst(fam);
   const derived = deriveLifeEvents(p.id, dataOf, { rel, visible, eventsOf });
   // No birth year (or a dead person without a death year): an estimated life window from the evidence. One estimate
   // for the whole family (memoized), read for this person.
@@ -1238,7 +1282,7 @@ const mapGroups = (people) => {
   return [...groups.values()];
 };
 const fcOf = (groups) => ({ type: 'FeatureCollection', features: groups.map((g, i) => ({ type: 'Feature', id: i, properties: { n: g.people.length, prec: g.precision, i, fi: groupFi(g) }, geometry: { type: 'Point', coordinates: [g.lon, g.lat] } })) });
-const mapRow = (p) => personItem({ rank: isLabelOnly(p.data) ? '' : rank(p.data), name: nameOf(p.data), sex: p.data.sex }, { href: ph(p, `person/${p.id}`), badge: famChipIf(p), sub: `${p.data.hidden_living && !genOf(M, p) ? '' : `Đời ${genOf(M, p) || '?'}`}${years(p.data) ? ' · ' + years(p.data) : ''}${p.data.place ? ' · ' + esc(p.data.place) : ''}` });
+const mapRow = (p) => personItem({ rank: isLabelOnly(p.data) ? '' : rank(p.data), name: nameOf(p.data), sex: p.data.sex }, { href: ph(p, `person/${p.id}`), badge: famChipIf(p), sub: `${p.data.hidden_living && !genOf(M, p) ? '' : `Đời ${genOf(M, p) || '?'}`}${yearsPlainOf(p) ? ' · ' + esc(yearsPlainOf(p)) : ''}${p.data.place ? ' · ' + esc(p.data.place) : ''}` });
 // Filter bar (toolbar + fpanel + active tags). Rebuilt when a filter changes; the search box itself is kept.
 // Chi and Đời options from the people on the map's side (all of them, not only the filtered ones).
 function mapOpts() {
@@ -1973,7 +2017,7 @@ function more() {
   const row = (k, label, badge = '', icn) => calmRow({ href: hf(k), icon: tile(icon(icn || NAV.find((x) => x[0] === k)[3])), title: label, badge, dense: true });
   const bdg = (c) => (c ? ` <b class="badge">${c}</b>` : '');
   const grp = (title, rows) => (rows.filter(Boolean).length ? section(title, `<div class="mg-g">${rows.filter(Boolean).join('')}</div>`) : '');
-  const view = grp('Xem', [row('map', 'Bản đồ'), row('stats', 'Thống kê'), row('verify', 'Cần bổ sung'), calmRow({ href: hf('consistency'), icon: tile(icon('info')), title: CSV.more_link, subtitle: CSV.more_sub, dense: true }), row('export', 'Tải về')]);
+  const view = grp('Xem', [row('map', 'Bản đồ'), row('stats', 'Thống kê'), row('verify', 'Cần bổ sung'), calmRow({ href: hf('consistency'), icon: tile(icon('info')), title: CSV.more_link, subtitle: CSV.more_sub, dense: true }), S.isMember() && !S.isAll() ? calmRow({ href: hf('consistency') + '?v=bo-sung', icon: tile(icon('flag')), title: NEEDS_VI.menu_needs, subtitle: NEEDS_VI.menu_needs_sub, dense: true }) : '', row('export', 'Tải về')]);
   const joinRow = signed && !S.isMember() ? calmRow({ href: hf('join'), icon: tile(icon('user')), title: acct.status === 'pending' ? 'Yêu cầu tham gia đang chờ duyệt' : 'Tham gia dòng họ', dense: true }) : '';
   const fam = grp('Dòng họ', [calmRow({ href: `#/${S.ALL_FAMS}/tree`, icon: tile(icon('search')), title: 'Tìm / lập dòng họ', dense: true }), S.isEditor() && !S.isAll() ? calmRow({ attrs: 'data-contact-import-fam', icon: tile(icon('user')), title: 'Nhập danh bạ', subtitle: 'vCard (.vcf) hoặc CSV, khớp với người trong họ', dense: true }) : '', row('gop-y', 'Góp ý', canAdminHere() ? bdg(sugCount) : ''), canAdminHere() ? row('members', 'Thành viên & quyền', bdg(joinCount)) : '', joinRow, signed ? row('nhan-quan-ly', 'Nhận quản lý cây', '', 'tree') : '', S.isMember() && !S.isAll() ? row('bieu-quyet', 'Biểu quyết', '', 'user') : '', S.isMember() && !S.isAll() ? row('nguon-tai-lieu', 'Nguồn tài liệu', '', 'note') : '', S.isEditor() && !S.isAll() ? row('thung-rac', 'Thùng rác', '<span data-trash-badge></span>', 'trash') : '']);
   // Ứng dụng: settings and the build in use; the check asks the server now (same unsaved-changes guard as the notice)
@@ -3018,7 +3062,7 @@ main.addEventListener('click', (e) => {
 main.addEventListener('keydown', (e) => { const g = e.target.closest?.('.cbx[data-sel]'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); g.dispatchEvent(new MouseEvent('click', { bubbles: true })); } });
 addEventListener('resize', () => { clearTimeout(window.__rz); window.__rz = setTimeout(() => route().view === 'tree' && render(), 200); });
 addEventListener('hashchange', () => { trailUpdate(); render(); UPD.decide('nav'); });
-S.subscribe(() => { const a = document.activeElement; if (a && main.contains(a) && a.tagName === 'INPUT') { M = build(); chrome(); } else renderSoon(); });
+S.subscribe(() => { const a = document.activeElement; if (a && main.contains(a) && a.tagName === 'INPUT') { M = withEst(build()); chrome(); } else renderSoon(); });
 // ---------- app update: a new deploy while the app is open (web/js/update.js) ----------
 // Busy (a form with unsaved changes or a dialog open): "Có bản mới · Tải lại". Idle: applied by itself on start, when
 // the app comes back, on a manual check, on the next navigation or when the app is hidden (a day at the latest).

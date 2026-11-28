@@ -17,6 +17,7 @@ const skip = !DB_URL ? 'set GP_TEST_DATABASE_URL (scratch DB) to run'
   : !/scratch|e2e|giapha_ci/.test(DB_URL) ? 'GP_TEST_DATABASE_URL must name a scratch database (contains "scratch", "e2e" or giapha_ci)'
   : !chromium ? 'playwright not installed (NODE_PATH)' : false;
 
+const NEEDS = eval('(' + fs.readFileSync(path.join(__dirname, '..', '..', 'web', 'js', 'needs-vi.js'), 'utf8').match(/NEEDS_VI = (\{[\s\S]*\});/)[1] + ')');
 const VI = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'web', 'js', 'consistency-vi.js'), 'utf8').match(/^export const VI = ([\s\S]*);\n$/)[1]);
 const OWNER = 'owner-consistency-e2e@test.local'; const MEMBER = 'member-consistency-e2e@test.local';
 const ISSUES = [
@@ -102,14 +103,17 @@ test('editor: issues grouped by severity, ignore moves one under the toggle; a m
   } finally { await ctx.close(); }
 });
 
-test('member: the list shows, with no ignore button', { skip }, async () => {
+// A member sees Cần bổ sung thông tin (the needs list) and no review item: Cần xem lại is for editors (estimates-needs.test.js).
+test('member: no review issues and no ignore button; the needs section shows', { skip }, async () => {
   const state = { open: ISSUES.map((i) => ({ ...i })), ignored: [] };
   const { ctx, page } = await newPage({ email: MEMBER, width: 1280, scheme: 'dark' });
   try {
     await mockApi(page, state);
     await page.goto(base + '/#/duong/consistency');
-    await page.waitForSelector('#csbox .cs-issue', { timeout: 15000 });
+    await page.waitForFunction((t) => (document.querySelector('#csbox')?.innerText || '').includes(t), NEEDS.section_needs, { timeout: 15000 });
+    assert.equal(await page.locator('#csbox .cs-issue').count(), 0, 'no review issue for a member');
     assert.equal(await page.locator('#csbox [data-cs=ignore]').count(), 0);
+    assert.ok(!(await page.locator('#csbox').innerText()).includes(NEEDS.section_review), 'no Cần xem lại section');
     await shot(page, 'consistency-1280-dark.png');
   } finally { await ctx.close(); }
 });

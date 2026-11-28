@@ -18,6 +18,7 @@ import { birthIso, isoOfDied } from './events.js';
 
 export const PASSES = 20;
 export const APPROX_SPAN = 5; // "khoảng 1780" = 1775–1785
+export const SHOW_MAX_WIDTH = 60; // an estimate is shown (profile, tree, lists, needs) only when its range is at most this many years
 const INF = Infinity;
 const MAX_BASIS = 3;
 
@@ -60,7 +61,7 @@ function link(X, Y, dmin, dmax, whyX, whyY = whyX) {
 // eventsOf(id): the person's stored events. today: ISO date (tests pass a fixed one).
 // Returns Map id -> estimate for every person in persons:
 //   { id, bornKnown, diedKnown, born:[lo,hi]|null, died:[lo,hi]|null, from, to, label:{born,died}, confidence,
-//     conflict, bornBasis, diedBasis, basis, hops, living, dead, ruleDead, genFallback }
+//     conflict, bornBasis, diedBasis, diedEvidence, basis, hops, living, dead, ruleDead, genFallback }
 // A person with no estimated bound has born and died null. conflict: lo > hi, the intervals are kept as they are.
 export function estimateFamily(persons, R, { eventsOf = () => [], today = null } = {}) {
   const todayY = today ? yr(today) : new Date().getUTCFullYear();
@@ -185,12 +186,16 @@ export function estimateFamily(persons, R, { eventsOf = () => [], today = null }
     const width = Math.min(born ? born[1] - born[0] : INF, died ? died[1] - died[0] : INF);
     const confidence = width <= 15 && hops <= 2 && !f.genFallback ? 'high' : width <= 30 && !f.genFallback ? 'medium' : 'low';
     const bornBasis = cap([...s.born.bl, ...s.born.bh]);
+    // evidence for the death year: a bound from another rule (relatives, own events, notes, age at death). The lifespan
+    // default (100 years, "đến hôm nay", the rule of 110 years) is not evidence: a death range without it is not shown.
+    const lifespanOnly = (t) => t === 'đến hôm nay' || t === 'sống tối đa 100 năm';
+    const diedEvidence = [...s.died.bl, ...s.died.bh].some((t) => !lifespanOnly(t)) || f.lastOwn > -INF || !!f.ageD;
     const diedBasis = cap([...(ruleDead ? ['quy tắc: sinh hơn 110 năm trước, không ghi nhận còn sống → mất ≈ sinh + 60 năm'] : []), ...s.died.bl, ...s.died.bh]);
     out.set(id, {
       id, bornKnown: f.bornKnown, diedKnown: f.diedKnown, born, died, from: from === null ? null : String(from),
       to: to === null ? null : String(to), label: { born: born ? span(born) : '', died: died ? span(died) : '' },
       confidence, conflict, bornBasis, diedBasis, basis: cap([...bornBasis, ...diedBasis]), hops: hops === INF ? null : hops,
-      living: f.living, dead: f.knownDead, ruleDead, genFallback: f.genFallback, name: d.name || '',
+      living: f.living, dead: f.knownDead, ruleDead, diedEvidence, genFallback: f.genFallback, name: d.name || '',
     });
   }
   return out;
