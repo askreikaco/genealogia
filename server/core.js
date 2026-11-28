@@ -1,10 +1,14 @@
 // Pure logic (no DB, no express): field rules, privacy filter, op merge. Tested in test/core.test.js.
 'use strict';
 
+// The calendars a person's date can be typed in ('' = Dương lịch, not stored); the same set as the event form's date_cal.
+const DATE_CALS = ['', 'vn-lunar', 'cn-lunar', 'japanese', 'hebrew', 'islamic-umalqura', 'text'];
 // Editable fields. type: text | int | enum. Anything else in an op is rejected.
 const FIELDS = {
   name: 'text', surname: 'text', given: 'text', name_order: { enum: ['', 'family_first', 'given_first'] }, thu: 'text', sex: { enum: ['m', 'f', ''] }, gen: 'int', parent: 'text', order: 'num',
   birth_date: 'text', birth_lunar: 'text', birth_place: 'text', death_date: 'text',
+  // a date typed in another calendar (web/js/person-date.js): the calendar and the text as typed (born/died hold the year)
+  birth_cal: { enum: DATE_CALS }, birth_text: 'text', death_cal: { enum: DATE_CALS }, death_text: 'text',
   spouse: 'text', spouse_of: 'text', spouse_n: 'int', other_parent: 'text', born: 'text', died: 'text', death_lunar: 'text', gio_lunar: 'text',
   place: 'text', alias: 'text', name_han: 'text', title_name: 'text', job: 'text', religion: 'text', married: 'text',
   burial: 'text', photo: 'text', phone: 'text', email: 'text', address: 'text', facebook: 'text',
@@ -57,6 +61,7 @@ function publicView(d, opts = {}) {
     for (const k of CONTACT) delete out[k];
   }
   delete out.birth_date; delete out.birth_lunar; delete out.death_date; // public sees the YEARS only; full dates for signed-in family members
+  delete out.birth_text; delete out.death_text; delete out.birth_cal; delete out.death_cal; // a date as typed (or its calendar) is a full date too
   if (Array.isArray(d.names)) out.names = publicNames(d.names); // the reason and source of a change: members only
   if (isDead(d)) for (const k of CONTACT) delete out[k];
   return out;

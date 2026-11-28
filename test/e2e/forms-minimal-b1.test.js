@@ -117,7 +117,7 @@ test('new person: five essentials and the links show; Thêm chi tiết is closed
   try {
     await openForm(page, 'them');
     const names = await visibleNames(page);
-    assert.deepEqual(names, ['birth_smart', 'dead', 'name', 'sex'], 'Họ tên, Giới tính, Ngày sinh, Đã khuất (Cha mẹ is the search box, checked next)');
+    assert.deepEqual(names, ['birth_cal', 'birth_smart', 'dead', 'name', 'sex'], 'Họ tên, Giới tính, Ngày sinh (its calendar and year are the shared field), Đã khuất (Cha mẹ is the search box, checked next)');
     assert.equal(await page.locator('#fpform input.pk-q').isVisible(), true, 'Cha/mẹ is on the page');
     for (const label of ['＋ Tên khác, tên húy', '+ Họ khác', '+ Liên hệ']) {
       assert.ok(await page.locator('#fpform', { hasText: label }).count(), `link ${label} is on the page`);
@@ -128,10 +128,10 @@ test('new person: five essentials and the links show; Thêm chi tiết is closed
     assert.equal(await page.locator('#fpform [data-ct-row]').count(), 0, 'no contact row by default');
     await shot(page, 'add-person-closed.png');
     // the date: a short placeholder, the ⓘ help beside it, and the lunar as a hint only (no Âm lịch input by default)
-    assert.equal(await page.locator('#fpform input[name="birth_smart"]').getAttribute('placeholder'), 'vd 1963 hoặc 5/3/1963');
+    assert.equal(await page.locator('#fpform input[name="birth_smart"]').getAttribute('placeholder'), 'vd 1981, 3/1981, 1980–1981');
     assert.ok(await page.locator('#fpform .evx-help summary').count() >= 1, 'the ⓘ help is on the date');
     await page.fill('#fpform input[name="birth_smart"]', '5/3/1963');
-    assert.equal((await page.locator('#fpform [data-lunar-hint="birth_lunar"]').innerText()).trim(), '≈ 10/2 ÂL', 'an exact date shows its lunar as a hint');
+    assert.equal((await page.locator('#fpform [data-pdate="birth"] [data-lunar-hint]').innerText()).trim(), '≈ 10/2 ÂL', 'an exact date shows its lunar as a hint');
     assert.equal(await page.locator('#fpform input[name="birth_lunar"]').count(), 0, 'no Âm lịch input is drawn by default');
     assert.equal(await foldOf(page).evaluate((el) => el.open), false, 'a computed lunar does not open the fold');
     assert.deepEqual(errs, []);

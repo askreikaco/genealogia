@@ -585,7 +585,7 @@ app.get('/api/history/:id', H(async (req, res) => {
   const { rows: pr } = await pool.query('select data from persons where id=$1', [req.params.id]);
   if (pr[0] && !(await EV.rules()).canSeeEventsOf(pr[0].data, { member: canSeePrivate(w), familyReadable: true })) return res.json([]);
   const { rows } = await pool.query('select field, old_value, new_value, by_user, source, at from history where person_id=$1 order by at desc limit 200', [req.params.id]);
-  const hidden = ['phone', 'email', 'address', 'facebook', 'zalo', 'social', 'birth_date', 'birth_lunar', 'death_date', 'quan_he_rieng', 'su_kien', 'cau_chuyen', 'nguon_khac'];
+  const hidden = ['phone', 'email', 'address', 'facebook', 'zalo', 'social', 'birth_date', 'birth_lunar', 'death_date', 'birth_text', 'death_text', 'birth_cal', 'death_cal', 'quan_he_rieng', 'su_kien', 'cau_chuyen', 'nguon_khac'];
   res.json(canSeePrivate(w) ? rows : rows.filter((r) => !hidden.includes(r.field)));
 }));
 

@@ -57,6 +57,18 @@ test('honeypot filled is rejected and nothing is stored', { skip }, async () => 
   assert.equal(rows[0].n, 0);
 });
 
+test('a date typed in another calendar: suggest accepts its keys and rejects a calendar it does not know', { skip }, async () => {
+  // its own client address (X-Forwarded-For, trust proxy 1): the per-address limit of the other tests is not spent here
+  const post = (changes) => fetch(base + '/api/suggest', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.' + (1 + Math.floor(Math.random() * 250)) },
+    body: JSON.stringify({ person_id: personId, changes, by_name: TAG }) });
+  const ok = await post({ birth_cal: 'vn-lunar', birth_text: '15/8/1890', born: '1890', birth_date: '28/09/1890' });
+  assert.equal(ok.status, 200, await ok.text());
+  assert.equal((await post({ death_cal: 'text', death_text: 'năm Giáp Tý', died: '1864' })).status, 200);
+  const bad = await post({ birth_cal: 'mars', birth_text: 'x' });
+  assert.equal(bad.status, 400);
+  assert.match((await bad.json()).error, /birth_cal/);
+});
+
 test('unknown field key is rejected', { skip }, async () => {
   const r = await call('POST', '/api/suggest', { person_id: personId, changes: { hack: 1 }, by_name: TAG });
   assert.equal(r.status, 400);

@@ -1,5 +1,24 @@
 {
   "modules": {
+    "person-date": {
+      "paths": [
+        "web/js/person-date.js",
+        "web/js/date-field.js",
+        "web/js/calendars.js",
+        "web/js/calendars-vi.js",
+        "web/js/pdate-vi.js",
+        "web/js/app.js",
+        "server/core.js",
+        "server/server.js",
+        "server/test/person-date.test.js",
+        "server/test/suggest.test.js"
+      ],
+      "e2e": [
+        "test/e2e/person-date*.test.js",
+        "test/e2e/forms-minimal-b1.test.js",
+        "test/e2e/form-fields.test.js"
+      ]
+    },
     "plus-for-everyone": {
       "paths": [
         "web/js/plus.js",

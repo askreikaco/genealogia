@@ -157,3 +157,17 @@ export function textSolar(yearText) {
   if (!y) return { kind: null, from: null, to: null };
   return /^\d{4}$/.test(y) ? { kind: 'about', from: y, to: null } : { error: CAL_VI.err_year };
 }
+
+// A Thời gian field (text, Loại lịch, the year of Lịch cũ) read as the stored fields: { date_text, date_cal, date_kind,
+// date_from, date_to } (date_cal null for Dương lịch), or { error, field }. Shared by the event form and the person form.
+export function readCalDate({ text = '', cal = '', year = '' } = {}) {
+  const t = String(text ?? '').trim(); const c = String(cal ?? '').trim();
+  if (c === 'text') {
+    const y = textSolar(year);
+    if (y.error) return { error: y.error, field: 'date_year' };
+    return { date_text: t, date_cal: 'text', date_kind: y.kind || null, date_from: y.from || null, date_to: null };
+  }
+  const r = toSolar(t, c);
+  if (r.error) return { error: r.error };
+  return { date_text: t, date_cal: c || null, date_kind: r.kind || null, date_from: r.from || null, date_to: r.to || null };
+}

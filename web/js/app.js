@@ -53,6 +53,9 @@ import { VI as CSV } from './consistency-vi.js';
 import { TEXT_SIZE_VI } from './text-size-vi.js';
 import { CAL_VI } from './calendars-vi.js';
 import { ALTCAL_KEY, altCalPref } from './calendars.js';
+import { dateFieldHtml, wireDateField, paintDateField } from './date-field.js';
+import { personDateRead, personDateText, personDateStored } from './person-date.js';
+import { PDATE_VI } from './pdate-vi.js';
 import { addSearch, addBasic } from './addflow.js';
 import * as VR from './variants.js';
 import { KIN_REGION_KEY, resolveRegion } from './kin/index.js';
@@ -629,10 +632,10 @@ function person(id) {
   const bornHint = bornHintShown({ born: d.born, dead: isDead(d), member: S.isMember() }, new Date().getFullYear());
   const groups = [
     { title: 'Sinh', basic: true, rows: [
-      row('Sinh', esc([d.birth_date || d.born, d.birth_lunar && d.birth_lunar + ' ÂL'].filter(Boolean).join(' · ')) + (bornHint ? ' <span class="sub">(ngày sinh chỉ hiện khi đăng nhập)</span>' : '') + (d.born || d.birth_date ? vt('born') : '')),
+      row('Sinh', esc(d.birth_cal ? personDateText(d, 'birth') : [d.birth_date || d.born, d.birth_lunar && d.birth_lunar + ' ÂL'].filter(Boolean).join(' · ')) + (bornHint ? ' <span class="sub">(ngày sinh chỉ hiện khi đăng nhập)</span>' : '') + (d.born || d.birth_date ? vt('born') : '')),
       row('Nơi sinh', d.birth_place ? PL.fieldHtml(id, 'birth_place', d.birth_place, plo) + vt('birth_place') : '')] },
     { title: 'Mất', basic: true, rows: [
-      row('Mất', d.died || d.death_lunar ? esc([d.died, d.death_lunar && d.death_lunar + ' ÂL'].filter(Boolean).join(' · ')) + vt('died') : ''),
+      row('Mất', d.died || d.death_lunar || d.death_cal ? esc(d.death_cal ? personDateText(d, 'death') : [d.died, d.death_lunar && d.death_lunar + ' ÂL'].filter(Boolean).join(' · ')) + vt('died') : ''),
       row('Giỗ', d.gio_lunar ? esc(d.gio_lunar) + ' ÂL' : ''),
       row('An táng', d.burial ? PL.fieldHtml(id, 'burial', d.burial, plo) + vt('burial') : '')] },
     { title: 'Nơi sống & nghề', rows: [
@@ -2246,7 +2249,8 @@ const F = [['name', 'Họ tên'], ['name_han', 'Tên chữ Hán'], ['thu', 'Th�
   ['born', 'Năm sinh'], ['birth_date', 'Ngày sinh (dd/mm/yyyy)'], ['birth_lunar', 'Ngày sinh âm lịch (dd/mm)'], ['died', 'Năm mất'], ['death_lunar', 'Ngày mất (ÂL, ví dụ 2/8)'], ['gio_lunar', 'Ngày giỗ (ÂL, nếu khác ngày mất)'], ['living', 'Tình trạng', [['', 'Chưa rõ'], ['living', 'Đang sống'], ['dead', 'Đã khuất']]],
   ['place', 'Nơi sống'], ['alias', 'Tên khác'], ['title_name', 'Tên húy / tự / hiệu'], ['job', 'Nghề'], ['religion', 'Tôn giáo'], ['burial', 'An táng'], ['photo', 'Ảnh'],
   ['phone', 'Điện thoại'], ['email', 'Email'], ['zalo', 'Zalo'], ['facebook', 'Facebook'], ['address', 'Địa chỉ'], ['contact_public', 'Liên hệ công khai?', [['', 'Không'], ['yes', 'Có']]],
-  ['note', 'Ghi chú'], ['verify', 'Cần xác minh'], ['source', 'Nguồn'], ['birth_place', 'Nơi sinh'], ['death_date', 'Ngày mất (dd/mm/yyyy)']];
+  ['note', 'Ghi chú'], ['verify', 'Cần xác minh'], ['source', 'Nguồn'], ['birth_place', 'Nơi sinh'], ['death_date', 'Ngày mất (dd/mm/yyyy)'],
+  ['birth_cal', PDATE_VI.birth_cal], ['birth_text', PDATE_VI.birth_text], ['death_cal', PDATE_VI.death_cal], ['death_text', PDATE_VI.death_text]];
 // Resize in the browser (longest side 800 px, JPEG) and upload; the person keeps the returned URL.
 async function uploadPhoto(file) {
   const img = await createImageBitmap(file);
@@ -2502,14 +2506,18 @@ const differs = (k, rec, v) => (k === 'contacts' ? !sameList(contactList(rec), v
 const FP_CONTACT = ['contact_public']; // the contact list ('contacts') is members-only: fpKeys adds it
 // Fields of the form for this viewer (guests have no contact fields); only-mode: the listed fields.
 const fpKeys = (only, member) => (only ? new Set(only) : new Set([...FP_SIMPLE.filter((k) => member || !FP_CONTACT.includes(k)),
-  'sex', 'parent', 'other_parent', 'birth_smart', 'death_smart', 'dead', 'gio_lunar', 'burial', ...(member ? ['contacts'] : [])]));
+  'sex', 'parent', 'other_parent', 'birth_smart', 'birth_cal', 'birth_year', 'death_smart', 'death_cal', 'death_year', 'dead', 'gio_lunar', 'burial', ...(member ? ['contacts'] : [])]));
 // The values the form starts with: the record (or the merged suggestion, or the prefill of a new person).
 function fpInitVals(st) {
   const { d } = st; const v = {};
   for (const k of st.keys) v[k] = d[k] == null ? '' : String(d[k]);
   if (st.keys.has('sex')) v.sex = d.sex === 'm' || d.sex === 'f' ? d.sex : '';
-  if (st.keys.has('birth_smart')) v.birth_smart = smartText(d.birth_date, d.born);
-  if (st.keys.has('death_smart')) v.death_smart = smartText(d.death_date, d.died);
+  for (const p of ['birth', 'death']) { // a date in another calendar: its text as typed (and the estimated year of Lịch cũ)
+    if (!st.keys.has(`${p}_smart`)) continue;
+    const cal = d[`${p}_cal`] || ''; const yr = p === 'birth' ? d.born : d.died;
+    v[`${p}_smart`] = cal ? (d[`${p}_text`] || '') : smartText(d[`${p}_date`], yr);
+    v[`${p}_cal`] = cal; v[`${p}_year`] = cal === 'text' ? String(yr ?? '') : '';
+  }
   if (st.keys.has('dead')) v.dead = isDead(d) ? 'on' : '';
   if (st.keys.has('contact_public')) v.contact_public = d.contact_public === 'yes' ? 'yes' : '';
   if (st.keys.has('contacts')) v.contacts = JSON.stringify(contactList(d)); // the list, as JSON text (a draft holds text too)
@@ -2518,8 +2526,12 @@ function fpInitVals(st) {
 }
 // A date field (Ngày sinh, Ngày mất): a short placeholder, the ⓘ help beside the label, and the auto lunar hint under it.
 // The lunar itself (with its Sửa override) sits in Thêm chi tiết; the hint is shown only when the date is exact.
-const fpDateField = (k, label, lk, st) => fpW(k, true, `<div class="fld"><span class="evx-dt-h"><span>${esc(label)}</span><details class="evx-help"><summary aria-label="${esc(FORMS_VI.date_help_label)}">ⓘ</summary><p class="sub">${esc(FORMS_VI.date_help)}</p></details></span><input name="${k}" value="${fpE(st.v[k])}" inputmode="numeric" autocomplete="off" aria-label="${esc(label)}" placeholder="${esc(FORMS_VI.date_ph)}"></div><p class="sub" data-lunar-hint="${lk}" hidden></p>`);
-const fpDeath = (st) => fpDateField('death_smart', 'Ngày mất', 'death_lunar', st);
+// The shared date field (date-field.js) with the form's input names: the text (k_smart), the calendar (k_cal) and the year (k_year).
+// p: 'birth' or 'death'. The hint under it is the shared one (the solar date, or the Lịch phụ hint of Dương lịch).
+const fpDateField = (p, label, st) => { const k = `${p}_smart`; return fpW(k, true, `<div data-pdate="${p}">${dateFieldHtml({ id: k, label, text: st.v[k] ?? '', cal: st.v[`${p}_cal`] ?? '', year: st.v[`${p}_year`] ?? '', help: `<details class="evx-help"><summary aria-label="${esc(FORMS_VI.date_help_label)}">ⓘ</summary><p class="sub">${esc(FORMS_VI.date_help)}</p></details>`, names: { text: k, cal: `${p}_cal`, year: `${p}_year` } })}</div>`); };
+const fpDeath = (st) => fpDateField('death', 'Ngày mất', st);
+// A date field's reading from the state (birth or death): the smart-date result, with the calendar (person-date.js).
+const pdateOf = (st, p) => personDateRead({ text: st.v[`${p}_smart`], cal: st.v[`${p}_cal`], year: st.v[`${p}_year`] });
 // Cha/mẹ: the chosen parent, or the search box (only one of the two is in the page).
 function fpPickBox(st) {
   const par = st.v.parent ? M.byId.get(st.v.parent) : null;
@@ -2548,7 +2560,7 @@ function fpEssentials(st) {
       <label class="fp-seg-o"><input type="radio" name="sex" value="m" ${v.sex === 'm' ? 'checked' : ''}>Nam</label>
       <label class="fp-seg-o"><input type="radio" name="sex" value="f" ${v.sex === 'f' ? 'checked' : ''}>Nữ</label></div></fieldset>`
     + (tableRel ? '<p class="sub wide">Cha mẹ, vợ/chồng và con sửa ở mục Quan hệ trên hồ sơ.</p>' : fpPickBox(st))
-    + fpDateField('birth_smart', 'Ngày sinh', 'birth_lunar', st)
+    + fpDateField('birth', 'Ngày sinh', st)
     + ((suggest && !S.isMember()) ? '<p class="sub wide">Ngày đầy đủ chỉ thành viên xem được. Bạn có thể góp ý ngày sinh đầy đủ.</p>' : '')
     + `<label class="fp-switch wide"><input type="checkbox" name="dead" role="switch" ${dead ? 'checked' : ''}><span>Đã khuất</span></label>`
     + `<div class="fp-death wide" data-death data-on="${dead ? '1' : ''}"${dead ? '' : ' hidden'}>${dead ? fpDeath(st) : ''}</div>`
@@ -2595,9 +2607,9 @@ const FP_FOLD = new Set(['name_han', 'spouse', 'married', 'other_parent', 'gio_l
 // A stored lunar that the date does not give (typed by someone, or a lunar with no exact date) opens the fold for it.
 function lunarTyped(st, k) {
   const stored = String(st.d[`${k}_lunar`] ?? '').trim(); if (!stored) return false;
-  const sol = parseSmartDate(String(st.v[`${k}_smart`] ?? ''));
+  const sol = pdateOf(st, k);
   if (!sol.ok || sol.kind !== 'full') return true;
-  return stored !== lunarOf(sol.day, sol.month, +sol.year).stored;
+  return stored !== (sol.lunar ?? lunarOf(sol.day, sol.month, +sol.year).stored);
 }
 function fpFoldOpen(st) {
   return foldHasValue(st.v, S.relOf(st.p?.fam || st.fam || S.curFamily()).source === 'table') || lunarTyped(st, 'birth') || (st.v.dead === 'on' && lunarTyped(st, 'death'));
@@ -2658,6 +2670,7 @@ function fpPaintDeath(form, st, dead) {
   const want = dead ? '1' : '';
   if (host.dataset.on === want) return;
   host.dataset.on = want; host.innerHTML = dead ? fpDeath(st) : '';
+  const dp = host.querySelector('[data-pdate="death"]'); if (dp) wireDateField(dp);
 }
 
 // Current values of every field, the auto values, and the inline errors. Pure read of the form; no save.
@@ -2697,14 +2710,17 @@ function fpResolve(form, st) {
   put('parent', parentId);
   put('other_parent', parentId ? sv('other_parent') : '');
   // Ngày sinh, Ngày mất
-  const bp = parseSmartDate(sv('birth_smart'));
+  // (another calendar: the solar date, when known, is born/birth_date; the calendar and the text as typed are kept too)
+  const bp = pdateOf(st, 'birth');
   if (!bp.ok) err('birth_smart', bp.error);
-  const dp = dead ? parseSmartDate(sv('death_smart')) : { ok: true, kind: 'empty' };
+  const dp = dead ? pdateOf(st, 'death') : { ok: true, kind: 'empty' };
   if (!dp.ok) err('death_smart', dp.error);
   const bok = bp.ok ? bp : { kind: 'empty' }; const dok = dp.ok ? dp : { kind: 'empty' };
   if (dead && bok.kind !== 'empty' && cmpDate(dok, bok) < 0) err('death_smart', 'Năm mất trước năm sinh.');
-  put('born', yrOf(bok)); put('birth_date', fullDate(bok));
-  put('died', dead ? yrOf(dok) : ''); put('death_date', dead ? fullDate(dok) : '');
+  // born, birth_date (and died, death_date); the calendar and its text only for another calendar (person-date.js)
+  const stored = { ...personDateStored('birth', bp, { text: sv('birth_smart'), cal: sv('birth_cal'), recordCal: d.birth_cal }),
+    ...personDateStored('death', dp, { on: dead, text: sv('death_smart'), cal: sv('death_cal'), recordCal: d.death_cal }) };
+  for (const [k, x] of Object.entries(stored)) put(k, x);
   put('living', dead ? 'dead' : d.living === 'dead' ? 'living' : (d.living ?? ''));
   // Đời
   const ovg = ovOf('gen'); let gen; let genAuto;
@@ -2730,6 +2746,7 @@ function fpResolve(form, st) {
       if (!/^\d{1,2}\/\d{1,2}( nhuận)?$/.test(ov)) err(k, 'Nhập ngày/tháng âm, ví dụ 12/2.');
       put(k, ov); eff[k] = { raw: ov, text: ov, auto: false, hint: 'sửa tay' }; return;
     }
+    if (sol.kind === 'full' && sol.lunar) { put(k, sol.lunar); eff[k] = { raw: sol.lunar, text: sol.lunar, auto: true, hint: 'tự tính', computed: true }; return; } // vn-lunar typed: the lunar day as typed
     if (sol.kind === 'full') {
       const lu = lunarOf(sol.day, sol.month, +sol.year);
       // a stored lunar that is not the computed one of the record's saved date was typed: it is kept (old data keeps saving)
@@ -2851,12 +2868,7 @@ function fpLive(form, st) {
     fpPaintDeath(form, st, r.dead);
   }
   for (const k of ['gen', 'thu', 'birth_lunar', 'death_lunar']) fpPaintAu(form, st, k);
-  for (const k of ['birth_lunar', 'death_lunar']) { // the hint under the date: the computed lunar, only for an exact date
-    const h = form.querySelector(`[data-lunar-hint="${k}"]`); if (!h) continue;
-    const e = st.eff[k]; const txt = e && e.computed ? FORMS_VI.lunar_hint.replace('{v}', e.raw) : '';
-    if (h.textContent !== txt) h.textContent = txt;
-    h.hidden = !txt;
-  }
+  form.querySelectorAll('[data-pdate]').forEach((el) => paintDateField(el)); // the hint under each date and its year block
   fpShowErrs(form, r.errs);
   if (!st.only) fpSummaries(form, st, r);
   return r;
@@ -2876,7 +2888,9 @@ async function fpQueue(item, st) {
   toast('Đang chờ mạng — sẽ gửi khi có mạng'); location.hash = hf('mine');
 }
 const FP_NOSAVE = ['website'];
-const FP_MAP = { birth_smart: ['born', 'birth_date'], death_smart: ['died', 'death_date'], dead: ['living', 'died', 'death_date', 'death_lunar'] };
+const FP_BIRTH = ['born', 'birth_date', 'birth_cal', 'birth_text']; const FP_DEATH = ['died', 'death_date', 'death_cal', 'death_text'];
+const FP_MAP = { birth_smart: FP_BIRTH, birth_cal: FP_BIRTH, birth_year: FP_BIRTH, death_smart: FP_DEATH, death_cal: FP_DEATH, death_year: FP_DEATH,
+  dead: ['living', ...FP_DEATH, 'death_lunar'] };
 const FP_AUK = ['gen', 'thu', 'birth_lunar', 'death_lunar'];
 // Every field's current value: the state, plus the inputs outside it (the suggestion's note and contact).
 function fpRaw(form, st) {
@@ -3012,6 +3026,7 @@ function formPage(arg) {
   };
   form.addEventListener('input', live);
   form.addEventListener('change', live);
+  form.querySelectorAll('[data-pdate]').forEach((el) => wireDateField(el)); // the date fields drawn now; a death field drawn later is wired by fpPaintDeath
   form.addEventListener('change', (e) => { if (e.target.id === 'fpfam') fpSwitchFam(form, st, e.target.value); });
   form.addEventListener('input', (e) => { if (e.target.classList?.contains('pk-q')) fpPickSearch(form, st, e.target); });
   form.addEventListener('keydown', (e) => { if (e.target.classList?.contains('pk-q')) fpPickKey(form, st, e); });
