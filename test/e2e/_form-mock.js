@@ -22,7 +22,7 @@ async function open(browser, opts) {
   if (opts.init) await ctx.addInitScript(opts.init);
   return { ...(await openIn(ctx, opts)), ctx };
 }
-async function openIn(ctx, { role, path: hash, persons = PERSONS, personsDelay = 0, ready = '#fpform, .fp-form, main h1' }) {
+async function openIn(ctx, { role, path: hash, persons = PERSONS, personsDelay = 0, rel, ready = '#fpform, .fp-form, main h1' }) {
   const page = await ctx.newPage();
   const log = { ops: [], suggest: [], errors: [], logout: 0, personsServed: 0 };
   page.on('pageerror', (e) => log.errors.push(e.message));
@@ -36,7 +36,8 @@ async function openIn(ctx, { role, path: hash, persons = PERSONS, personsDelay =
     // like the server: rows with a version above the cursor (every row is version 1 unless a test bumps it)
     if (p === '/api/persons') {
       const since = Number(new URL(req.url()).searchParams.get('since')) || 0; const rows = persons.filter((x) => (x.v || 1) > since);
-      const body = JSON.stringify({ items: rows, next_since: rows.length ? Math.max(...rows.map((x) => x.v || 1)) : since });
+      // rel (optional): the family's relation rows as the server gives them ({ source: 'table', parent_child, couple })
+      const body = JSON.stringify({ items: rows, next_since: rows.length ? Math.max(...rows.map((x) => x.v || 1)) : since, ...(rel ? { rel } : {}) });
       // personsDelay: the answer waits (a slow network); the page must already show what it has on this device
       const answer = () => { log.personsServed++; route.fulfill({ status: 200, contentType: 'application/json', body }).catch(() => {}); };
       if (personsDelay) return setTimeout(answer, personsDelay);

@@ -2,11 +2,10 @@
 // Data: store.relOf(family) (server rows for this viewer) + relgraph.js (pure rules). Icons are plain line icons (no Hán).
 import * as S from './store.js';
 import { esc, rank, years, isDead } from './model.js';
-import { index, siblingsOf, descendantLevels, pedigreeRows, ancestorChain, coupleNotes, PC_LABEL, CP_LABEL, PC_KINDS, CP_KINDS } from './relgraph.js';
+import { index, siblingsOf, descendantLevels, ancestorLevels, coupleNotes, PC_LABEL, CP_LABEL, PC_KINDS, CP_KINDS } from './relgraph.js';
 import { kinPath, lineDesc, term as kinTerm, resolveRegion, KIN_REGION_KEY } from './kin/index.js';
-import { calmRow, calmAct, popMenu, cic, surnameTile, surnameOf, ghostRow, moreFold, toolbar, ltags, fpanel, addBtn, setUntag, section, sheet as openDialog, KEEP } from './ui.js';
+import { calmRow, calmAct, popMenu, cic, surnameTile, toolbar, ltags, fpanel, addBtn, setUntag, section, sheet as openDialog, KEEP } from './ui.js';
 import { relPrefill, nextOrder } from './prefill.js';
-import { personItem } from './person-item.js';
 import { VI as RPV } from './relpath-vi.js';
 import { dangerButton, dangerZone, dangerItem, dangerLabel, confirmDanger, undoToast, restoreTrash } from './danger.js';
 
@@ -60,9 +59,9 @@ function rowsFor(M, id) {
   return { parents, partners, kids, sibs: siblingsOf(ix, id, sx), ix };
 }
 
-// Quan hệ toolbar (the shared list toolbar: search · Bộ lọc · "+"). Search and filters cover every level, Chắt and deeper
-// included (their fold opens while a search or filter is on). The state is kept while the profile shows one person.
-const RLV = [['cm', 'Cha mẹ'], ['vc', 'Vợ/chồng'], ['ace', 'Anh chị em'], ['con', 'Con'], ['chau', 'Cháu'], ['chat', 'Chắt trở xuống']];
+// Quan hệ toolbar (the shared list toolbar: search · Bộ lọc · "+"). Search and filters cover the two generations each way
+// (Ông bà to Cháu); deeper people are on the tree. The state is kept while the profile shows one person.
+const RLV = [['ob', 'Ông bà'], ['cm', 'Cha mẹ'], ['vc', 'Vợ/chồng'], ['ace', 'Anh chị em'], ['con', 'Con'], ['chau', 'Cháu']];
 const RLV_TYPE = { cm: 'parent', vc: 'spouse', ace: 'sibling', con: 'child' }; // a level filter picks what "+" adds
 const RF = { id: '', q: '', lv: '', liv: '', sex: '', br: '' };
 let RLAST = null; // { M, p, ctx } of the section on screen: search and filters repaint it in place
@@ -95,7 +94,8 @@ function relSheet(M, p) {
 }
 
 // Profile section, one calm list (mockup quanhe-390). Editors: the whole row opens the edit sheet. Others: the whole row
-// opens the person. Groups: parents, spouses, siblings (computed), children, grandchildren, then Chắt and deeper in one fold.
+// opens the person. Groups: grandparents (Ông bà), parents, spouses, siblings (computed), children, grandchildren; then one
+// tree link for each deeper side (Xem con cháu / Xem tổ tiên trên cây), shown only when that side has people beyond.
 export function relSection(M, p, ctx = {}) {
   if (RF.id !== p.id) Object.assign(RF, { id: p.id, q: '', lv: '', liv: '', sex: '', br: '' });
   RLAST = { M, p, ctx };
@@ -144,55 +144,33 @@ function relBody(M, p, ctx) {
   const descRow = (x, g) => { const d = { ...lineDesc(0, g, sexOf(M)(x.id)), kind: x.row?.kind === 'nuoi' ? 'adopted' : 'blood' }; return calmRow({ href: href(x.id), tile: surnameTile(pname(M, x.id)), sex: M.byId.get(x.id)?.data.sex, title: pname(M, x.id), subtitle: `${esc(kinTerm(d, { locale: 'vi', region }))} · con của ${esc(pname(M, x.parent))}` }); };
   const cháu = (lv[1] || []).filter((x) => keep(x.id, 'chau'));
   const cháuRows = cháu.map((x) => descRow(x, 2)).join('');
-  // generations past Chít: the tree link sits at the end of the deepest shown group (inside the fold), when nothing narrows the list
-  const deep = filtering ? 0 : lv.slice(5).reduce((n, l) => n + l.length, 0);
-  const deepRow = deep ? calmRow({ href: ctx.treeHref || '#', title: `Xem thêm ${deep} hậu duệ trên cây ›`, trailing: 'none' }) : '';
-  const lvF = (g) => (lv[g - 1] || []).filter((x) => keep(x.id, 'chat'));
-  const far = [3, 4, 5].filter((g) => lvF(g).length);
-  const deepAt = far.length ? far[far.length - 1] : 0;
-  const levelGroup = (g) => { const rows = lvF(g).map((x) => descRow(x, g)).join('') + (g === deepAt ? deepRow : ''); return rows ? group(gTitle(g, region), rows) : ''; };
-  // Chắt and deeper: one fold under Cháu, closed by default and open while searching or filtering (a whole level is shown
-  // or folded, never part of one)
-  const farN = far.reduce((n, g) => n + lvF(g).length, 0);
-  const farHtml = far.length ? moreFold(`Xem thêm ${far.length} đời · ${farN} người (${far.map((g) => gTitle(g, region)).join(', ')})`, far.map(levelGroup).join(''), filtering) : '';
+  // grandparents: the parents of each parent, one row per person (up to 4, in order of first appearance). A person who is a
+  // grandparent on both sides (pedigree collapse) is one row with both labels ("Ông nội · Ông ngoại"): each side is read on
+  // its own index (the other parent's link left out), so the label says which side the person is on.
+  const anc = ancestorLevels(ix, id);
+  const kin = kinOpts(M);
+  const obPeople = new Map();
+  for (const { other: p } of parents) {
+    const side = index(ix.pc.filter((r) => !(r.child_id === id && r.parent_id !== p)), ix.cp);
+    for (const r of side.parentsOf.get(p) || []) {
+      const gp = r.parent_id; if (gp === id) continue;
+      if (!obPeople.has(gp)) obPeople.set(gp, []);
+      const label = kinTerm(kinPath(side, id, gp, kin), { locale: 'vi', region });
+      if (label && !obPeople.get(gp).includes(label)) obPeople.get(gp).push(label);
+    }
+  }
+  const obRows = [...obPeople].slice(0, 4).filter(([x]) => keep(x, 'ob')).map(([x, labels]) => calmRow({ href: href(x), tile: surnameTile(pname(M, x)), sex: M.byId.get(x)?.data.sex, title: pname(M, x), subtitle: esc(labels.join(' · ')) })).join('');
+  // deeper than Cháu: one tree link, when great-grandchildren exist (lv[2]); above grandparents likewise (anc[2])
+  const downN = lv.length > 2 ? lv.length - 2 : 0; const upN = anc.length > 2 ? anc.length - 2 : 0;
+  const treeLink = (to, title) => `<div class="relrows">${calmRow({ href: to, title })}</div>`;
   const counted = (t, n) => `${t} · ${n} người`;
   const lvName = Object.fromEntries(RLV); const brName = RF.br ? pname(M, RF.br) : '';
   const tags = [RF.lv && ['lv', lvName[RF.lv]], RF.liv && ['liv', RF.liv === 'mat' ? 'Đã khuất' : 'Đang sống'], RF.sex && ['sex', RF.sex === 'f' ? 'Nữ' : 'Nam'], RF.br && ['br', 'Nhánh ' + brName]].filter(Boolean);
-  const body = group('Cha mẹ', pRows) + group('Vợ/chồng', cRows) + group('Anh chị em (tự tính)', sRows) + group(counted(gTitle(1, region), kidsF.length), kRows) +
-    group(counted(gTitle(2, region), cháu.length), cháuRows) + farHtml;
+  const body = group('Ông bà', obRows) + group('Cha mẹ', pRows) + group('Vợ/chồng', cRows) + group('Anh chị em (tự tính)', sRows) + group(counted(gTitle(1, region), kidsF.length), kRows) +
+    group(counted(gTitle(2, region), cháu.length), cháuRows) + (downN ? treeLink(ctx.treeHref || '#', `Xem con cháu trên cây · ${downN} đời`) : '');
   // a search that found no one: say so, and point at "+" (only when this viewer has the "+")
   const none = q && rel.editable ? `Không thấy “${esc(RF.q.trim())}”. Bấm + để thêm người này.` : filtering ? 'Không có ai khớp.' : 'Chưa ghi quan hệ nào.';
-  return `${ltags(tags)}${body || `<p class="sub rel-empty">${none}</p>`}`;
-}
-
-// Pedigree: the ancestors as one chain, one tappable row per ancestor (opens the Hồ sơ): the same shared person row as
-// Quan hệ (calmRow), indented one step per generation. Labels come from the path (Cha, Mẹ, Ông nội, Bà ngoại...); a repeated
-// ancestor is a row too (it opens the same person) with the place it was first drawn. The Thủy tổ (the root of the father
-// line) is labelled with its generation; the deeper generations fold into a ghost row (ui.js ghostRow) right after the last
-// visible father-line ancestor. A woman whose father is recorded has her own father line under her, behind a ghost row
-// "Họ X · N đời" that ends with her line's Thủy tổ ("Thủy tổ họ X"). The chain itself is built in relgraph.js (ancestorChain).
-export function pedigreeHtml(M, id, shown = 4, ctx = {}) {
-  const { ix } = relsOf(M);
-  const region = kinRegion(); const kin = kinOpts(M);
-  const sexOfId = (x) => M.byId.get(x)?.data.sex || '';
-  const nameOf = (x) => pname(M, x);
-  const items = ancestorChain(ix, id, sexOfId, shown);
-  if (!items.length) return '';
-  const kinLabel = (x) => kinTerm(kinPath(ix, id, x, kin), { locale: 'vi', region }) || 'Tổ tiên';
-  const row = (it) => {
-    const ref = it.repeat ? `<span class="sub ped-ref">↗ xem ở nhánh ${esc(it.ref)}</span>` : '';
-    const gen = M.byId.get(it.id)?.data.gen;
-    let label;
-    if (it.type === 'root') label = it.mother ? `Thủy tổ họ ${surnameOf(nameOf(it.id))}` : `Thủy tổ${gen ? ' · Đời ' + gen : ''}`;
-    else { label = kinLabel(it.id); if (label === 'Thủy tổ') label = `Tổ đời ${it.gen}`; } // a line top that is not a father-line root is "Tổ đời N"
-    return `<li style="--d:${it.d}">${personItem({ name: nameOf(it.id), sex: sexOfId(it.id) }, { href: ctx.personHref ? ctx.personHref(it.id) : '#', sub: esc(label) + ref })}</li>`;
-  };
-  const list = (its) => its.map((it) => {
-    if (it.type === 'fold') return `<li class="ped-fold" style="--d:${it.d}">${ghostRow({ closed: `${it.gens} đời ẩn · ${it.people} người`, tiles: it.tiles.map((x) => surnameOf(nameOf(x))), body: `<ul class="ped ped-hid">${list(it.body)}</ul>` })}</li>`;
-    const own = it.ghost ? `<li class="ped-fold" style="--d:${it.ghost.d}">${ghostRow({ closed: `Họ ${surnameOf(nameOf(it.ghost.root))} · ${it.ghost.n} đời`, tiles: it.ghost.tiles.map((x) => surnameOf(nameOf(x))), body: `<ul class="ped ped-hid">${list(it.ghost.items)}</ul>` })}</li>` : '';
-    return row(it) + own;
-  }).join('');
-  return section('Tổ tiên', `<ul class="ped">${list(items)}</ul>`, { variant: 'card', label: 'Tổ tiên', cls: 'relsec sec-card', level: 2 });
+  return `${ltags(tags)}${body || `<p class="sub rel-empty">${none}</p>`}${upN ? treeLink(ctx.treeOf ? ctx.treeOf(id) : '#', `Xem tổ tiên trên cây · ${upN} đời`) : ''}`;
 }
 
 // ---------- sheets ----------

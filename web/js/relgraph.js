@@ -259,6 +259,19 @@ export function pedigreeRows(ix, rootId, depth = 4, nameOf = () => '', labelOf =
   return out;
 }
 
+// Ancestors by generation (pure): levels[0] = parents, levels[1] = grandparents, levels[2] = great-grandparents...
+// Each person once (the first place in the walk wins); every parent link counts (as pedigree does).
+export function ancestorLevels(ix, id) {
+  const seen = new Set([id]); const levels = []; let frontier = [id];
+  for (let d = 0; frontier.length && d < 50; d++) {
+    const next = [];
+    for (const cid of frontier) for (const r of ix.parentsOf.get(cid) || []) if (!seen.has(r.parent_id)) { seen.add(r.parent_id); next.push({ id: r.parent_id, child: cid }); }
+    if (next.length) levels.push(next);
+    frontier = next.map((x) => x.id);
+  }
+  return levels;
+}
+
 // The direct father line of id, father first: at each step the parent recorded as a man (sex 'm'), until a generation has
 // none. [] when the person has no father on record; the last id is the root (the farthest known ancestor up the line).
 export function paternalLine(ix, id, sexOf = () => '') {

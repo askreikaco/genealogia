@@ -168,3 +168,13 @@ test('descendant levels: blood and adopted lineage by generation, parent then bi
   assert.ok(!ids(2).includes('DX'), 'a step line never reaches A');
   assert.deepEqual(R.descendantLevels(ix, 'E1'), [], 'a leaf has no descendants');
 });
+
+test('ancestorLevels: parents, then grandparents, then great-grandparents; each person once, a leaf ancestor has none', async () => {
+  const R = await load();
+  const pc = (parent_id, child_id) => ({ id: parent_id + '>' + child_id, parent_id, child_id, kind: 'ruot' });
+  // C has parents P and M; M also lists GP (a repeated grandparent, drawn once); GP has the parent GG
+  const ix = R.index([pc('P', 'C'), pc('M', 'C'), pc('GP', 'P'), pc('GM', 'P'), pc('GP', 'M'), pc('GG', 'GP')], []);
+  const levels = R.ancestorLevels(ix, 'C').map((l) => l.map((x) => x.id));
+  assert.deepEqual(levels, [['P', 'M'], ['GP', 'GM'], ['GG']], 'by generation, the repeated GP once');
+  assert.deepEqual(R.ancestorLevels(ix, 'GG'), [], 'a root has no ancestors');
+});

@@ -24,7 +24,7 @@ import { searchPeople } from './fuzzy.js';
 import { nameHit, listPrefill, gioPrefill, eventPrefill } from './prefill.js';
 import { codeOf, codeQuery, matchCode, CODE_HELP } from './codes.js';
 import { formatSid, normalizeSid, SID_HELP } from './shortid.js';
-import { relSection, pedigreeHtml, relWire, setNewPersonHandler, relTable, addNewRelated } from './relui.js';
+import { relSection, relWire, setNewPersonHandler, relTable, addNewRelated } from './relui.js';
 import { parseSmartDate, fullDate, yearOf as yrOf, smartText, cmpDate, lunarOf, yearOfData, inferThuBase, suggestGen, suggestThu, hanNameError } from './formrules.js';
 import * as SUC from './succession.js';
 import * as CLM from './claim.js';
@@ -796,7 +796,7 @@ function lifeModel(p) {
 }
 
 let profTab = 'info'; let profFor = '';
-const PTABS = [['info', 'Thông tin'], ['life', 'Dòng đời'], ['story', STORIES_VI.tab], ['src', 'Tư liệu']]; // Quan hệ and Tổ tiên sit on Thông tin
+const PTABS = [['info', 'Thông tin'], ['life', 'Dòng đời'], ['story', STORIES_VI.tab], ['src', 'Tư liệu']]; // Quan hệ sits on Thông tin
 let LIFE = null; // the person whose timeline is on screen: { p }
 function profTabsHtml() {
   return `<nav class="ptabs" role="tablist" aria-label="Hồ sơ">${PTABS.map(([k, l]) => `<button type="button" role="tab" class="ptab${profTab === k ? ' on' : ''}" data-ptab="${k}" aria-selected="${profTab === k}">${l}</button>`).join('')}</nav>`;
@@ -935,7 +935,7 @@ async function evApiSave({ fam, p, kind, id, item, direct, action }) {
   S.addReceipt(j.id, j.receipt);
   return j;
 }
-// Hồ sơ: one tab's content. The Thông tin tab keeps the facts; Quan hệ keeps the relations and the ancestors.
+// Hồ sơ: one tab's content. The Thông tin tab keeps the facts; Quan hệ keeps the relations.
 // Liên hệ: its own group card on the profile. Values when the viewer may see them (members, or the person made them
 // public); otherwise, when the server says there are some (has_contact), a sign-in prompt. No card when nothing to show.
 function contactCard(d, id, fam) {
@@ -992,7 +992,7 @@ function profBody(p, { groups, id, d }) {
   LIFE = { p };
   const facts = factCardHtml(factGroups(groups));
   return `${d.verify ? `<div class="ntc warn"><b>Cần xác minh</b><span class="sub">${esc(d.verify)}</span></div>` : ''}${facts}${codeOf(M, id) ? `<p class="sub">Vị trí trong cây <span class="ppos" title="${esc(CODE_HELP)}">${esc(codeOf(M, id))}</span></p>` : ''}${contactCard(d, id, p.fam || S.curFamily())}`
-    + `${(LK.ensure(p.fam || S.curFamily()), '')}${relSection(M, p, { editable: S.isEditor(), relpathHref: (x) => hf(`relpath/${encodeURIComponent(x)}`), treeHref: hf(`tree/@${id}`), treeOf: (x) => hf(`tree/@${x}`), personHref: (x) => hf(`person/${x}`), links: LK.linesHtml(p.fam || S.curFamily(), id, { clan: CL.clanLinkHtml(S.familyName(p.fam || S.curFamily()), 'clan-in', S.familyMeta(p.fam || S.curFamily())?.country) }) + (BT.ensureBranches(p.fam || S.curFamily()), BT.rootLinkHtml(p.fam || S.curFamily(), id)) })}${pedigreeHtml(M, id, 4, { personHref: (x) => hf(`person/${x}`) })}`;
+    + `${(LK.ensure(p.fam || S.curFamily()), '')}${relSection(M, p, { editable: S.isEditor(), relpathHref: (x) => hf(`relpath/${encodeURIComponent(x)}`), treeHref: hf(`tree/@${id}`), treeOf: (x) => hf(`tree/@${x}`), personHref: (x) => hf(`person/${x}`), links: LK.linesHtml(p.fam || S.curFamily(), id, { clan: CL.clanLinkHtml(S.familyName(p.fam || S.curFamily()), 'clan-in', S.familyMeta(p.fam || S.curFamily())?.country) }) + (BT.ensureBranches(p.fam || S.curFamily()), BT.rootLinkHtml(p.fam || S.curFamily(), id)) })}`;
 }
 // The open tab is in the address (?tab=…), so a reload or a shared link opens it. Thông tin is the default (no parameter).
 function setTabUrl() {
@@ -3052,6 +3052,8 @@ function formPage(arg) {
       if (navigator.onLine === false) toast('Đang chờ mạng — sẽ gửi khi có mạng');
       if (p) await evFlush(st, id);
       await S.draftDelete(st.draftKey);
+      // a new person: the server must have it before the profile opens (it asks for the person's own settings, photos and history at once)
+      if (!p && navigator.onLine !== false) await S.sync().catch(() => {});
       if (!p && st0?.afterSave) await st0.afterSave(id); // e.g. link a new parent to the child
       formDirty = false; toast('Đã lưu'); location.hash = S.isAll() ? `#/${st.fam}/person/${id}` : hf(`person/${id}`);
     } catch (x) { err.hidden = false; err.textContent = x.message; }

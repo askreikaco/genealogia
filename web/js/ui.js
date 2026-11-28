@@ -185,7 +185,7 @@ export function familyCrest(f, size = 'md') {
 const CHEV_SVG = '<svg class="calm-c" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
 // "Xem thêm" at the end of a list: one full-width tertiary button (48 px). Native <details>: it opens the hidden part in
 // place with no script, assistive tech announces expanded / collapsed, and the open button reads "Thu gọn".
-// Used by Quan hệ (Chắt and deeper) and Tổ tiên (generations past four). label: plain text; body: HTML.
+// Used by lists that fold their tail (Xem thêm N). label: plain text; body: HTML.
 const CHEV_DOWN = '<svg class="ic more-chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
 // disc (Thêm chi tiết, forms): the same fold with a summary line that, while closed, lists the hidden fields that hold a
 // value ("Âm lịch 15/8 · 2 ảnh · 1 nguồn"); see discRefresh. open: start open (a hidden field has a value or an error).
@@ -218,11 +218,6 @@ export function discWire(root) {
 export function discOpenErr(root) {
   root.querySelectorAll('[data-disc]').forEach((d) => { if (d.querySelector('[aria-invalid="true"]')) d.open = true; });
 }
-// The ghost row: a fold drawn as a person row (the same height and indent), a dashed tile with up to 3 overlapping mini
-// crests of the folded people, the closed text in muted type, and a chevron that turns when open (the text then reads
-// "Thu gọn"). Native details: the hidden part (body, HTML) opens in place. Shared by every fold of people.
-//   closed: text when shut. tiles: the surnames of the folded people (up to 3 are drawn). open: start open.
-export const ghostRow = ({ closed, tiles = [], body = '', open = false }) => `<details class="ghost"${open ? ' open' : ''}><summary class="calm ghost-row"><span class="ghost-tile" aria-hidden="true">${tiles.slice(0, 3).map((s) => surnameTileOf(s, { size: 'sm' })).join('')}</span><span class="calm-t"><b class="calm-n ghost-n"><span class="gh-closed">${esc(closed)}</span><span class="gh-open">Thu gọn</span></b></span><svg class="calm-c gh-chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></summary>${body ? `<div class="ghost-body">${body}</div>` : ''}</details>`;
 // The one list row (people, relations, menus, settings, pickers). A link when href is set, else a button (attrs: data-* or id).
 //   icon: svg HTML (the caller's icon()), or tile: surnameTile HTML. title: plain text. subtitle: HTML the caller has escaped.
 //   trailing: 'chevron' (default), 'none', or HTML the caller built. badge: HTML (a count) placed after the title.

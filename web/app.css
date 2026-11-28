@@ -482,23 +482,10 @@ dialog.cfm{max-width:440px}
 .add-dup{display:flex;align-items:center;gap:var(--sp-3);border-left:var(--bw-strong) solid var(--c-warn);background:var(--c-layer);padding:var(--sp-3) var(--sp-4)}
 .add-dup .grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--sp-1)}
 .rel-tog{display:flex;align-items:center;gap:var(--sp-3);min-height:44px}
-/* Tổ tiên: one tappable row per ancestor, 16 px per generation, a short connector to the parent line */
+/* a list of people (relpath chain and picker results): rows are the shared calmRow */
 .ped{list-style:none;margin:var(--sp-3) 0 0;padding:0}
-.ped li{margin:0;padding-left:calc((var(--d, 1) - 1) * var(--sp-5))} /* one indent step per generation; rows are the shared calmRow */
+.ped li{margin:0;padding-left:calc((var(--d, 1) - 1) * var(--sp-5))}
 .more-fold{margin-top:var(--sp-5)}
-.ped li.ped-fold{padding-left:0} /* a ghost row indents its own summary (below), so the rows it opens keep their indents */
-.ped-fold>.ghost>.ghost-row{width:calc(100% - (var(--d,1) - 1) * var(--sp-5));margin-left:calc((var(--d,1) - 1) * var(--sp-5))}
-.ped-hid{margin:0}
-/* ghost row (ui.js ghostRow): a person row with a dashed tile of overlapping mini crests; muted closed text */
-.ghost-row{list-style:none}
-.ghost-row::-webkit-details-marker{display:none}
-.ghost-tile{display:flex;align-items:center;flex:none;padding:var(--sp-1);border:1px dashed var(--c-border-strong);border-radius:var(--r-icon)}
-.ghost-tile .crest-sq+.crest-sq{margin-left:calc(var(--sz-crest-sm) * -.45);box-shadow:0 0 0 1px var(--c-layer)}
-.ghost-n{color:var(--c-text-2)}
-.ghost .gh-open,.ghost[open] .gh-closed{display:none}
-.ghost[open] .gh-open{display:inline}
-.ghost .gh-chev{transition:transform var(--dur-fast)}
-.ghost[open] .gh-chev{transform:rotate(180deg)}
 .btn.more-sum{display:flex;width:100%;min-height:48px;padding:var(--sp-3) var(--sp-5);gap:var(--sp-3);white-space:normal;text-align:center;list-style:none}
 .more-sum::-webkit-details-marker{display:none}
 .btn .more-chev{margin:0;flex:none;transition:transform .15s}
@@ -519,7 +506,6 @@ dialog.cfm{max-width:440px}
 .evx-help>summary::-webkit-details-marker{display:none}
 .evx-help[open]>p{position:absolute;left:0;top:100%;width:min(var(--sz-dialog),80vw);margin:var(--sp-1) 0 0;padding:var(--sp-3);background:var(--c-layer);border:1px solid var(--c-border);box-shadow:var(--shadow-pop)}
 .evx-lunar{margin:0}
-.ped-ref{display:block;font-style:italic}
 .rel-body .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:var(--sp-3)}
 .rel-body .fld{min-width:0}
 .rel-body .seg{display:flex;flex-wrap:wrap;width:100%}

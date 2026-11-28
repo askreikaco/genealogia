@@ -87,15 +87,17 @@ async function assertRows(page, scope, expected, label) {
   });
 }
 
-test('pedigree (Tổ tiên) rows are person rows with the sex mark and one link each', { skip }, async () => {
+test('Ông bà rows (Quan hệ) are person rows with the sex mark and one link each', { skip }, async () => {
   const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox'] });
   try {
     const { page, ctx, errors } = await open(browser, '/#/duong/person/K1');
-    await page.waitForSelector('[aria-label="Tổ tiên"] .calm', { timeout: 5000 });
-    await assertRows(page, '[aria-label="Tổ tiên"]', [
-      { name: 'Dương Văn Cha', sex: 'm', href: true },
-      { name: 'Dương Văn Tổ', sex: 'm', href: true },
-    ], 'pedigree');
+    await page.waitForSelector('section.relsec h3.relgrp', { timeout: 5000 });
+    const ob = await page.$$eval('section.relsec h3.relgrp', (hs) => {
+      const h = hs.find((x) => x.textContent.trim().startsWith('Ông bà'));
+      return h ? [...h.nextElementSibling.querySelectorAll('a.calm')].map((a) => ({ name: a.querySelector('.calm-n')?.textContent.trim() || '', sex: !!a.querySelector('.calm-n .sx'), href: /person\//.test(a.getAttribute('href') || '') })) : [];
+    });
+    assert.deepEqual(ob, [{ name: 'Dương Văn Tổ', sex: true, href: true }], 'Ông bà: the grandfather, one link to the person');
+    assert.equal(await page.locator('section[aria-label="Tổ tiên"]').count(), 0, 'no Tổ tiên card');
     assert.deepEqual(errors, [], 'no page errors');
     await ctx.close();
   } finally { await browser.close(); }
@@ -121,7 +123,7 @@ test('link picker options are person rows (role option, one button, no nested co
   const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox'] });
   try {
     const { page, ctx, errors } = await open(browser, '/#/duong/person/K1');
-    await page.waitForSelector('[aria-label="Tổ tiên"] .calm', { timeout: 5000 });
+    await page.waitForSelector('section.relsec .calm', { timeout: 5000 });
     await page.evaluate(async () => {
       const LK = await import('/js/links.js');
       LK.openSheet({ fam: 'duong', personId: 'K1', personName: 'Dương Văn Một', families: [{ id: 'other', label: 'Họ khác' }] });

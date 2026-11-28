@@ -1,10 +1,10 @@
-// E2E: Hồ sơ lineage rows and the ancestor list, in the browser. Needs a database (GP_TEST_DATABASE_URL): it runs in its own
+// E2E: Hồ sơ lineage rows and the Quan hệ tree links, in the browser. Needs a database (GP_TEST_DATABASE_URL): it runs in its own
 // schema (e2e_descendants), so no other file's rows are touched. NODE_PATH=<dir with playwright>
 //   npm run test:e2e (from giapha/server). GP_SHOT_DIR=<dir> also writes the 390 px light and dark screenshots.
-// Covers: a 5-generation fixture on legacy fields (before backfill) and on the tables (after backfill): Cháu and Chắt
-// rows with "con của" subtitles in parent then birth order, one row per person, "Xem thêm N" for deeper generations,
-// married-in spouse's children not counted; the tổ tiên rows (label per path, tap height >= 44 px, no horizontal scroll);
-// a guest's cold load of the app and of a profile makes no 4xx request and no console error.
+// Covers: a 5-generation fixture on legacy fields (before backfill) and on the tables (after backfill): Cháu rows with
+// "con của" subtitles in parent then birth order, one row per person, no Chắt row, one tree link for the deeper
+// generations ("Xem con cháu trên cây · 3 đời"), married-in spouse's children not counted; the Ông bà rows; a guest's
+// cold load of the app and of a profile makes no 4xx request and no console error.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
@@ -97,7 +97,7 @@ async function groups(page) {
 const openProfile = async (page, id) => {
   await page.goto(base + '/#person/' + id);
   await page.waitForSelector('nav.ptabs', { timeout: 15000 });
-  // Quan hệ and Tổ tiên are on the Thông tin tab (no separate tab)
+  // Quan hệ is on the Thông tin tab (no separate tab)
   await page.waitForSelector('section.relsec', { timeout: 15000 });
   // names of people outside the first load arrive with the full pull; the list is read after they are drawn
   await page.waitForFunction(() => !document.querySelector('section.relsec')?.innerText.includes('chưa rõ tên'), null, { timeout: 15000 });
@@ -107,7 +107,7 @@ async function checkLineage(label) {
   const { ctx, page } = await newPage(390, 'light', true);
   try {
     await openProfile(page, 'P801');
-    await page.waitForFunction(() => document.querySelector('section.relsec')?.textContent.includes('Dương Văn Bảy'), null, { timeout: 15000 });
+    await page.waitForFunction(() => document.querySelector('section.relsec')?.textContent.includes('Dương Văn Năm'), null, { timeout: 15000 });
     const g = await groups(page);
     const by = (t) => g.find((x) => x.title.startsWith(t));
     assert.ok(by('Con'), `${label}: Con group`);
@@ -123,27 +123,15 @@ async function checkLineage(label) {
       { name: 'Dương Thị Sáu', sub: 'Cháu · con của Dương Thị Ba' },
     ], `${label}: Cháu rows in parent then birth order`);
     assert.ok(!/Xem trên cây/.test(cháu.link || '') && !/Xem trên cây/.test(JSON.stringify(cháu)), `${label}: no Xem trên cây chip in the Cháu header`);
-    const chắt = by('Chắt');
-    assert.ok(chắt, `${label}: Chắt group`);
-    assert.deepEqual(chắt.rows, [
-      { name: 'Dương Văn Bảy', sub: 'Chắt · con của Dương Văn Năm' },
-      { name: 'Dương Thị Tám', sub: 'Chắt · con của Dương Thị Sáu' },
-    ], `${label}: Chắt rows`);
-    // generations 4 and 5 have their own groups (Chút, Chít); only generation 6 and beyond sits behind the tree link
-    const chút = by('Chút');
-    assert.deepEqual(chút && chút.rows.map((r) => r.sub), ['Chút · con của Dương Văn Bảy'], `${label}: Chút group`);
-    const chít = by('Chít');
-    assert.deepEqual(chít && chít.rows.map((r) => r.sub), ['Chít · con của Dương Văn Chín'], `${label}: Chít group`);
+    // Chắt and deeper are not rows of Quan hệ: one tree link after Cháu counts the generations on the tree
+    assert.ok(!g.some((x) => /Chắt|Chút|Chít/.test(x.title)), `${label}: no Chắt, Chút or Chít group`);
     const all = g.flatMap((x) => x.rows.map((r) => r.name));
+    assert.ok(!all.includes('Dương Văn Bảy') && !all.includes('Dương Thị Tám'), `${label}: no Chắt row`);
     assert.ok(!all.includes('Dương Văn Mười Một') && !all.includes('Võ Thị Mai'), `${label}: married-in spouse and her child are not descendants`);
-    // Chắt and deeper: one closed fold under Cháu; the Quan hệ tab is gone
-    const fold = await page.evaluate(() => { const d = document.querySelector('section.relsec details.more-fold'); return d && { open: d.open, label: d.querySelector('.more-closed')?.textContent.trim(), inside: [...d.querySelectorAll('h3.relgrp')].map((h) => h.textContent.trim()) }; });
-    assert.ok(fold && !fold.open, `${label}: Chắt and deeper are folded by default`);
-    assert.equal(fold.label, 'Xem thêm 3 đời · 4 người (Chắt, Chút, Chít)', `${label}: the fold names the levels and counts the people`);
-    assert.deepEqual(fold.inside, ['Chắt', 'Chút', 'Chít'], `${label}: the fold holds Chắt, Chút and Chít`);
+    assert.equal(await page.locator('section.relsec details.more-fold').count(), 0, `${label}: no fold in Quan hệ`);
+    const down = await page.$$eval('section.relsec a.calm', (as) => as.map((a) => a.querySelector('.calm-n')?.textContent.trim()).filter((t) => /^Xem con cháu/.test(t)));
+    assert.deepEqual(down, ['Xem con cháu trên cây · 3 đời'], `${label}: the tree link counts Chắt, Chút and Chít`);
     assert.equal(await page.locator('button[data-ptab="rel"]').count(), 0, `${label}: no Quan hệ tab`);
-    await page.locator('section.relsec details.more-fold > summary').first().click();
-    assert.ok(await page.evaluate(() => document.querySelector('section.relsec details.more-fold').open), `${label}: the fold opens in place`);
     const sw = await page.evaluate(() => document.documentElement.scrollWidth);
     assert.ok(sw <= 390, `${label}: no horizontal scroll (${sw})`);
     if (SHOT && label === 'after backfill') {
@@ -154,7 +142,7 @@ async function checkLineage(label) {
         await p2.goto(base + '/#person/P812');
         await p2.waitForSelector('nav.ptabs', { timeout: 15000 });
         await p2.waitForSelector('section.relsec', { timeout: 15000 });
-        await p2.waitForFunction(() => document.querySelector('section.relsec ul.ped')?.innerText.includes('Dương Văn Hai'), null, { timeout: 15000 });
+        await p2.waitForFunction(() => document.querySelectorAll('section.relsec .calm').length > 0, null, { timeout: 15000 });
         await p2.waitForTimeout(500);
         await p2.screenshot({ path: path.join(SHOT, `hoso-390-${scheme}.png`), fullPage: true });
         await c2.close();
@@ -166,40 +154,18 @@ async function checkLineage(label) {
 
 test('lineage rows before the backfill (legacy fields)', { skip }, async () => { await checkLineage('before backfill'); });
 
-test('pedigree rows: label per path, 44 px tap height, the row opens the ancestor', { skip }, async () => {
+test('Cách gọi: Miền Nam keeps the grandparent label (Ông nội) on the profile (generations 3-4 are unit-tested in kin.test.js)', { skip }, async () => {
   const { ctx, page } = await newPage(390, 'light', true);
   try {
     await openProfile(page, 'P812');
-    await page.waitForFunction(() => document.querySelector('section.relsec ul.ped')?.innerText.includes('Dương Văn Hai'), null, { timeout: 15000 });
-    const rows = await page.evaluate(() => [...document.querySelectorAll('section.relsec > ul.ped > li')].map((li) => ({
-      depth: li.style.getPropertyValue('--d'), name: li.querySelector('.calm-n')?.textContent.trim(), label: li.querySelector('.calm-s')?.textContent.trim(),
-      href: li.querySelector('a')?.getAttribute('href') || '', h: li.querySelector('a').getBoundingClientRect().height,
-    })));
-    // four generations, then the Thủy tổ (the father line's root, the last row); nothing is hidden, so no fold row
-    assert.deepEqual(rows.map((r) => [r.depth, r.name, r.label]), [
-      ['1', 'Dương Văn Chín', 'Cha'], ['2', 'Dương Văn Bảy', 'Ông nội'], ['3', 'Dương Văn Năm', 'Ông cụ'], ['4', 'Dương Văn Hai', 'Ông kỵ'],
-      ['5', 'Dương Văn Gốc', 'Thủy tổ · Đời 1'],
-    ], 'ancestor rows with labels per path, the Thủy tổ last');
-    assert.ok(rows.every((r) => r.h >= 44), 'tap height at least 44 px');
-    assert.ok(rows.every((r) => /#person\/P\d+$/.test(r.href)), 'each row opens the person');
-    assert.equal(await page.locator('section[aria-label="Tổ tiên"] .ped-fold').count(), 0, 'no fold row when nothing is hidden');
-    await page.locator('section.relsec ul.ped a').first().click();
-    await page.waitForURL(/#person\/P809/, { timeout: 10000 });
-  } finally { await ctx.close(); }
-});
-
-test('Cách gọi: Miền Nam changes the gen-4 ancestor label from "Ông kỵ" to the Southern form', { skip }, async () => {
-  const { ctx, page } = await newPage(390, 'light', true);
-  try {
-    await openProfile(page, 'P812');
-    const label = () => page.evaluate(() => [...document.querySelectorAll('section.relsec > ul.ped > li')]
-      .find((li) => li.querySelector('.calm-n')?.textContent.trim() === 'Dương Văn Hai')?.querySelector('.calm-s')?.textContent.trim());
-    // the Tổ tiên row can be drawn after the profile opens: wait for it, then read it
-    const labelIs = (want) => page.waitForFunction((w) => [...document.querySelectorAll('section.relsec > ul.ped > li')]
-      .find((li) => li.querySelector('.calm-n')?.textContent.trim() === 'Dương Văn Hai')?.querySelector('.calm-s')?.textContent.trim() === w, want, { timeout: 15000 }).catch(() => {});
-    await labelIs('Ông kỵ');
-    assert.equal(await label(), 'Ông kỵ', 'standard wording by default');
-    // Cài đặt → Cách gọi → Miền Nam (the row and the sub-page are the only way to change it)
+    // the grandfather Dương Văn Bảy's row in Ông bà (the full pull brings his name in)
+    const label = () => page.evaluate(() => {
+      const h = [...document.querySelectorAll('section.relsec h3.relgrp')].find((x) => x.textContent.trim().startsWith('Ông bà'));
+      const a = h && [...h.nextElementSibling.querySelectorAll('a.calm')].find((x) => x.querySelector('.calm-n')?.textContent.trim() === 'Dương Văn Bảy');
+      return a?.querySelector('.calm-s')?.textContent.trim();
+    });
+    await page.waitForFunction(() => { const h = [...document.querySelectorAll('section.relsec h3.relgrp')].find((x) => x.textContent.trim().startsWith('Ông bà')); return !!h && h.nextElementSibling.textContent.includes('Dương Văn Bảy'); }, null, { timeout: 15000 });
+    assert.equal(await label(), 'Ông nội', 'standard wording');
     await page.goto(base + '/#settings');
     await page.waitForSelector('a[href="#cach-goi"]', { timeout: 15000 });
     await page.click('a[href="#cach-goi"]');
@@ -207,8 +173,8 @@ test('Cách gọi: Miền Nam changes the gen-4 ancestor label from "Ông kỵ" 
     await page.check('input[name=kreg][value=nam]');
     assert.equal(await page.evaluate(() => localStorage.getItem('kinRegion')), 'nam');
     await openProfile(page, 'P812');
-    await labelIs('Ông sơ');
-    assert.equal(await label(), 'Ông sơ', 'Southern wording after the change');
+    await page.waitForFunction(() => { const h = [...document.querySelectorAll('section.relsec h3.relgrp')].find((x) => x.textContent.trim().startsWith('Ông bà')); return !!h && h.nextElementSibling.textContent.includes('Dương Văn Bảy'); }, null, { timeout: 15000 });
+    assert.equal(await label(), 'Ông nội', 'the same grandparent label in the Southern wording');
   } finally { await ctx.close(); }
 });
 

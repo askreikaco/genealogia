@@ -99,7 +99,7 @@ for (const [width, scheme] of [[390, 'dark'], [390, 'light'], [1280, 'dark'], [1
   });
 }
 
-test('Tổ tiên rows are the same person row as Quan hệ (calm row, tile, sex mark) and open the profile', { skip }, async () => {
+test('Ông bà rows are the same person row as Quan hệ (calm row, tile, sex mark), no Tổ tiên card, and open the profile', { skip }, async () => {
   const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
   try {
     for (const scheme of ['light', 'dark']) {
@@ -113,13 +113,14 @@ test('Tổ tiên rows are the same person row as Quan hệ (calm row, tile, sex 
       });
       await page.evaluate(() => indexedDB.databases?.().then((ds) => Promise.all(ds.map((d) => new Promise((r) => { const q = indexedDB.deleteDatabase(d.name); q.onsuccess = q.onerror = q.onblocked = r; })))));
       await page.goto(base + '/#/duong/person/K1'); await page.reload();
-      await page.waitForSelector('section[aria-label="Tổ tiên"] .ped li', { timeout: 8000 });
-      const anc = page.locator('section[aria-label="Tổ tiên"] .ped li > a.calm').first();
-      const rel = page.locator('section.relsec .relrows a.calm').first();
+      await page.waitForSelector('section.relsec h3.relgrp:text-is("Ông bà") + .relrows > a.calm', { timeout: 8000 });
+      assert.equal(await page.locator('section[aria-label="Tổ tiên"]').count(), 0, 'no Tổ tiên card');
+      const anc = page.locator('section.relsec h3.relgrp:text-is("Ông bà") + .relrows > a.calm').first();
+      const rel = page.locator('section.relsec h3.relgrp:text-is("Cha mẹ") + .relrows > a.calm').first();
       assert.equal(await anc.getAttribute('class'), await rel.getAttribute('class'), 'same row classes as Quan hệ');
       const shape = (l) => l.evaluate((el) => [...el.children].map((c) => c.tagName + '.' + (c.getAttribute('class') || '')).join(' '));
       assert.equal(await shape(anc), await shape(rel), 'same inner structure');
-      assert.ok(await page.locator('section[aria-label="Tổ tiên"] .ped .sx').count() > 0, 'sex mark present');
+      assert.ok(await page.locator('section.relsec h3.relgrp:text-is("Ông bà") + .relrows .sx').count() > 0, 'sex mark present');
       const tA = await anc.locator('.crest-sq').boundingBox(); const tR = await rel.locator('.crest-sq').boundingBox();
       assert.equal(Math.round(tA.width), Math.round(tR.width), 'same tile size');
       if (SHOT_DIR) await page.screenshot({ path: path.join(SHOT_DIR, `ancestors-${scheme}-390.png`), fullPage: true });

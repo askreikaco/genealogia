@@ -147,6 +147,8 @@ test('relative couple: a neutral note, not a block; own-ancestor link blocked wi
   const { ctx, page } = await ownerPage(390);
   try {
     await openProfile(page, 'P004');
+    // P005 is P004's sibling (linked through P001 only): the profile has her once the full pull is in (her name shows in the siblings)
+    await page.waitForFunction(() => document.querySelector('section.relsec')?.innerText.includes('Giả Mỹ Nhàn'), null, { timeout: 15000 });
     await addFlow(page, 'P004', 'spouse');
     await page.locator('#rel-q').fill('Giả Mỹ Nhàn');
     await page.locator('.calm[data-pick="P005"]').click();
@@ -159,6 +161,8 @@ test('relative couple: a neutral note, not a block; own-ancestor link blocked wi
     await page.locator('button[data-x]').first().click();
 
     await openProfile(page, 'P001');
+    // P007 is a grandchild (Cháu) of P001, reached through P004: wait for the full pull before searching
+    await page.waitForFunction(() => document.querySelector('section.relsec')?.innerText.includes('Giả Công Trí'), null, { timeout: 15000 });
     await addFlow(page, 'P001', 'parent');
     await page.locator('#rel-q').fill('Giả Công Trí');
     await page.locator('.calm[data-pick="P007"]').click();
@@ -223,7 +227,7 @@ test('edit a spouse kind, then remove the relation after a confirm (history kept
   } finally { await ctx.close(); }
 });
 
-test('pedigree: a repeated ancestor is a link to where it was drawn; the tree shows the wives in order', { skip }, async () => {
+test('a repeated grandparent is one Ông bà row; no tree link without ancestors beyond grandparents; the tree shows the wives in order', { skip }, async () => {
   const { ctx, page, cookie } = await ownerPage(1280);
   try {
     // a child of two siblings (P004 and P005 share the grandparent P001 on both sides)
@@ -237,10 +241,24 @@ test('pedigree: a repeated ancestor is a link to where it was drawn; the tree sh
       assert.equal(r.status, 200, await r.text());
     }
     await openProfile(page, id);
-    const t = await txt(page);
-    assert.match(t, /Tổ tiên/);
-    assert.match(t, /↗ xem ở nhánh/);
-    if (SHOT) await page.locator('section', { hasText: 'Tổ tiên' }).screenshot({ path: path.join(SHOT, 'pedigree-collapse-1280.png') });
+    // P001 is the parent of both parents: drawn once in Ông bà (the full pull brings the names in first)
+    await page.waitForFunction(() => document.querySelector('section.relsec')?.innerText.includes('Giả Văn An'), null, { timeout: 15000 });
+    const ob = await page.$$eval('section.relsec h3.relgrp', (hs) => {
+      const h = hs.find((x) => x.textContent.trim() === 'Ông bà');
+      return h ? [...h.nextElementSibling.querySelectorAll('a.calm .calm-n')].map((n) => n.textContent.trim()) : [];
+    });
+    // P001 is the grandparent on both sides: one row, both labels; the other grandparents follow in order of appearance
+    assert.deepEqual(ob, ['Giả Văn An', 'Giả Ngọc Giao', 'Giả Thanh Huệ'], 'the shared grandparent is one row');
+    const subOf = await page.evaluate(() => {
+      const h = [...document.querySelectorAll('section.relsec h3.relgrp')].find((x) => x.textContent.trim() === 'Ông bà');
+      const a = [...h.nextElementSibling.querySelectorAll('a.calm')].find((x) => x.querySelector('.calm-n')?.textContent.trim() === 'Giả Văn An');
+      return a?.querySelector('.calm-s')?.textContent.trim() || '';
+    });
+    assert.deepEqual(subOf.split(' · ').sort(), ['Ông ngoại', 'Ông nội'], 'Giả Văn An is Ông nội and Ông ngoại');
+    // no ancestor beyond grandparents (P001 is the top of the line): no tree link for ancestors
+    assert.equal(await page.locator('section.relsec a.calm', { hasText: 'Xem tổ tiên trên cây' }).count(), 0, 'no ancestor link');
+    assert.equal(await page.locator('section[aria-label="Tổ tiên"]').count(), 0, 'no Tổ tiên card');
+    if (SHOT) await page.locator('section.relsec').first().screenshot({ path: path.join(SHOT, 'quanhe-repeated-1280.png') });
     await page.goto(base + '/#tree/@P001');
     await page.waitForSelector('.tdesk svg.tchart', { timeout: 10000 });
     await page.waitForFunction(() => /Giả Văn An/.test(document.querySelector('.tdesk svg.tchart')?.textContent || ''), null, { timeout: 8000 });
