@@ -18,4 +18,13 @@ export const FORMS_VI = {
   gio_short: "Giỗ riêng",
   date_ph: "vd 1963 hoặc 5/3/1963",
   date_help: "Nhập năm (1963), tháng/năm (3/1963) hoặc ngày đầy đủ (5/3/1963). Âm lịch tự tính khi có ngày đầy đủ.",
+  link_place: "+ Nơi sống",
+  link_job: "+ Nghề nghiệp",
+  link_edu: "+ Học vấn",
+  link_religion: "+ Tôn giáo",
+  cur_value: "Hiện tại:",
+  convert_ev: "Chuyển thành sự kiện",
+  clear_field: "Để trống",
+  ev_after_save: "Lưu người này trước, rồi bạn có thể thêm nơi sống, nghề nghiệp, học vấn và tôn giáo như sự kiện.",
+  from_year: "từ {v}",
 };

@@ -12,7 +12,7 @@
 // (no duplicate). Every derived row points at the person it is about (person_id), and follows that person's
 // privacy: visible(data) false -> left out (living relatives are for members only).
 import { historyItems, KEY_HISTORY } from './events-history.js';
-import { startDays, endDays, eventDays, birthIso, isoOfDied, sortEvents } from './events.js';
+import { startDays, endDays, eventDays, birthIso, isoOfDied, sortEvents, EVENT_TYPE_KEYS } from './events.js';
 
 const nm = (d) => (d && d.name) || '';
 const yearOf = (iso) => (iso ? Number(String(iso).slice(0, 4)) : null);
@@ -212,4 +212,42 @@ export function estimatedLifeRows(personId, est, stored = []) {
   if (!est.bornKnown && est.born && !has('sinh')) out.push(row('sinh', 'Sinh (ước tính)', est.born, est.bornBasis));
   if (!est.diedKnown && est.died && (est.dead || est.ruleDead) && !has('mat')) out.push(row('mat', 'Mất (ước tính)', est.died, est.diedBasis));
   return out;
+}
+
+// Profile facts that are timeline events now: Nơi sống (chuyen_nha), Nghề (nghe), Tôn giáo (ton_giao). The profile (Thông tin)
+// shows the current value from the events, else the old person field (kept as it was). Pure, no DOM.
+export const FACT_EVENT_TYPE = { place: 'chuyen_nha', job: 'nghe', religion: 'ton_giao' };
+// The text of one event for its fact: the place of a move; the first line of the description for a job or a religion
+// (the place when the description is empty).
+const factText = (key, e) => {
+  const desc = String(e.description || '').split('\n')[0].trim();
+  const place = String(e.place || '').trim();
+  return key === 'place' ? (place || desc) : (desc || place);
+};
+// The current value of one fact, { value, year, source: 'event' | 'field' }, or null when neither holds a value.
+// Among the stored events of its type that hold a text, the latest dated one wins (a dated event beats an undated one);
+// the undated ones: the last in timeline order. With none, the old person field is the value (no year).
+export function currentFact(events, key, data = {}) {
+  const type = FACT_EVENT_TYPE[key];
+  const list = sortEvents((events || []).filter((e) => !e.derived && e.type === type && factText(key, e)));
+  if (list.length) {
+    const dated = list.filter((e) => e.date_from); // sortEvents puts the undated last: the latest dated one is picked first
+    const e = dated.length ? dated[dated.length - 1] : list[list.length - 1];
+    return { value: factText(key, e), year: e.date_from ? String(e.date_from).slice(0, 4) : '', source: 'event', id: e.id };
+  }
+  const field = String(data[key] ?? '').trim();
+  return field ? { value: field, year: '', source: 'field' } : null;
+}
+// The three facts at once: { place, job, religion }, each as currentFact gives it.
+export const currentFacts = (events, data) => Object.fromEntries(Object.keys(FACT_EVENT_TYPE).map((k) => [k, currentFact(events, k, data)]));
+
+// The event editor's start values for a person form link ("+ Nơi sống", "Chuyển thành sự kiện"): the type, and the field's
+// text as the place (Nơi sống) or the description (Nghề, Tôn giáo). null when the type is not an event type.
+export function linkedEventItem(type, { place = '', description = '' } = {}) {
+  if (!EVENT_TYPE_KEYS.includes(type)) return null;
+  const o = { type };
+  const pl = String(place ?? '').trim().slice(0, 200); const de = String(description ?? '').trim().slice(0, 200);
+  if (pl) o.place = pl;
+  if (de) o.description = de;
+  return o;
 }

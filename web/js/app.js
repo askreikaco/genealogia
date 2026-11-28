@@ -55,7 +55,7 @@ import { addSearch, addBasic } from './addflow.js';
 import * as VR from './variants.js';
 import { KIN_REGION_KEY, resolveRegion } from './kin/index.js';
 import { EVENT_TYPES, SOURCE_QUALITY, formatEventDate, sortEvents, birthIso, autoSummary, canSeeEventsOf, parseEventDate, EVENT_PHOTO_MAX } from './events.js';
-import { deriveLifeEvents, historyRows, relAccess, legacyAccess, estimatedLifeRows } from './events-life.js';
+import { deriveLifeEvents, historyRows, relAccess, legacyAccess, estimatedLifeRows, currentFacts, linkedEventItem } from './events-life.js';
 import { estimateFamilyCached, ageAtDeathOf } from './estimate-graph.js';
 import { estItems, estHtml, estPlain, estLabel, basisText } from './est-years.js';
 import { NEEDS_VI } from './needs-vi.js';
@@ -617,6 +617,8 @@ function person(id) {
   const d = p.data; const sp = d.spouse_of && M.byId.get(d.spouse_of); const ks = sp ? (M.kidsOf2(id).length || M.inlaws(sp.id).length > 1 ? M.kidsOf2(id) : M.kids(sp.id)) : M.kids(id); const br = branchOf(M, sp || p);
   const row = (k, v) => (v ? [k, v] : null); // one fact: [label, value html], or null when empty
   const loc = locate(d);
+  const cf = currentFacts(EVD.get(evKey(famOfP(p), id))?.items || [], d); // Nơi sống, Nghề, Tôn giáo: current values (events-life.js)
+  const curHtml = (f) => esc(f.value) + (f.year ? ` <span class="sub">(${esc(FORMS_VI.from_year.replace('{v}', f.year))})</span>` : '');
   const plo = { editable: S.isEditor(), placeHref: (x) => hf(`place/${x}`) }; PL.ensure(p.fam || S.curFamily(), id); // place links (shared gazetteer)
   VR.ensure(p.fam || S.curFamily(), id); const vt = (k) => VR.tag(id, k); // "N nguồn khác nhau" (conflicting data)
   // Facts: one card (facts.js). Life basics (Sinh, Mất) sit under "Tóm tắt"; the other groups keep their own labels.
@@ -630,9 +632,10 @@ function person(id) {
       row('Giỗ', d.gio_lunar ? esc(d.gio_lunar) + ' ÂL' : ''),
       row('An táng', d.burial ? PL.fieldHtml(id, 'burial', d.burial, plo) + vt('burial') : '')] },
     { title: 'Nơi sống & nghề', rows: [
-      row('Nơi sống', d.place ? PL.fieldHtml(id, 'place', d.place, { ...plo, extra: loc ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lon}" target="_blank" rel="noopener">Google Maps</a>` : '' }) + vt('place') : ''),
-      row('Nghề', esc(d.job)),
-      row('Tôn giáo', esc(d.religion))] },
+      // the current value from the life events (latest one, with its year), else the old field as it is
+      row('Nơi sống', cf.place?.source === 'event' ? curHtml(cf.place) : d.place ? PL.fieldHtml(id, 'place', d.place, { ...plo, extra: loc ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lon}" target="_blank" rel="noopener">Google Maps</a>` : '' }) + vt('place') : ''),
+      row('Nghề', cf.job?.source === 'event' ? curHtml(cf.job) : esc(d.job)),
+      row('Tôn giáo', cf.religion?.source === 'event' ? curHtml(cf.religion) : esc(d.religion))] },
     { title: 'Ghi chú & nguồn', rows: [row('Ghi chú', esc(d.note)), row('Nguồn', esc(d.source))] }];
   const surnG = SN.surnameGroup(id, d, M, { editor: S.isEditor() }); if (surnG) groups.splice(groups.length - 1, 0, surnG); // Họ qua các thời kỳ, before Ghi chú
   main.innerHTML = `<div class="prof">${d.photo ? `<img src="${esc(d.photo)}" alt="" class="photo">` : ''}<div><div class="row wrap">${sp ? `${tag(`${esc(inLaw(p))}`, { tone: 'purple' })}` : `${tag(`Đời ${d.gen || '?'}`, { tone: 'blue' })}`}${SEX_LABEL[d.sex] ? `<span class="tag gray sxtag">${sexMark(d.sex)}${SEX_LABEL[d.sex]}</span>` : ''}${d.sid ? `<button type="button" class="tag gray pcode" data-copy-code="${esc(formatSid(d.sid))}" title="${esc(SID_HELP)} Bấm để chép." aria-label="Mã người ${esc(formatSid(d.sid))}. Bấm để chép.">${esc(formatSid(d.sid))}</button>` : ''}${br ? `${tag(`Chi ${esc(rank(br.data))} ${esc(br.data.name)}`, { tone: 'gray' })}` : ''}${S.myPersonId() === id ? '<span class="tag green">Đây là bạn</span>' : ''}</div>
@@ -852,7 +855,10 @@ function eventPage(pid) {
   const it = id ? (ev.items || []).find((x) => x.id === id) : null;
   if (id && !it) { main.innerHTML = '<h1>Sự kiện</h1><p class="sub">Không tìm thấy sự kiện này.</p>'; return; }
   const f = tlLoad();
-  const item = it || eventPrefill({ types: f.types, q: f.q });
+  // From the person form's links (Thêm chi tiết: "+ Nơi sống" …): one type, and the field's text as the place or description.
+  const lk = route().qs; const linked = !it ? linkedEventItem(lk.get('type'), { place: lk.get('place') || '', description: lk.get('desc') || '' }) : null;
+  const linkType = linked ? linked.type : '';
+  const item = it || linked || eventPrefill({ types: f.types, q: f.q });
   const h = !id ? 'Thêm sự kiện' : direct ? 'Sửa sự kiện' : 'Góp ý sửa sự kiện';
   main.innerHTML = `<h1>${esc(h)}</h1><div class="form-stack fp-form evpage"><p class="sub">${esc(p.data.name)}${direct ? '' : ' · Quản trị sẽ duyệt trước khi hiển thị.'}</p>`
     + evEditorHtml(item, { people: item.people || [], persons, id: id || '', page: true })
@@ -860,7 +866,8 @@ function eventPage(pid) {
     + '</div>';
   const root = main.querySelector('[data-evx]'); wireEvx(root, persons, { fam });
   const fail = (m) => { const e = root.querySelector('[data-evx-err]'); e.hidden = false; e.textContent = m; discOpenErr(root); };
-  const done = async (msg) => { if (msg) toast(msg); if (direct) { evInvalidate(fam, p.id); await evLoad(fam, p.id, true).catch(() => {}); } profTab = 'life'; location.hash = hf(`person/${p.id}?tab=life`); };
+  // Saved from the person form's link: back to the profile's Thông tin (where the current value shows); else Dòng đời.
+  const done = async (msg) => { if (msg) toast(msg); if (direct) { evInvalidate(fam, p.id); await evLoad(fam, p.id, true).catch(() => {}); } if (linkType) { profTab = 'info'; location.hash = hf(`person/${p.id}`); return; } profTab = 'life'; location.hash = hf(`person/${p.id}?tab=life`); };
   root.querySelector('[data-evx-cancel]').onclick = () => goBack();
   root.querySelector('[data-evx-save]').onclick = async (e) => {
     const r = readEvx(root); if (r.error) return fail(r.error);
@@ -2498,6 +2505,23 @@ function fpEssentials(st) {
     + `<div class="fp-death wide" data-death data-on="${dead ? '1' : ''}"${dead ? '' : ' hidden'}>${dead ? fpDeath(st) : ''}</div>`
     + (st.keys.has('contacts') ? ctEditorHtml(st) : '');
 }
+// Nơi sống, Nghề, Học vấn and Tôn giáo are timeline events (Dòng đời), so the fold links to adding one of each type. A value the
+// old field still holds is shown read-only ("Hiện tại") with "Chuyển thành sự kiện"; saving keeps the field (nothing is
+// cleared on save). Editors (not suggestions) can clear it with "Bỏ giá trị này". A new person has no id yet: the links wait.
+const FP_EV_LINKS = [['place', 'chuyen_nha', FORMS_VI.link_place], ['job', 'nghe', FORMS_VI.link_job], [null, 'hoc', FORMS_VI.link_edu], ['religion', 'ton_giao', FORMS_VI.link_religion]];
+const fpEvHref = (fam, pid, qs = '') => '#' + (fam === 'duong' ? '' : '/' + fam + '/') + `su-kien/${pid}?${qs}`;
+function fpEvBlockHtml(st) {
+  if (!st.p?.id) return `<p class="sub wide" data-fp-evs>${fpE(FORMS_VI.ev_after_save)}</p>`;
+  const fam = famOfP(st.p); const canClear = S.isEditor() && !st.suggest;
+  const links = FP_EV_LINKS.map(([, type, label]) => `<a class="linkbtn" href="${fpEvHref(fam, st.p.id, `type=${type}`)}">${fpE(label)}</a>`).join('');
+  // one "Hiện tại" line per field that still holds a value, under the link row
+  const cur = FP_EV_LINKS.filter(([k]) => k && String(st.v[k] ?? '').trim()).map(([k, type]) => {
+    const v = String(st.v[k]).trim();
+    const back = fpEvHref(fam, st.p.id, `type=${type}&${k === 'place' ? 'place' : 'desc'}=${encodeURIComponent(v)}`);
+    return `<p class="sub fp-cur">${fpE(FORMS_VI.cur_value)} <b>${fpE(v)}</b> · <a class="linkbtn" href="${back}">${fpE(FORMS_VI.convert_ev)}</a>${canClear ? ` · <button type="button" class="linkbtn" data-fp-clear="${k}">${fpE(FORMS_VI.clear_field)}</button>` : ''}</p>`;
+  }).join('');
+  return `<div class="fp-evs wide" data-fp-evs><div class="fp-links">${links}</div>${cur}</div>`;
+}
 // The rare fields behind "Thêm chi tiết". A field with a part label shows in the closed summary when it holds a value.
 function fpFoldBody(st) {
   const v = st.v; const table = S.relOf(st.p?.fam || st.fam || S.curFamily()).source === 'table';
@@ -2511,9 +2535,7 @@ function fpFoldBody(st) {
     + inP('gio_lunar', 'Ngày giỗ (ÂL), nếu khác ngày mất', FORMS_VI.gio_short, true)
     + inP('burial', 'Nơi an táng', 'Nơi an táng', true)
     + inP('birth_place', 'Nơi sinh', 'Nơi sinh', true)
-    + inP('place', 'Nơi sống', 'Nơi sống', false)
-    + inP('job', 'Nghề', 'Nghề', false)
-    + inP('religion', 'Tôn giáo', 'Tôn giáo', false)
+    + fpEvBlockHtml(st)
     + photo
     + inP('note', 'Ghi chú', 'Ghi chú', true)
     + inP('verify', 'Cần xác minh', 'Cần xác minh', true)
@@ -2771,6 +2793,8 @@ function fpPickSet(form, st, id) {
 // Recompute and repaint everything that depends on the inputs: errors, auto chips, the death block.
 // Recompute and repaint everything that depends on the inputs: errors, auto chips, the death block, and the summaries.
 function fpLive(form, st) {
+  const evh = form.querySelector('[data-fp-evs]'); const evHtml = evh ? fpEvBlockHtml(st) : ''; // the "Hiện tại" values follow the state (a clear, a draft)
+  if (evh && evh.outerHTML !== evHtml) evh.outerHTML = evHtml;
   form.querySelectorAll('[data-ov]').forEach((el) => { const k = el.dataset.ov; if (st.A[k]) st.A[k].v = el.value; });
   const r = fpResolve(form, st);
   if (!st.only) {
@@ -2945,6 +2969,8 @@ function formPage(arg) {
   form.addEventListener('mousedown', (e) => { const b = e.target.closest('[data-pk]'); if (b) { e.preventDefault(); fpPickSet(form, st, b.dataset.pk); } });
   form.addEventListener('click', (e) => {
     if (evFormClick(form, st, e)) return; // the events and stories section
+    const fclr = e.target.closest('[data-fp-clear]');
+    if (fclr) { fpSync(form, st); st.v[fclr.dataset.fpClear] = ''; formDirty = true; fpLive(form, st); fpDraftSave(form, st); return; }
     if (e.target.closest('[data-ct-add]')) { ctMutate(form, st, (l) => l.push({ type: 'phone', value: '' }), ctItems(st).length, 'val'); return; }
     if (e.target.closest('[data-sn-add]')) { snMutate(form, st, (l) => l.push({ type: 'changed', surname: '' }), snItems(st).length); return; }
     const sdel = e.target.closest('[data-sn-del]'); if (sdel) { const i = Number(sdel.dataset.snDel); snMutate(form, st, (l) => l.splice(i, 1), -1); return; }

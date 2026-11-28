@@ -410,6 +410,15 @@
         "test/e2e/forms-minimal-b1.test.js"
       ]
     },
+    "forms-b2": {
+      "paths": [
+        "web/js/forms-vi.js",
+        "server/test/current-facts.test.js"
+      ],
+      "e2e": [
+        "test/e2e/forms-minimal-b2.test.js"
+      ]
+    },
     "gedcom": {
       "paths": [
         "server/gedcom*.js",

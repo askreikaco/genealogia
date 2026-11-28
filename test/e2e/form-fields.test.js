@@ -129,19 +129,19 @@ test('draft restore into a closed section: the value is kept, shown in the heade
   const browser = await launch();
   try {
     const s = await open(browser, { role: 'editor', path: '#sua/K2' });
-    await expand(s.page, 'noi'); // Nghề sits in Thêm chi tiết (the fold is open for K2's birth place)
-    await s.page.fill('input[name=job]', 'Thợ hồ');
+    await expand(s.page, 'noi'); // the birth place sits in Thêm chi tiết (open for K2; Nơi sống, Nghề and Tôn giáo are event links now)
+    await s.page.fill('input[name=birth_place]', 'Bến Tre');
     await s.page.waitForFunction(() => /Đã lưu nháp/.test(document.getElementById('fpstat')?.textContent || ''), null, { timeout: 5000 });
     const ctx = s.ctx; await s.page.close();
     const p2 = await openIn(ctx, { role: 'editor', path: '#sua/K2' });
     await p2.page.waitForSelector('.fp-draft', { timeout: 5000 });
     await p2.page.click('[data-dr-go]');
     await p2.page.waitForFunction(() => /Đã khôi phục/.test(document.getElementById('fpstat')?.textContent || ''), null, { timeout: 5000 });
-    assert.match(await p2.page.locator('#fpform [data-fp-fold] [data-disc-sum]').textContent(), /Thợ hồ/, 'the fold summary shows the restored value');
+    assert.match(await p2.page.locator('#fpform [data-fp-fold] [data-disc-sum]').textContent(), /Bến Tre/, 'the fold summary shows the restored value');
     await p2.page.click('.fp-bar button[type=submit]');
     await p2.page.waitForFunction(() => location.hash.includes('person/'), null, { timeout: 5000 });
-    const job = p2.log.ops.map((o) => o.fields).find((f) => 'job' in f);
-    assert.deepEqual(job, { job: 'Thợ hồ' }, 'the save sends the restored value');
+    const bp = p2.log.ops.map((o) => o.fields).find((f) => 'birth_place' in f);
+    assert.deepEqual(bp, { birth_place: 'Bến Tre' }, 'the save sends the restored value');
     assert.deepEqual(p2.log.errors, [], 'page errors');
     await ctx.close();
   } finally { await browser.close(); }

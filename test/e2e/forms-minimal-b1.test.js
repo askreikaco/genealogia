@@ -278,7 +278,9 @@ test('a member still sends a suggestion: no "+ Họ khác", Gửi góp ý, the s
     assert.equal(await m.page.locator('#fpform [data-ct-add]').count(), 1, 'members see the contact rows');
     // the fold may be open already (LIVING has a stored lunar from an earlier test): open it only when it is closed
     if (!(await foldOf(m.page).evaluate((d) => d.open))) await m.page.locator('#fpform [data-fp-fold] summary').click();
-    await m.page.fill('#fpform input[name="place"]', 'Thành phố thử');
+    // the place is an event now (Thêm chi tiết: "+ Nơi sống"): a member reaches it through the same event suggestion path
+    assert.ok(await m.page.locator('#fpform [data-fp-evs] a', { hasText: '+ Nơi sống' }).count(), 'the place link is on the page');
+    await m.page.fill('#fpform input[name="burial"]', 'Nghĩa trang thử');
     await m.page.click('#fpsave');
     let n = 0;
     for (let i = 0; i < 60 && !n; i++) {

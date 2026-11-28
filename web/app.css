@@ -1095,6 +1095,10 @@ body:has(.fp-bar) .updnote{bottom:calc(56px + var(--fp-bar-h) + env(safe-area-in
 /* Họ khác rows (person form): the same row look as the contacts, with a year field. Links sit on one line. */
 .fp-links{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3) var(--sp-5)}
 .fp-links .fp-2col{flex:1 1 100%}
+/* Thêm chi tiết: the event links share the .fp-links row; each "Hiện tại" line sits under it, no extra gap */
+.fp-evs{grid-column:1/-1;display:flex;flex-direction:column;gap:var(--sp-2)}
+.fp-evs .fp-links .linkbtn{min-height:var(--sz-touch);display:inline-flex;align-items:center}
+.fp-evs .fp-cur{margin:0}
 .sn-list{display:flex;flex-direction:column;gap:var(--sp-3)}
 .sn-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto var(--sz-touch);gap:var(--sp-3);align-items:center}
 .sn-row select,.sn-row input{min-height:var(--sz-touch);min-width:0;font:inherit;color:var(--c-text);background:var(--c-field,var(--c-layer));border:1px solid var(--c-border);padding:0 var(--sp-3)}
